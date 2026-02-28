@@ -54,8 +54,13 @@ it('returns a consultation with all related data on show', function () {
         ->getJson(route('consultations.show', $consultation))
         ->assertOk()
         ->assertJsonStructure([
-            'id', 'patient', 'doctor',
-            'note', 'vital_signs', 'prescriptions', 'deepfake_scan_logs',
+            'id',
+            'patient',
+            'doctor',
+            'note',
+            'vital_signs',
+            'prescriptions',
+            'deepfake_scan_logs',
         ]);
 });
 
