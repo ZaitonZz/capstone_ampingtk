@@ -69,8 +69,9 @@ export default function PatientList() {
             <Head title="Patients" />
 
             <div className="space-y-6 p-6">
-                <div className="flex items-center justify-between">
+                <div className="space-y-1">
                     <h1 className="text-2xl font-semibold">Patients</h1>
+                    <p className="text-sm text-muted-foreground">Manage patient records</p>
                 </div>
 
                 {/* Search and Actions Bar */}
