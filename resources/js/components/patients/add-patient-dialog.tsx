@@ -110,14 +110,14 @@ export default function AddPatientDialog({
                                     <InputError message={errors.date_of_birth} />
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-2 sm:col-span-2">
                                     <Label htmlFor="gender">
-                                        Gender{' '}
+                                        Sex{' '}
                                         <span className="text-destructive">*</span>
                                     </Label>
                                     <Select name="gender" required>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select gender" />
+                                            <SelectValue placeholder="Select sex" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="male">Male</SelectItem>
@@ -129,123 +129,6 @@ export default function AddPatientDialog({
                                     </Select>
                                     <InputError message={errors.gender} />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="civil_status">
-                                        Civil Status
-                                    </Label>
-                                    <Select name="civil_status">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="single">Single</SelectItem>
-                                            <SelectItem value="married">
-                                                Married
-                                            </SelectItem>
-                                            <SelectItem value="widowed">
-                                                Widowed
-                                            </SelectItem>
-                                            <SelectItem value="separated">
-                                                Separated
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errors.civil_status} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="contact_number">
-                                        Contact Number
-                                    </Label>
-                                    <Input
-                                        id="contact_number"
-                                        name="contact_number"
-                                        type="tel"
-                                        maxLength={30}
-                                    />
-                                    <InputError message={errors.contact_number} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input
-                                        id="email"
-                                        name="email"
-                                        type="email"
-                                        maxLength={191}
-                                    />
-                                    <InputError message={errors.email} />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="address">Address</Label>
-                                <Input id="address" name="address" />
-                                <InputError message={errors.address} />
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <div className="space-y-2">
-                                    <Label htmlFor="blood_type">Blood Type</Label>
-                                    <Select name="blood_type">
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="A+">A+</SelectItem>
-                                            <SelectItem value="A-">A-</SelectItem>
-                                            <SelectItem value="B+">B+</SelectItem>
-                                            <SelectItem value="B-">B-</SelectItem>
-                                            <SelectItem value="AB+">AB+</SelectItem>
-                                            <SelectItem value="AB-">AB-</SelectItem>
-                                            <SelectItem value="O+">O+</SelectItem>
-                                            <SelectItem value="O-">O-</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errors.blood_type} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="emergency_contact_name">
-                                        Emergency Contact Name
-                                    </Label>
-                                    <Input
-                                        id="emergency_contact_name"
-                                        name="emergency_contact_name"
-                                        maxLength={191}
-                                    />
-                                    <InputError
-                                        message={errors.emergency_contact_name}
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="emergency_contact_number">
-                                        Emergency Contact Number
-                                    </Label>
-                                    <Input
-                                        id="emergency_contact_number"
-                                        name="emergency_contact_number"
-                                        type="tel"
-                                        maxLength={30}
-                                    />
-                                    <InputError
-                                        message={errors.emergency_contact_number}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="known_allergies">
-                                    Known Allergies
-                                </Label>
-                                <Input
-                                    id="known_allergies"
-                                    name="known_allergies"
-                                    placeholder="e.g., Penicillin, Peanuts"
-                                />
-                                <InputError message={errors.known_allergies} />
                             </div>
 
                             <DialogFooter className="gap-2">
