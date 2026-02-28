@@ -11,15 +11,13 @@ it('redirects guests to login', function () {
         ->assertRedirect(route('login'));
 });
 
-it('returns null when no vitals have been recorded', function () {
+it('returns 204 when no vitals have been recorded', function () {
     $doctor       = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
-    $response = $this->actingAs($doctor)
+    $this->actingAs($doctor)
         ->getJson(route('consultations.vitals.show', $consultation))
-        ->assertOk();
-
-    expect($response->json())->toBeNull();
+        ->assertNoContent();
 });
 
 it('creates vital signs and sets recorded_by to auth user', function () {

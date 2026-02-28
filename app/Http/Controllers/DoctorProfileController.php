@@ -10,9 +10,13 @@ class DoctorProfileController extends Controller
 {
     public function show(Request $request): JsonResponse
     {
-        return response()->json(
-            $request->user()->doctorProfile
-        );
+        $profile = $request->user()->doctorProfile;
+
+        if (is_null($profile)) {
+            return response()->json(null, 204);
+        }
+
+        return response()->json($profile);
     }
 
     public function upsert(UpsertDoctorProfileRequest $request): JsonResponse

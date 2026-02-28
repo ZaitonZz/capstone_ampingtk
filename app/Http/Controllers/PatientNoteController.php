@@ -11,7 +11,13 @@ class PatientNoteController extends Controller
 {
     public function show(Consultation $consultation): JsonResponse
     {
-        return response()->json($consultation->note);
+        $note = $consultation->note;
+
+        if (is_null($note)) {
+            return response()->json(null, 204);
+        }
+
+        return response()->json($note);
     }
 
     public function store(StorePatientNoteRequest $request, Consultation $consultation): JsonResponse

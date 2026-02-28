@@ -10,7 +10,13 @@ class VitalSignController extends Controller
 {
     public function show(Consultation $consultation): JsonResponse
     {
-        return response()->json($consultation->vitalSigns);
+        $vitals = $consultation->vitalSigns;
+
+        if (is_null($vitals)) {
+            return response()->json(null, 204);
+        }
+
+        return response()->json($vitals);
     }
 
     public function store(StoreVitalSignRequest $request, Consultation $consultation): JsonResponse

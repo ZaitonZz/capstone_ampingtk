@@ -7,14 +7,12 @@ it('redirects guests to login', function () {
     $this->get(route('doctor.profile.show'))->assertRedirect(route('login'));
 });
 
-it('returns null when the doctor has no profile yet', function () {
+it('returns 204 when the doctor has no profile yet', function () {
     $doctor = User::factory()->doctor()->create();
 
-    $response = $this->actingAs($doctor)
+    $this->actingAs($doctor)
         ->getJson(route('doctor.profile.show'))
-        ->assertOk();
-
-    expect($response->json())->toBeNull();
+        ->assertNoContent();
 });
 
 it('creates a doctor profile on first upsert', function () {
