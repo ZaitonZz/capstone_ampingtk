@@ -8,7 +8,10 @@ export default function AppLogo() {
             </div>
             <div className="ml-1 grid flex-1 text-left text-sm">
                 <span className="mb-0.5 truncate leading-tight font-semibold">
-                    Laravel Starter Kit
+                    Electronic Medical Records
+                </span>
+                <span className="text-xs text-muted-foreground">
+                    AmpingTK Capstone Project
                 </span>
             </div>
         </>
