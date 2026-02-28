@@ -12,6 +12,8 @@ class PatientPhotoController extends Controller
 {
     public function index(Patient $patient): JsonResponse
     {
+        $this->authorize('view', $patient);
+
         return response()->json(
             $patient->photos()->latest()->get()
         );
@@ -19,6 +21,8 @@ class PatientPhotoController extends Controller
 
     public function store(StorePatientPhotoRequest $request, Patient $patient): JsonResponse
     {
+        $this->authorize('update', $patient);
+
         $isPrimary = (bool) $request->input('is_primary', false);
 
         // If flagged as primary, unset other primary photos
@@ -32,10 +36,10 @@ class PatientPhotoController extends Controller
         );
 
         $photo = $patient->photos()->create([
-            'file_path'   => $path,
-            'disk'        => 'local',
-            'is_primary'  => $isPrimary,
-            'notes'       => $request->input('notes'),
+            'file_path' => $path,
+            'disk' => 'local',
+            'is_primary' => $isPrimary,
+            'notes' => $request->input('notes'),
             'uploaded_by' => $request->user()->id,
         ]);
 
@@ -44,6 +48,8 @@ class PatientPhotoController extends Controller
 
     public function destroy(Patient $patient, PatientPhoto $photo): JsonResponse
     {
+        $this->authorize('update', $patient);
+
         abort_if($photo->patient_id !== $patient->id, 404);
 
         Storage::disk($photo->disk)->delete($photo->file_path);

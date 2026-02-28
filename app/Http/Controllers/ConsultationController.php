@@ -13,12 +13,15 @@ class ConsultationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Consultation::class);
+
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
-            ->when($request->patient_id, fn($q, $id) => $q->where('patient_id', $id))
-            ->when($request->doctor_id,  fn($q, $id) => $q->where('doctor_id', $id))
-            ->when($request->status,     fn($q, $s)  => $q->where('status', $s))
-            ->when($request->type,       fn($q, $t)  => $q->where('type', $t))
+            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
+            ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
+            ->when($request->type, fn ($q, $t) => $q->where('type', $t))
             ->orderByDesc('scheduled_at')
             ->paginate($request->integer('per_page', 15));
 
@@ -27,6 +30,8 @@ class ConsultationController extends Controller
 
     public function show(Consultation $consultation): JsonResponse
     {
+        $this->authorize('view', $consultation);
+
         $consultation->load([
             'patient',
             'doctor.doctorProfile',
@@ -41,6 +46,8 @@ class ConsultationController extends Controller
 
     public function store(StoreConsultationRequest $request): JsonResponse
     {
+        $this->authorize('create', Consultation::class);
+
         $data = $request->validated();
 
         // Generate a unique session token for teleconsultations
@@ -55,6 +62,8 @@ class ConsultationController extends Controller
 
     public function update(UpdateConsultationRequest $request, Consultation $consultation): JsonResponse
     {
+        $this->authorize('update', $consultation);
+
         $consultation->update($request->validated());
 
         return response()->json($consultation->fresh(['patient', 'doctor']));
@@ -62,6 +71,8 @@ class ConsultationController extends Controller
 
     public function destroy(Consultation $consultation): JsonResponse
     {
+        $this->authorize('delete', $consultation);
+
         $consultation->delete();
 
         return response()->json(['message' => 'Consultation removed.']);

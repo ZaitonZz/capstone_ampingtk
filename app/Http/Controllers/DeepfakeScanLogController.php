@@ -13,13 +13,14 @@ class DeepfakeScanLogController extends Controller
 {
     public function index(Request $request, Consultation $consultation): JsonResponse
     {
+        $this->authorize('view', $consultation);
+
         $logs = $consultation->deepfakeScanLogs()
             ->when(
                 $request->filled('flagged'),
-                fn($q) =>
-                $q->where('flagged', filter_var($request->flagged, FILTER_VALIDATE_BOOLEAN))
+                fn ($q) => $q->where('flagged', filter_var($request->flagged, FILTER_VALIDATE_BOOLEAN))
             )
-            ->when($request->result, fn($q, $r) => $q->where('result', $r))
+            ->when($request->result, fn ($q, $r) => $q->where('result', $r))
             ->orderByDesc('scanned_at')
             ->get();
 
@@ -28,6 +29,8 @@ class DeepfakeScanLogController extends Controller
 
     public function show(Consultation $consultation, DeepfakeScanLog $log): JsonResponse
     {
+        $this->authorize('view', $consultation);
+
         abort_if($log->consultation_id !== $consultation->id, 404);
 
         $log->load('reviewer');
@@ -37,6 +40,8 @@ class DeepfakeScanLogController extends Controller
 
     public function store(StoreDeepfakeScanLogRequest $request, Consultation $consultation): JsonResponse
     {
+        $this->authorize('update', $consultation);
+
         $log = $consultation->deepfakeScanLogs()->create($request->validated());
 
         // If the scan is flagged as fake, mark consultation's deepfake_verified flag
@@ -50,6 +55,8 @@ class DeepfakeScanLogController extends Controller
     /** Reviewer marks a scan log (flag/unflag + notes) */
     public function update(ReviewDeepfakeScanLogRequest $request, Consultation $consultation, DeepfakeScanLog $log): JsonResponse
     {
+        $this->authorize('update', $consultation);
+
         abort_if($log->consultation_id !== $consultation->id, 404);
 
         $log->update([
