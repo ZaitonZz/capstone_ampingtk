@@ -14,14 +14,13 @@ class StoreDeepfakeScanLogRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'consultation_id'  => ['required', 'exists:consultations,id'],
-            'result'           => ['required', 'in:real,fake,inconclusive'],
+            'result' => ['required', 'in:real,fake,inconclusive'],
             'confidence_score' => ['nullable', 'numeric', 'between:0,1'],
-            'frame_path'       => ['nullable', 'string', 'max:500'],
-            'frame_number'     => ['nullable', 'integer', 'min:0'],
-            'model_version'    => ['nullable', 'string', 'max:50'],
-            'flagged'          => ['sometimes', 'boolean'],
-            'scanned_at'       => ['nullable', 'date'],
+            'frame_path' => ['nullable', 'string', 'max:500'],
+            'frame_number' => ['nullable', 'integer', 'min:0'],
+            'model_version' => ['nullable', 'string', 'max:50'],
+            'flagged' => ['sometimes', 'boolean'],
+            'scanned_at' => ['nullable', 'date'],
         ];
     }
 }
