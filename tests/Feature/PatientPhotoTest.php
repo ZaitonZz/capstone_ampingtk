@@ -13,10 +13,10 @@ it('redirects guests to login on photos index', function () {
 });
 
 it('returns all photos for a patient', function () {
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
     PatientPhoto::factory(2)->create([
-        'patient_id'  => $patient->id,
+        'patient_id' => $patient->id,
         'uploaded_by' => $doctor->id,
     ]);
 
@@ -28,13 +28,13 @@ it('returns all photos for a patient', function () {
 
 it('uploads a photo and stores it on disk', function () {
     Storage::fake('local');
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
-    $file    = UploadedFile::fake()->image('avatar.jpg');
+    $file = UploadedFile::fake()->image('avatar.jpg');
 
     $this->actingAs($doctor)
         ->postJson(route('patients.photos.store', $patient), [
-            'photo'      => $file,
+            'photo' => $file,
             'is_primary' => false,
         ])
         ->assertCreated()
@@ -48,19 +48,19 @@ it('uploads a photo and stores it on disk', function () {
 
 it('marks previous primary photos as non-primary when uploading a new primary photo', function () {
     Storage::fake('local');
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
 
     // Existing primary
     $existing = PatientPhoto::factory()->primary()->create([
-        'patient_id'  => $patient->id,
+        'patient_id' => $patient->id,
         'uploaded_by' => $doctor->id,
-        'file_path'   => "patients/{$patient->id}/photos/old.jpg",
+        'file_path' => "patients/{$patient->id}/photos/old.jpg",
     ]);
 
     $this->actingAs($doctor)
         ->postJson(route('patients.photos.store', $patient), [
-            'photo'      => UploadedFile::fake()->image('new.jpg'),
+            'photo' => UploadedFile::fake()->image('new.jpg'),
             'is_primary' => true,
         ])
         ->assertCreated();
@@ -72,13 +72,13 @@ it('soft-deletes a photo and removes the file from storage', function () {
     Storage::fake('local');
     Storage::disk('local')->put('patients/1/photos/test.jpg', 'fake-content');
 
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
-    $photo   = PatientPhoto::factory()->create([
-        'patient_id'  => $patient->id,
+    $photo = PatientPhoto::factory()->create([
+        'patient_id' => $patient->id,
         'uploaded_by' => $doctor->id,
-        'file_path'   => 'patients/1/photos/test.jpg',
-        'disk'        => 'local',
+        'file_path' => 'patients/1/photos/test.jpg',
+        'disk' => 'local',
     ]);
 
     $this->actingAs($doctor)
@@ -91,11 +91,11 @@ it('soft-deletes a photo and removes the file from storage', function () {
 });
 
 it('returns 404 when destroying a photo belonging to another patient', function () {
-    $doctor   = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient1 = Patient::factory()->create(['registered_by' => $doctor->id]);
     $patient2 = Patient::factory()->create(['registered_by' => $doctor->id]);
-    $photo    = PatientPhoto::factory()->create([
-        'patient_id'  => $patient2->id,
+    $photo = PatientPhoto::factory()->create([
+        'patient_id' => $patient2->id,
         'uploaded_by' => $doctor->id,
     ]);
 

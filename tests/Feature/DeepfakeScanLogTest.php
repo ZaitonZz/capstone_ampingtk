@@ -12,7 +12,7 @@ it('redirects guests to login', function () {
 });
 
 it('returns all scan logs for a consultation', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     DeepfakeScanLog::factory(3)->create(['consultation_id' => $consultation->id]);
 
@@ -23,7 +23,7 @@ it('returns all scan logs for a consultation', function () {
 });
 
 it('filters scan logs by flagged=true', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     DeepfakeScanLog::factory()->fake()->create(['consultation_id' => $consultation->id]);
     DeepfakeScanLog::factory()->real()->create(['consultation_id' => $consultation->id]);
@@ -37,7 +37,7 @@ it('filters scan logs by flagged=true', function () {
 });
 
 it('filters scan logs by result', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     DeepfakeScanLog::factory()->fake()->create(['consultation_id' => $consultation->id]);
     DeepfakeScanLog::factory()->real()->create(['consultation_id' => $consultation->id]);
@@ -51,33 +51,33 @@ it('filters scan logs by result', function () {
 });
 
 it('creates a deepfake scan log', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.deepfake-scans.store', $consultation), [
-            'consultation_id'  => $consultation->id,
-            'result'           => 'real',
+            'consultation_id' => $consultation->id,
+            'result' => 'real',
             'confidence_score' => 0.9423,
-            'model_version'    => 'v2.0',
+            'model_version' => 'v2.0',
         ])
         ->assertCreated()
         ->assertJsonFragment(['result' => 'real']);
 
     $this->assertDatabaseHas('deepfake_scan_logs', [
         'consultation_id' => $consultation->id,
-        'result'          => 'real',
+        'result' => 'real',
     ]);
 });
 
 it('sets consultation deepfake_verified to false when a fake scan is stored', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.deepfake-scans.store', $consultation), [
-            'consultation_id'  => $consultation->id,
-            'result'           => 'fake',
+            'consultation_id' => $consultation->id,
+            'result' => 'fake',
             'confidence_score' => 0.9501,
         ])
         ->assertCreated();
@@ -86,13 +86,13 @@ it('sets consultation deepfake_verified to false when a fake scan is stored', fu
 });
 
 it('reviewer can mark a scan log as flagged with notes', function () {
-    $reviewer     = User::factory()->doctor()->create();
+    $reviewer = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $reviewer->id]);
-    $log          = DeepfakeScanLog::factory()->create(['consultation_id' => $consultation->id]);
+    $log = DeepfakeScanLog::factory()->create(['consultation_id' => $consultation->id]);
 
     $this->actingAs($reviewer)
         ->patchJson(route('consultations.deepfake-scans.update', [$consultation, $log]), [
-            'flagged'        => true,
+            'flagged' => true,
             'reviewer_notes' => 'Confirmed deepfake — synthetic face detected.',
         ])
         ->assertOk()

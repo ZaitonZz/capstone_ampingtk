@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VitalSign extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'consultation_id',
         'patient_id',
@@ -27,11 +28,11 @@ class VitalSign extends Model
     protected function casts(): array
     {
         return [
-            'temperature'             => 'float',
-            'oxygen_saturation'       => 'float',
-            'weight'                  => 'float',
-            'height'                  => 'float',
-            'bmi'                     => 'float',
+            'temperature' => 'float',
+            'oxygen_saturation' => 'float',
+            'weight' => 'float',
+            'height' => 'float',
+            'bmi' => 'float',
         ];
     }
 

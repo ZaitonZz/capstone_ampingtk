@@ -48,16 +48,16 @@ it('stores a new patient and sets registered_by to auth user', function () {
 
     $this->actingAs($doctor)
         ->postJson(route('patients.store'), [
-            'first_name'    => 'Juan',
-            'last_name'     => 'Dela Cruz',
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
             'date_of_birth' => '1990-05-15',
-            'gender'        => 'male',
+            'gender' => 'male',
         ])
         ->assertCreated()
         ->assertJsonFragment(['first_name' => 'Juan']);
 
     $this->assertDatabaseHas('patients', [
-        'first_name'    => 'Juan',
+        'first_name' => 'Juan',
         'registered_by' => $doctor->id,
     ]);
 });
@@ -84,7 +84,7 @@ it('updates a patient record', function () {
 });
 
 it('soft-deletes a patient on destroy', function () {
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
 
     $this->actingAs($doctor)

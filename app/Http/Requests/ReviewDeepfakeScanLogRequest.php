@@ -14,8 +14,8 @@ class ReviewDeepfakeScanLogRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'flagged'         => ['sometimes', 'boolean'],
-            'reviewer_notes'  => ['nullable', 'string'],
+            'flagged' => ['sometimes', 'boolean'],
+            'reviewer_notes' => ['nullable', 'string'],
         ];
     }
 }

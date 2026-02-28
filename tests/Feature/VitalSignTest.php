@@ -2,7 +2,6 @@
 
 use App\Models\Consultation;
 use App\Models\User;
-use App\Models\VitalSign;
 
 it('redirects guests to login', function () {
     $consultation = Consultation::factory()->create();
@@ -12,7 +11,7 @@ it('redirects guests to login', function () {
 });
 
 it('returns 204 when no vitals have been recorded', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
@@ -21,31 +20,31 @@ it('returns 204 when no vitals have been recorded', function () {
 });
 
 it('creates vital signs and sets recorded_by to auth user', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.vitals.store', $consultation), [
-            'temperature'              => 36.5,
-            'blood_pressure_systolic'  => 120,
+            'temperature' => 36.5,
+            'blood_pressure_systolic' => 120,
             'blood_pressure_diastolic' => 80,
-            'heart_rate'               => 72,
-            'respiratory_rate'         => 16,
-            'oxygen_saturation'        => 98.5,
+            'heart_rate' => 72,
+            'respiratory_rate' => 16,
+            'oxygen_saturation' => 98.5,
         ])
         ->assertCreated()
         ->assertJsonFragment(['heart_rate' => 72]);
 
     $this->assertDatabaseHas('vital_signs', [
         'consultation_id' => $consultation->id,
-        'recorded_by'     => $doctor->id,
+        'recorded_by' => $doctor->id,
     ]);
 });
 
 it('upserts vitals — no duplicate rows created on second store', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
-    $payload      = ['temperature' => 36.5, 'heart_rate' => 70];
+    $payload = ['temperature' => 36.5, 'heart_rate' => 70];
 
     $this->actingAs($doctor)->postJson(route('consultations.vitals.store', $consultation), $payload);
     $this->actingAs($doctor)->postJson(route('consultations.vitals.store', $consultation), $payload);
@@ -54,7 +53,7 @@ it('upserts vitals — no duplicate rows created on second store', function () {
 });
 
 it('auto-computes bmi from weight and height', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $response = $this->actingAs($doctor)
@@ -70,12 +69,12 @@ it('auto-computes bmi from weight and height', function () {
 });
 
 it('validates vital sign values are within clinical ranges', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.vitals.store', $consultation), [
-            'temperature'       => 200, // invalid
+            'temperature' => 200, // invalid
             'oxygen_saturation' => 200, // invalid
         ])
         ->assertUnprocessable()

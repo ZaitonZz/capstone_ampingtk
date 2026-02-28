@@ -20,17 +20,17 @@ it('creates a doctor profile on first upsert', function () {
 
     $this->actingAs($doctor)
         ->postJson(route('doctor.profile.upsert'), [
-            'specialty'      => 'Cardiology',
+            'specialty' => 'Cardiology',
             'license_number' => 'LIC-001234',
-            'clinic_name'    => 'Heart Clinic',
-            'phone'          => '+639171234567',
+            'clinic_name' => 'Heart Clinic',
+            'phone' => '+639171234567',
         ])
         ->assertCreated()
         ->assertJsonFragment(['specialty' => 'Cardiology']);
 
     $this->assertDatabaseHas('doctor_profiles', [
-        'user_id'        => $doctor->id,
-        'specialty'      => 'Cardiology',
+        'user_id' => $doctor->id,
+        'specialty' => 'Cardiology',
         'license_number' => 'LIC-001234',
     ]);
 });
@@ -39,13 +39,13 @@ it('updates an existing profile on second upsert without creating a duplicate', 
     $doctor = User::factory()->doctor()->create();
 
     $this->actingAs($doctor)->postJson(route('doctor.profile.upsert'), [
-        'specialty'      => 'Cardiology',
+        'specialty' => 'Cardiology',
         'license_number' => 'LIC-001234',
     ]);
 
     $this->actingAs($doctor)
         ->postJson(route('doctor.profile.upsert'), [
-            'specialty'      => 'Neurology',
+            'specialty' => 'Neurology',
             'license_number' => 'LIC-001234',
         ])
         ->assertOk()
@@ -53,7 +53,7 @@ it('updates an existing profile on second upsert without creating a duplicate', 
 
     $this->assertDatabaseCount('doctor_profiles', 1);
     $this->assertDatabaseHas('doctor_profiles', [
-        'user_id'   => $doctor->id,
+        'user_id' => $doctor->id,
         'specialty' => 'Neurology',
     ]);
 });
@@ -70,7 +70,7 @@ it('returns 422 when specialty and license_number are missing', function () {
 it('returns the profile on show after upsert', function () {
     $doctor = User::factory()->doctor()->create();
     DoctorProfile::factory()->create([
-        'user_id'   => $doctor->id,
+        'user_id' => $doctor->id,
         'specialty' => 'Pediatrics',
     ]);
 

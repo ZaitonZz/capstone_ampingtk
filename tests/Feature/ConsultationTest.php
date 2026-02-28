@@ -19,7 +19,7 @@ it('returns paginated consultations for authenticated users', function () {
 });
 
 it('filters consultations by patient_id', function () {
-    $doctor   = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient1 = Patient::factory()->create(['registered_by' => $doctor->id]);
     $patient2 = Patient::factory()->create(['registered_by' => $doctor->id]);
     Consultation::factory()->create(['doctor_id' => $doctor->id, 'patient_id' => $patient1->id]);
@@ -47,7 +47,7 @@ it('filters consultations by status', function () {
 });
 
 it('returns a consultation with all related data on show', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
@@ -60,16 +60,16 @@ it('returns a consultation with all related data on show', function () {
 });
 
 it('creates an in-person consultation', function () {
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.store'), [
-            'patient_id'      => $patient->id,
-            'doctor_id'       => $doctor->id,
-            'type'            => 'in_person',
+            'patient_id' => $patient->id,
+            'doctor_id' => $doctor->id,
+            'type' => 'in_person',
             'chief_complaint' => 'Fever and headache',
-            'scheduled_at'    => now()->addDay()->toDateTimeString(),
+            'scheduled_at' => now()->addDay()->toDateTimeString(),
         ])
         ->assertCreated()
         ->assertJsonFragment(['type' => 'in_person'])
@@ -77,16 +77,16 @@ it('creates an in-person consultation', function () {
 });
 
 it('creates a teleconsultation and generates a session_token', function () {
-    $doctor  = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
 
     $response = $this->actingAs($doctor)
         ->postJson(route('consultations.store'), [
-            'patient_id'      => $patient->id,
-            'doctor_id'       => $doctor->id,
-            'type'            => 'teleconsultation',
+            'patient_id' => $patient->id,
+            'doctor_id' => $doctor->id,
+            'type' => 'teleconsultation',
             'chief_complaint' => 'Follow-up',
-            'scheduled_at'    => now()->addDay()->toDateTimeString(),
+            'scheduled_at' => now()->addDay()->toDateTimeString(),
         ])
         ->assertCreated()
         ->assertJsonFragment(['type' => 'teleconsultation']);
@@ -95,7 +95,7 @@ it('creates a teleconsultation and generates a session_token', function () {
 });
 
 it('updates consultation status', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
@@ -105,7 +105,7 @@ it('updates consultation status', function () {
 });
 
 it('soft-deletes a consultation on destroy', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)

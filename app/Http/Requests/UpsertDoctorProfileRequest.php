@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\DoctorProfile;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,7 +15,7 @@ class UpsertDoctorProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        $existingProfileId = $this->user()->doctorProfile?->id;
+        $existingProfileId = DoctorProfile::where('user_id', $this->user()->id)->value('id');
 
         return [
             'specialty' => ['required', 'string', 'max:191'],

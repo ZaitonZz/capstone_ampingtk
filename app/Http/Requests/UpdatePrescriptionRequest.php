@@ -15,11 +15,11 @@ class UpdatePrescriptionRequest extends FormRequest
     {
         return [
             'medication_name' => ['sometimes', 'string', 'max:191'],
-            'dosage'          => ['nullable', 'string', 'max:100'],
-            'frequency'       => ['nullable', 'string', 'max:100'],
-            'duration'        => ['nullable', 'string', 'max:100'],
-            'route'           => ['nullable', 'string', 'max:100'],
-            'instructions'    => ['nullable', 'string'],
+            'dosage' => ['nullable', 'string', 'max:100'],
+            'frequency' => ['nullable', 'string', 'max:100'],
+            'duration' => ['nullable', 'string', 'max:100'],
+            'route' => ['nullable', 'string', 'max:100'],
+            'instructions' => ['nullable', 'string'],
         ];
     }
 }

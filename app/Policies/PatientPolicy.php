@@ -38,6 +38,6 @@ class PatientPolicy
 
     public function delete(User $user, Patient $patient): bool
     {
-        return $user->isAdmin();
+        return $this->isMedicalStaff($user);
     }
 }

@@ -14,12 +14,12 @@ class PatientPhotoFactory extends Factory
     public function definition(): array
     {
         return [
-            'patient_id'  => Patient::factory(),
+            'patient_id' => Patient::factory(),
             'uploaded_by' => User::factory()->doctor(),
-            'file_path'   => 'patients/1/photos/test.jpg',
-            'disk'        => 'local',
-            'is_primary'  => false,
-            'notes'       => fake()->optional(0.3)->sentence(),
+            'file_path' => 'patients/1/photos/test.jpg',
+            'disk' => 'local',
+            'is_primary' => false,
+            'notes' => fake()->optional(0.3)->sentence(),
         ];
     }
 

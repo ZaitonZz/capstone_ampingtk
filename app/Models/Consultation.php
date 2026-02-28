@@ -30,9 +30,9 @@ class Consultation extends Model
     protected function casts(): array
     {
         return [
-            'scheduled_at'      => 'datetime',
-            'started_at'        => 'datetime',
-            'ended_at'          => 'datetime',
+            'scheduled_at' => 'datetime',
+            'started_at' => 'datetime',
+            'ended_at' => 'datetime',
             'deepfake_verified' => 'boolean',
         ];
     }

@@ -15,9 +15,9 @@ class UpdatePatientNoteRequest extends FormRequest
     {
         return [
             'subjective' => ['nullable', 'string'],
-            'objective'  => ['nullable', 'string'],
+            'objective' => ['nullable', 'string'],
             'assessment' => ['nullable', 'string'],
-            'plan'       => ['nullable', 'string'],
+            'plan' => ['nullable', 'string'],
         ];
     }
 }

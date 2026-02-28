@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class DeepfakeScanLog extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'consultation_id',
         'result',
@@ -27,9 +28,9 @@ class DeepfakeScanLog extends Model
     {
         return [
             'confidence_score' => 'float',
-            'flagged'          => 'boolean',
-            'reviewed_at'      => 'datetime',
-            'scanned_at'       => 'datetime',
+            'flagged' => 'boolean',
+            'reviewed_at' => 'datetime',
+            'scanned_at' => 'datetime',
         ];
     }
 

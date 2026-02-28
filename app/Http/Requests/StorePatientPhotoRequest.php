@@ -14,9 +14,9 @@ class StorePatientPhotoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'photo'      => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'is_primary' => ['sometimes', 'boolean'],
-            'notes'      => ['nullable', 'string', 'max:500'],
+            'notes' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

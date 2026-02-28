@@ -12,12 +12,12 @@ it('redirects guests to login', function () {
 });
 
 it('returns all prescriptions for a consultation', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     Prescription::factory(3)->create([
         'consultation_id' => $consultation->id,
-        'patient_id'      => $consultation->patient_id,
-        'doctor_id'       => $doctor->id,
+        'patient_id' => $consultation->patient_id,
+        'doctor_id' => $doctor->id,
     ]);
 
     $this->actingAs($doctor)
@@ -27,30 +27,30 @@ it('returns all prescriptions for a consultation', function () {
 });
 
 it('creates a prescription with patient_id and doctor_id from parent consultation', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.prescriptions.store', $consultation), [
             'medication_name' => 'Amoxicillin',
-            'dosage'          => '500mg',
-            'frequency'       => 'Three times daily',
-            'duration'        => '7 days',
-            'route'           => 'oral',
+            'dosage' => '500mg',
+            'frequency' => 'Three times daily',
+            'duration' => '7 days',
+            'route' => 'oral',
         ])
         ->assertCreated()
         ->assertJsonFragment(['medication_name' => 'Amoxicillin']);
 
     $this->assertDatabaseHas('prescriptions', [
         'consultation_id' => $consultation->id,
-        'patient_id'      => $consultation->patient_id,
-        'doctor_id'       => $consultation->doctor_id,
+        'patient_id' => $consultation->patient_id,
+        'doctor_id' => $consultation->doctor_id,
         'medication_name' => 'Amoxicillin',
     ]);
 });
 
 it('returns 422 when medication_name is missing on store', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
@@ -60,12 +60,12 @@ it('returns 422 when medication_name is missing on store', function () {
 });
 
 it('updates a prescription dosage', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     $prescription = Prescription::factory()->create([
         'consultation_id' => $consultation->id,
-        'patient_id'      => $consultation->patient_id,
-        'doctor_id'       => $doctor->id,
+        'patient_id' => $consultation->patient_id,
+        'doctor_id' => $doctor->id,
     ]);
 
     $this->actingAs($doctor)
@@ -79,12 +79,12 @@ it('updates a prescription dosage', function () {
 });
 
 it('soft-deletes a prescription on destroy', function () {
-    $doctor       = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     $prescription = Prescription::factory()->create([
         'consultation_id' => $consultation->id,
-        'patient_id'      => $consultation->patient_id,
-        'doctor_id'       => $doctor->id,
+        'patient_id' => $consultation->patient_id,
+        'doctor_id' => $doctor->id,
     ]);
 
     $this->actingAs($doctor)
@@ -97,13 +97,13 @@ it('soft-deletes a prescription on destroy', function () {
 });
 
 it('returns 404 when updating a prescription from a different consultation', function () {
-    $doctor        = User::factory()->doctor()->create();
+    $doctor = User::factory()->doctor()->create();
     $consultation1 = Consultation::factory()->create(['doctor_id' => $doctor->id]);
     $consultation2 = Consultation::factory()->create(['doctor_id' => $doctor->id]);
-    $prescription  = Prescription::factory()->create([
+    $prescription = Prescription::factory()->create([
         'consultation_id' => $consultation2->id,
-        'patient_id'      => $consultation2->patient_id,
-        'doctor_id'       => $doctor->id,
+        'patient_id' => $consultation2->patient_id,
+        'doctor_id' => $doctor->id,
     ]);
 
     $this->actingAs($doctor)
