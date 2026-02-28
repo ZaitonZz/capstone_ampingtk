@@ -14,22 +14,21 @@ class UpsertDoctorProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        $userId = $this->user()->id;
+        $existingProfileId = $this->user()->doctorProfile?->id;
 
         return [
-            'specialty'       => ['required', 'string', 'max:191'],
-            'license_number'  => [
+            'specialty' => ['required', 'string', 'max:191'],
+            'license_number' => [
                 'required',
                 'string',
                 'max:191',
                 Rule::unique('doctor_profiles', 'license_number')
-                    ->where('user_id', $userId)
-                    ->ignore($userId, 'user_id'),
+                    ->ignore($existingProfileId),
             ],
-            'clinic_name'    => ['nullable', 'string', 'max:191'],
+            'clinic_name' => ['nullable', 'string', 'max:191'],
             'clinic_address' => ['nullable', 'string'],
-            'phone'          => ['nullable', 'string', 'max:30'],
-            'bio'            => ['nullable', 'string'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'bio' => ['nullable', 'string'],
         ];
     }
 }
