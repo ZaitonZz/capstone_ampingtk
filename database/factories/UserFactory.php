@@ -28,11 +28,27 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => 'doctor',
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ];
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => ['role' => 'admin']);
+    }
+
+    public function doctor(): static
+    {
+        return $this->state(fn (array $attributes) => ['role' => 'doctor']);
+    }
+
+    public function patient(): static
+    {
+        return $this->state(fn (array $attributes) => ['role' => 'patient']);
     }
 
     /**
