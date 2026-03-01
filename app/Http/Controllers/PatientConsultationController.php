@@ -30,6 +30,7 @@ class PatientConsultationController extends Controller
                 'start' => $c->scheduled_at?->toIso8601String(),
                 'end' => $c->ended_at?->toIso8601String(),
                 'extendedProps' => [
+                    'consultation_id' => $c->id,
                     'status' => $c->status,
                     'type' => $c->type,
                     'chief_complaint' => $c->chief_complaint,
