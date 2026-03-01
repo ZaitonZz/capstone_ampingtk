@@ -27,6 +27,8 @@ class Consultation extends Model
         'cancellation_reason',
     ];
 
+    protected $appends = ['duration_minutes'];
+
     protected function casts(): array
     {
         return [

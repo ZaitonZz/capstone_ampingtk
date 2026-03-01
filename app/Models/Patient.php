@@ -31,6 +31,8 @@ class Patient extends Model
         'known_allergies',
     ];
 
+    protected $appends = ['full_name'];
+
     protected function casts(): array
     {
         return [
