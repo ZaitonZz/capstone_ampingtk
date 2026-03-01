@@ -1,19 +1,29 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE consultations MODIFY COLUMN status ENUM('pending','scheduled','ongoing','completed','cancelled','no_show') NOT NULL DEFAULT 'scheduled'");
+        Schema::table('consultations', function (Blueprint $table) {
+            $table->enum('status', ['pending', 'scheduled', 'ongoing', 'completed', 'cancelled', 'no_show'])
+                ->default('scheduled')
+                ->change();
+        });
     }
 
     public function down(): void
     {
-        // Move any 'pending' rows back to 'scheduled' before removing the value
-        DB::statement("UPDATE consultations SET status = 'scheduled' WHERE status = 'pending'");
-        DB::statement("ALTER TABLE consultations MODIFY COLUMN status ENUM('scheduled','ongoing','completed','cancelled','no_show') NOT NULL DEFAULT 'scheduled'");
+        DB::table('consultations')->where('status', 'pending')->update(['status' => 'scheduled']);
+
+        Schema::table('consultations', function (Blueprint $table) {
+            $table->enum('status', ['scheduled', 'ongoing', 'completed', 'cancelled', 'no_show'])
+                ->default('scheduled')
+                ->change();
+        });
     }
 };
