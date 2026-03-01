@@ -37,13 +37,14 @@ class ConsultationController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $this->authorize('create', Consultation::class);
 
         return Inertia::render('consultations/create', [
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'doctors' => User::query()->where('role', 'doctor')->with('doctorProfile')->orderBy('name')->get(['id', 'name']),
+            'scheduled_at' => $request->query('scheduled_at', ''),
         ]);
     }
 
@@ -59,7 +60,14 @@ class ConsultationController extends Controller
 
         $consultation = Consultation::create($data);
 
-        return redirect()->route('consultations.show', $consultation)
+        $returnTo = $request->query('_return_to');
+
+        if ($returnTo === 'calendar') {
+            return redirect()->route('consultations.calendar')
+                ->with('success', 'Consultation scheduled.');
+        }
+
+        return redirect()->route('consultations.index')
             ->with('success', 'Consultation scheduled.');
     }
 
