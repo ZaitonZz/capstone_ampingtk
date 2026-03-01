@@ -1,11 +1,11 @@
+import { usePage } from '@inertiajs/react';
+import { useEffect } from 'react';
+import { toast, Toaster } from 'sonner';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import type { AppLayoutProps } from '@/types';
-import { usePage } from '@inertiajs/react';
-import { useEffect } from 'react';
-import { toast, Toaster } from 'sonner';
 
 export default function AppSidebarLayout({
     children,

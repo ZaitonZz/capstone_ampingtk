@@ -1,11 +1,11 @@
 import { Head, Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import { Edit, Trash2, CheckCircle } from 'lucide-react';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import { Edit, Trash2, CheckCircle } from 'lucide-react';
 
 const STATUS_LABELS: Record<ConsultationStatus, string> = {
     pending: 'Pending',

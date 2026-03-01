@@ -91,13 +91,12 @@ export default function PatientConsultationCalendar({
         extendedProps: e.extendedProps,
     }));
 
-    const { data, setData, post, processing, errors, reset } =
-        useForm({
-            doctor_id: '',
-            type: 'in_person' as 'in_person' | 'teleconsultation',
-            chief_complaint: '',
-            scheduled_at: '',
-        });
+    const { data, setData, post, processing, errors, reset } = useForm({
+        doctor_id: '',
+        type: 'in_person' as 'in_person' | 'teleconsultation',
+        chief_complaint: '',
+        scheduled_at: '',
+    });
 
     function openRequestModal(date?: string) {
         setData('scheduled_at', date ?? '');

@@ -1,16 +1,17 @@
 import { Head, Link, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import { CalendarDays, Plus, Check } from 'lucide-react';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     PaginatedConsultations,
     ConsultationStatus,
 } from '@/types/consultation';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import { CalendarDays, Plus, Check } from 'lucide-react';
-import { FormEvent, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Consultations', href: ConsultationController.index.url() },

@@ -1,9 +1,19 @@
+import type { DateSelectArg, EventClickArg } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
+import { List, X } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { toast } from 'sonner';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -11,16 +21,6 @@ import type {
     PatientSummary,
     DoctorSummary,
 } from '@/types/consultation';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import type { DateSelectArg, EventClickArg } from '@fullcalendar/core';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { List, X } from 'lucide-react';
-import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Consultations', href: ConsultationController.index.url() },

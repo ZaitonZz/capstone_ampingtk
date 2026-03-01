@@ -1,13 +1,13 @@
 import { Head, useForm, Link } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import type { FormEvent } from 'react';
+import { toast } from 'sonner';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { PatientSummary, DoctorSummary } from '@/types/consultation';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import type { FormEvent } from 'react';
-import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Consultations', href: ConsultationController.index.url() },
