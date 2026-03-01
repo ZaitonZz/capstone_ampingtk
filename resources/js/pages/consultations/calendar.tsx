@@ -1,8 +1,9 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -17,7 +18,9 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateSelectArg, EventClickArg } from '@fullcalendar/core';
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { List, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Consultations', href: ConsultationController.index.url() },
@@ -78,6 +81,40 @@ export default function ConsultationsCalendar({
     const [selected, setSelected] = useState<SelectedEvent | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const { data, setData, post, processing, errors, reset } = useForm({
+        patient_id: '',
+        doctor_id: '',
+        type: 'in_person' as 'in_person' | 'teleconsultation',
+        status: 'scheduled',
+        chief_complaint: '',
+        scheduled_at: '',
+    });
+
+    function openCreateModal(scheduledAt = '') {
+        reset();
+        setData('scheduled_at', scheduledAt);
+        setIsCreateOpen(true);
+    }
+
+    function handleCreateSubmit(e: FormEvent) {
+        e.preventDefault();
+        post(
+            ConsultationController.store.url({
+                query: { _return_to: 'calendar' },
+            }),
+            {
+                onSuccess: () => {
+                    setIsCreateOpen(false);
+                    reset();
+                },
+                onError: () => {
+                    toast.error('Please fix the errors and try again.');
+                },
+            },
+        );
+    }
+
     // Map events to FullCalendar format with colors
     const calendarEvents = events.map((e) => ({
         id: String(e.id),
@@ -106,11 +143,8 @@ export default function ConsultationsCalendar({
     }
 
     function handleDateSelect(info: DateSelectArg) {
-        // Navigate to create page pre-filling scheduled_at via query string
         const dt = new Date(info.startStr).toISOString().slice(0, 16);
-        router.get(
-            ConsultationController.create.url({ query: { scheduled_at: dt } }),
-        );
+        openCreateModal(dt);
     }
 
     function handleApprove(id: number) {
@@ -119,6 +153,7 @@ export default function ConsultationsCalendar({
             {},
             {
                 onSuccess: () => setIsDialogOpen(false),
+                onError: () => toast.error('Failed to approve consultation.'),
             },
         );
     }
@@ -138,10 +173,8 @@ export default function ConsultationsCalendar({
                                 All Consultations
                             </Link>
                         </Button>
-                        <Button asChild>
-                            <Link href={ConsultationController.create.url()}>
-                                + New Consultation
-                            </Link>
+                        <Button onClick={() => openCreateModal()}>
+                            + New Consultation
                         </Button>
                     </div>
                 </div>
@@ -279,6 +312,178 @@ export default function ConsultationsCalendar({
                                 </Button>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* New Consultation modal */}
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/50"
+                        onClick={() => setIsCreateOpen(false)}
+                    />
+                    <div className="relative z-10 w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg">
+                        <div className="mb-5 flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">
+                                New Consultation
+                            </h2>
+                            <button
+                                onClick={() => setIsCreateOpen(false)}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        <form
+                            onSubmit={handleCreateSubmit}
+                            className="flex flex-col gap-4"
+                        >
+                            {/* Patient */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="modal_patient_id">
+                                    Patient
+                                </Label>
+                                <select
+                                    id="modal_patient_id"
+                                    value={data.patient_id}
+                                    onChange={(e) =>
+                                        setData('patient_id', e.target.value)
+                                    }
+                                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                >
+                                    <option value="">Select patient…</option>
+                                    {patients.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.full_name ??
+                                                `${p.last_name}, ${p.first_name}`}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.patient_id && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.patient_id}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Doctor */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="modal_doctor_id">Doctor</Label>
+                                <select
+                                    id="modal_doctor_id"
+                                    value={data.doctor_id}
+                                    onChange={(e) =>
+                                        setData('doctor_id', e.target.value)
+                                    }
+                                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                >
+                                    <option value="">Select doctor…</option>
+                                    {doctors.map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name}
+                                            {d.doctor_profile?.specialty
+                                                ? ` — ${d.doctor_profile.specialty}`
+                                                : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.doctor_id && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.doctor_id}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Type */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="modal_type">Type</Label>
+                                <select
+                                    id="modal_type"
+                                    value={data.type}
+                                    onChange={(e) =>
+                                        setData(
+                                            'type',
+                                            e.target.value as
+                                                | 'in_person'
+                                                | 'teleconsultation',
+                                        )
+                                    }
+                                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                >
+                                    <option value="in_person">In Person</option>
+                                    <option value="teleconsultation">
+                                        Teleconsultation
+                                    </option>
+                                </select>
+                                {errors.type && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.type}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Scheduled At */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="modal_scheduled_at">
+                                    Scheduled Date &amp; Time
+                                </Label>
+                                <Input
+                                    id="modal_scheduled_at"
+                                    type="datetime-local"
+                                    value={data.scheduled_at}
+                                    onChange={(e) =>
+                                        setData('scheduled_at', e.target.value)
+                                    }
+                                />
+                                {errors.scheduled_at && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.scheduled_at}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Chief Complaint */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="modal_chief_complaint">
+                                    Chief Complaint
+                                </Label>
+                                <textarea
+                                    id="modal_chief_complaint"
+                                    value={data.chief_complaint}
+                                    onChange={(e) =>
+                                        setData(
+                                            'chief_complaint',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={3}
+                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground"
+                                    placeholder="Describe the patient's main concern…"
+                                />
+                                {errors.chief_complaint && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.chief_complaint}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 pt-1">
+                                <Button type="submit" disabled={processing}>
+                                    {processing
+                                        ? 'Saving…'
+                                        : 'Schedule Consultation'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setIsCreateOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
