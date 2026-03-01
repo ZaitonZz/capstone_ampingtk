@@ -20,7 +20,10 @@ class PatientConsultationController extends Controller
         abort_unless($patient !== null, 403, 'Patient profile not found.');
 
         $consultations = Consultation::query()
-            ->with(['doctor.doctorProfile'])
+            ->with([
+                'doctor' => fn ($q) => $q->select('id', 'name')
+                    ->with(['doctorProfile' => fn ($q) => $q->select('user_id', 'specialty')]),
+            ])
             ->where('patient_id', $patient->id)
             ->whereNotNull('scheduled_at')
             ->get()
@@ -43,7 +46,7 @@ class PatientConsultationController extends Controller
             'events' => $consultations,
             'doctors' => User::query()
                 ->where('role', 'doctor')
-                ->with('doctorProfile')
+                ->with(['doctorProfile' => fn ($q) => $q->select('user_id', 'specialty')])
                 ->orderBy('name')
                 ->get(['id', 'name']),
         ]);
