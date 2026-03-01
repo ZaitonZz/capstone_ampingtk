@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { CalendarDays, Plus, Check } from 'lucide-react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Badge } from '@/components/ui/badge';
