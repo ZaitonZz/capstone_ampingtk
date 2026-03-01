@@ -21,7 +21,19 @@ interface Props {
 
 function toDatetimeLocal(iso: string | null): string {
     if (!iso) return '';
-    return new Date(iso).toISOString().slice(0, 16);
+    const d = new Date(iso);
+    return (
+        [
+            d.getFullYear(),
+            String(d.getMonth() + 1).padStart(2, '0'),
+            String(d.getDate()).padStart(2, '0'),
+        ].join('-') +
+        'T' +
+        [
+            String(d.getHours()).padStart(2, '0'),
+            String(d.getMinutes()).padStart(2, '0'),
+        ].join(':')
+    );
 }
 
 export default function ConsultationEdit({ consultation }: Props) {
