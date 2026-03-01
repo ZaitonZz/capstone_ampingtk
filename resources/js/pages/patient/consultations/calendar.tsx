@@ -1,23 +1,24 @@
-import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import type { DateClickArg } from '@fullcalendar/interaction';
+import FullCalendar from '@fullcalendar/react';
+import { Head } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
+import { X, CalendarPlus } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
     ConsultationStatus,
     DoctorSummary,
 } from '@/types/consultation';
-import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import type { DateClickArg } from '@fullcalendar/interaction';
-import { useForm } from '@inertiajs/react';
-import { useState, FormEvent } from 'react';
-import { X, CalendarPlus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -90,7 +91,7 @@ export default function PatientConsultationCalendar({
         extendedProps: e.extendedProps,
     }));
 
-    const { data, setData, post, processing, errors, reset, wasSuccessful } =
+    const { data, setData, post, processing, errors, reset } =
         useForm({
             doctor_id: '',
             type: 'in_person' as 'in_person' | 'teleconsultation',
