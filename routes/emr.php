@@ -21,7 +21,11 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     });
 
     // ── Consultations ─────────────────────────────────────────────────────────
-    Route::apiResource('consultations', ConsultationController::class);
+    // Extra named routes MUST be declared before Route::resource to prevent
+    // 'calendar' and 'approve' being swallowed by the {consultation} wildcard.
+    Route::get('consultations/calendar', [ConsultationController::class, 'calendar'])->name('consultations.calendar');
+    Route::patch('consultations/{consultation}/approve', [ConsultationController::class, 'approve'])->name('consultations.approve');
+    Route::resource('consultations', ConsultationController::class);
 
     Route::prefix('consultations/{consultation}')->name('consultations.')->group(function () {
 
