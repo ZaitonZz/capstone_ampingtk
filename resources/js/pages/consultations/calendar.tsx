@@ -143,7 +143,18 @@ export default function ConsultationsCalendar({
     }
 
     function handleDateSelect(info: DateSelectArg) {
-        const dt = new Date(info.startStr).toISOString().slice(0, 16);
+        const d = new Date(info.startStr);
+        const dt =
+            [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+            ].join('-') +
+            'T' +
+            [
+                String(d.getHours()).padStart(2, '0'),
+                String(d.getMinutes()).padStart(2, '0'),
+            ].join(':');
         openCreateModal(dt);
     }
 
