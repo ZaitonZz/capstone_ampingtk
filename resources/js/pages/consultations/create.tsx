@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import type { BreadcrumbItem } from '@/types';
 import type { PatientSummary, DoctorSummary } from '@/types/consultation';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import { FormEvent } from 'react';
+import type { FormEvent } from 'react';
+import { toast } from 'sonner';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Consultations', href: ConsultationController.index.url() },
@@ -16,21 +17,30 @@ const breadcrumbs: BreadcrumbItem[] = [
 interface Props {
     patients: PatientSummary[];
     doctors: DoctorSummary[];
+    scheduled_at?: string;
 }
 
-export default function ConsultationCreate({ patients, doctors }: Props) {
+export default function ConsultationCreate({
+    patients,
+    doctors,
+    scheduled_at = '',
+}: Props) {
     const { data, setData, post, processing, errors } = useForm({
         patient_id: '',
         doctor_id: '',
         type: 'in_person' as 'in_person' | 'teleconsultation',
         status: 'scheduled',
         chief_complaint: '',
-        scheduled_at: '',
+        scheduled_at,
     });
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        post(ConsultationController.store.url());
+        post(ConsultationController.store.url(), {
+            onError: () => {
+                toast.error('Please fix the errors and try again.');
+            },
+        });
     }
 
     return (
