@@ -109,12 +109,19 @@ export default function ConsultationEdit({ consultation }: Props) {
                         <select
                             id="status"
                             value={data.status}
-                            onChange={(e) =>
-                                setData(
-                                    'status',
-                                    e.target.value as ConsultationStatus,
-                                )
-                            }
+                            onChange={(e) => {
+                                const next = e.target
+                                    .value as ConsultationStatus;
+                                setData((prev) => ({
+                                    ...prev,
+                                    status: next,
+                                    cancellation_reason:
+                                        next === 'cancelled' ||
+                                        next === 'no_show'
+                                            ? prev.cancellation_reason
+                                            : '',
+                                }));
+                            }}
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                         >
                             <option value="pending">Pending</option>
