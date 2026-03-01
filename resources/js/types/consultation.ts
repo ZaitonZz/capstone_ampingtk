@@ -1,4 +1,10 @@
-export type ConsultationStatus = 'pending' | 'scheduled' | 'ongoing' | 'completed' | 'cancelled' | 'no_show';
+export type ConsultationStatus =
+    | 'pending'
+    | 'scheduled'
+    | 'ongoing'
+    | 'completed'
+    | 'cancelled'
+    | 'no_show';
 export type ConsultationType = 'in_person' | 'teleconsultation';
 
 export interface PatientSummary {
