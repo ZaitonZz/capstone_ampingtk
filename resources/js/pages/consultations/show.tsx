@@ -2,7 +2,6 @@ import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import type { BreadcrumbItem } from '@/types';
 import type { Consultation, ConsultationStatus } from '@/types/consultation';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';

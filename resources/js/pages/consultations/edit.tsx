@@ -24,11 +24,7 @@ function toDatetimeLocal(iso: string | null): string {
     return new Date(iso).toISOString().slice(0, 16);
 }
 
-export default function ConsultationEdit({
-    consultation,
-    patients,
-    doctors,
-}: Props) {
+export default function ConsultationEdit({ consultation }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
         {

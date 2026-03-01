@@ -3,12 +3,10 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import type { BreadcrumbItem } from '@/types';
 import type {
     PaginatedConsultations,
     ConsultationStatus,
-    ConsultationType,
 } from '@/types/consultation';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { CalendarDays, Plus, Check } from 'lucide-react';
