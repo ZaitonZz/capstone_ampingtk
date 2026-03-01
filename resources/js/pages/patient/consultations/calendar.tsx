@@ -78,7 +78,6 @@ export default function PatientConsultationCalendar({
     const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(
         null,
     );
-    const [preselectDate, setPreselectDate] = useState('');
 
     const calendarEvents = events.map((e) => ({
         id: String(e.id),
@@ -100,7 +99,6 @@ export default function PatientConsultationCalendar({
         });
 
     function openRequestModal(date?: string) {
-        setPreselectDate(date ?? '');
         setData('scheduled_at', date ?? '');
         setIsRequestModalOpen(true);
     }
