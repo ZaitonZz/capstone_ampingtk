@@ -109,6 +109,7 @@ export default function PatientTable({
                                                     variant="ghost"
                                                     className="size-8"
                                                     onClick={() => onView(patient)}
+                                                    aria-label="View patient details"
                                                 >
                                                     <Eye className="size-4" />
                                                 </Button>
@@ -119,6 +120,7 @@ export default function PatientTable({
                                                     variant="ghost"
                                                     className="size-8"
                                                     onClick={() => onEdit(patient)}
+                                                    aria-label="Edit patient information"
                                                 >
                                                     <Edit className="size-4" />
                                                 </Button>
@@ -129,6 +131,7 @@ export default function PatientTable({
                                                     variant="ghost"
                                                     className="size-8 text-destructive hover:text-destructive"
                                                     onClick={() => onDelete(patient)}
+                                                    aria-label="Delete patient"
                                                 >
                                                     <Trash2 className="size-4" />
                                                 </Button>
