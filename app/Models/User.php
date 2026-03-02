@@ -97,4 +97,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(DeepfakeScanLog::class, 'reviewed_by');
     }
+
+    /** Consultation consents confirmed by this user */
+    public function consultationConsents(): HasMany
+    {
+        return $this->hasMany(ConsultationConsent::class);
+    }
 }
