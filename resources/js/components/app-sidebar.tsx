@@ -14,7 +14,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { page as patientsListPage } from '@/routes/patients/index/index';
+import { list as patientsList } from '@/routes/patients';
 import type { NavItem } from '@/types';
  
 const mainNavItems: NavItem[] = [
@@ -25,7 +25,7 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Patient List',
-        href: patientsListPage(),
+        href: patientsList(),
         icon: ClipboardList,
     },
 ];
