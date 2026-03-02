@@ -14,14 +14,14 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { page as patientsListPage } from '@/routes/patients/index/index';
+import { list as patientsList } from '@/routes/patients';
 import type { BreadcrumbItem } from '@/types';
 import type { Patient, PaginatedData } from '@/types/patient';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Patients',
-        href: patientsListPage(),
+        href: patientsList(),
     },
 ];
 
