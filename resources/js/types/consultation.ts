@@ -65,3 +65,13 @@ export interface PaginatedConsultations {
     total: number;
     links: Array<{ url: string | null; label: string; active: boolean }>;
 }
+
+export interface ConsultationConsent {
+    id: number;
+    consultation_id: number;
+    user_id: number;
+    consent_confirmed: boolean;
+    confirmed_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
