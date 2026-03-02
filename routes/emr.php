@@ -13,9 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'medical.staff'])->group(function () {
 
     // ── Patients ──────────────────────────────────────────────────────────────
-    Route::get('patients/list', function () {
-        return inertia('patients/patientList');
-    })->name('patients.index.page');
+    Route::inertia('patients/list', 'patients/patientList')->name('patients.index.page');
 
     Route::apiResource('patients', PatientController::class);
 
