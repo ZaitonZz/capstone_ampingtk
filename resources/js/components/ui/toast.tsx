@@ -48,6 +48,7 @@ export function Toast({ toast, onClose }: ToastProps) {
                 variant="ghost"
                 className="size-5 hover:bg-black/10 dark:hover:bg-white/10"
                 onClick={() => onClose(toast.id)}
+                aria-label="Close notification"
             >
                 <X className="size-4" />
             </Button>
