@@ -14,21 +14,36 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Create a test doctor account
-        $doctor = User::factory()->doctor()->create([
-            'name' => 'Dr. Test Doctor',
-            'email' => 'doctor@example.com',
-        ]);
+        // Only seed test accounts in development
+        if (! app()->environment('local', 'development')) {
+            return;
+        }
 
-        // Create a test admin account
-        User::factory()->admin()->create([
-            'name' => 'Admin User',
-            'email' => 'admin@example.com',
-        ]);
+        // Create or find test doctor account (idempotent)
+        $doctor = User::firstOrCreate(
+            ['email' => 'doctor@example.com'],
+            [
+                'name' => 'Dr. Test Doctor',
+                'password' => bcrypt('password'),
+                'role' => 'doctor',
+            ]
+        );
 
-        // Create 50 patients registered by the test doctor
-        Patient::factory(50)->create([
-            'registered_by' => $doctor->id,
-        ]);
+        // Create or find test admin account (idempotent)
+        User::firstOrCreate(
+            ['email' => 'admin@example.com'],
+            [
+                'name' => 'Admin User',
+                'password' => bcrypt('password'),
+                'role' => 'admin',
+            ]
+        );
+
+        // Create 50 patients registered by the test doctor (only if none exist)
+        if (Patient::where('registered_by', $doctor->id)->count() === 0) {
+            Patient::factory(50)->create([
+                'registered_by' => $doctor->id,
+            ]);
+        }
     }
 }
