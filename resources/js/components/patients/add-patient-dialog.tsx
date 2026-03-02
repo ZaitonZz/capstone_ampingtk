@@ -49,21 +49,16 @@ export default function AddPatientDialog({
             gender, // Add gender from state since Select doesn't work with FormData
         };
 
-        console.log('Submitting patient data:', data);
-
         try {
             // Get CSRF token from meta tag
             const csrfElement = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
             const csrfToken = csrfElement?.content || '';
 
-            console.log('CSRF Token found:', !!csrfToken);
             if (!csrfToken) {
                 console.error('CSRF token not found in meta tag');
                 error('Security token missing - page may need to be refreshed');
                 return;
             }
-
-            console.log('Sending request to /patients with CSRF token');
 
             const response = await fetch('/patients', {
                 method: 'POST',
@@ -77,11 +72,7 @@ export default function AddPatientDialog({
                 credentials: 'same-origin',
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response ok:', response.ok);
-
             const responseText = await response.text();
-            console.log('Response text:', responseText);
 
             let responseData;
             try {
@@ -93,7 +84,6 @@ export default function AddPatientDialog({
             }
 
             if (!response.ok) {
-                console.log('Error response:', responseData);
                 if (responseData.errors) {
                     // Laravel validation errors come as {field: [message]}
                     const formattedErrors: Record<string, string> = {};
@@ -108,7 +98,6 @@ export default function AddPatientDialog({
                 return;
             }
 
-            console.log('Success response:', responseData);
             success('Patient added successfully!');
             
             // Reset form before closing dialog
