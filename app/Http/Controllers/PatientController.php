@@ -24,6 +24,10 @@ class PatientController extends Controller
                         ->orWhere('contact_number', 'like', "%{$search}%")
                 )
             )
+            ->when(
+                $request->gender,
+                fn ($q, $gender) => $q->where('gender', $gender)
+            )
             ->orderBy('last_name')
             ->paginate($request->integer('per_page', 15));
 
