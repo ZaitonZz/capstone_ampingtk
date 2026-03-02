@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AddPatientDialog from '@/components/patients/add-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
@@ -31,13 +31,16 @@ export default function PatientList() {
     const [filterValue, setFilterValue] = useState('all');
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const initialMount = useRef(true);
 
-    const fetchPatients = async (page = 1, search = '') => {
+    const fetchPatients = async (page = 1, search = '', filter = 'all') => {
         setIsLoading(true);
         try {
-            const response = await fetch(
-                `/patients?page=${page}&search=${encodeURIComponent(search)}`
-            );
+            let url = `/patients?page=${page}&search=${encodeURIComponent(search)}`;
+            if (filter !== 'all') {
+                url += `&gender=${encodeURIComponent(filter)}`;
+            }
+            const response = await fetch(url);
             const data = await response.json();
             setPatients(data);
         } catch (error) {
@@ -47,21 +50,33 @@ export default function PatientList() {
         }
     };
 
+    // Initial load
     useEffect(() => {
-        fetchPatients();
+        fetchPatients(1, searchQuery, filterValue);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Trigger when filter changes (but not on initial mount)
+    useEffect(() => {
+        if (initialMount.current) {
+            initialMount.current = false;
+            return;
+        }
+        fetchPatients(1, searchQuery, filterValue);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filterValue]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        fetchPatients(1, searchQuery);
+        fetchPatients(1, searchQuery, filterValue);
     };
 
     const handlePageChange = (page: number) => {
-        fetchPatients(page, searchQuery);
+        fetchPatients(page, searchQuery, filterValue);
     };
 
     const handleAddPatientSuccess = () => {
-        fetchPatients(1, searchQuery);
+        fetchPatients(1, searchQuery, filterValue);
     };
 
     return (
