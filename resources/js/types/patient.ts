@@ -1,0 +1,29 @@
+export type Patient = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    middle_name?: string;
+    date_of_birth: string;
+    age?: number;
+    gender: string;
+    civil_status?: string;
+    contact_number?: string;
+    email?: string;
+    address?: string;
+    blood_type?: string;
+    emergency_contact_name?: string;
+    emergency_contact_number?: string;
+    known_allergies?: string;
+    created_at: string;
+    updated_at: string;
+};
+
+export type PaginatedData<T> = {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
+};

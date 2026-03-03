@@ -31,7 +31,7 @@ class Patient extends Model
         'known_allergies',
     ];
 
-    protected $appends = ['full_name'];
+    protected $appends = ['age', 'full_name'];
 
     protected function casts(): array
     {
@@ -47,9 +47,9 @@ class Patient extends Model
     }
 
     /** Age in years */
-    public function getAgeAttribute(): int
+    public function getAgeAttribute(): ?int
     {
-        return $this->date_of_birth->age;
+        return $this->date_of_birth?->age;
     }
 
     // Relationships

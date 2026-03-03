@@ -4,8 +4,21 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import { initializeTheme } from '@/hooks/use-appearance';
+import { ToastProvider, useToast } from '@/hooks/use-toast';
+import { ToastContainer } from '@/components/ui/toast';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+function AppWithToast({ children }: { children: React.ReactNode }) {
+    const { toasts, removeToast } = useToast();
+
+    return (
+        <>
+            {children}
+            <ToastContainer toasts={toasts} onClose={removeToast} />
+        </>
+    );
+}
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
@@ -19,7 +32,11 @@ createInertiaApp({
 
         root.render(
             <StrictMode>
-                <App {...props} />
+                <ToastProvider>
+                    <AppWithToast>
+                        <App {...props} />
+                    </AppWithToast>
+                </ToastProvider>
             </StrictMode>,
         );
     },

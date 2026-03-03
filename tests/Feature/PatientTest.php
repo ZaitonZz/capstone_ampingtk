@@ -32,6 +32,22 @@ it('filters patients by search query', function () {
     expect($names)->not->toContain('Person');
 });
 
+it('filters patients by gender', function () {
+    $doctor = User::factory()->doctor()->create();
+    Patient::factory()->create(['first_name' => 'Male', 'last_name' => 'Patient', 'gender' => 'male', 'registered_by' => $doctor->id]);
+    Patient::factory()->create(['first_name' => 'Female', 'last_name' => 'Patient', 'gender' => 'female', 'registered_by' => $doctor->id]);
+    Patient::factory()->create(['first_name' => 'Other', 'last_name' => 'Patient', 'gender' => 'other', 'registered_by' => $doctor->id]);
+
+    $response = $this->actingAs($doctor)
+        ->getJson(route('patients.index', ['gender' => 'female']))
+        ->assertOk();
+
+    $genders = collect($response->json('data'))->pluck('gender');
+    expect($genders)->each->toBe('female');
+    expect($genders)->not->toContain('male');
+    expect($genders)->not->toContain('other');
+});
+
 it('returns a patient with relationships on show', function () {
     $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
