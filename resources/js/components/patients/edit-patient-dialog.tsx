@@ -47,11 +47,32 @@ export default function EditPatientDialog({
 
     useEffect(() => {
         if (patient) {
+            console.log('Patient object received:', patient);
+            console.log('date_of_birth value:', patient.date_of_birth);
+            console.log('date_of_birth type:', typeof patient.date_of_birth);
+            
+            // Format date_of_birth to YYYY-MM-DD for date input
+            let formattedDate = '';
+            if (patient.date_of_birth) {
+                // If already in YYYY-MM-DD format, use it directly
+                if (typeof patient.date_of_birth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(patient.date_of_birth)) {
+                    formattedDate = patient.date_of_birth;
+                } else {
+                    // Otherwise, try to parse and format it
+                    const date = new Date(patient.date_of_birth);
+                    if (!isNaN(date.getTime())) {
+                        formattedDate = date.toISOString().split('T')[0];
+                    }
+                }
+            }
+            
+            console.log('Formatted date:', formattedDate);
+
             setFormData({
                 first_name: patient.first_name || '',
                 last_name: patient.last_name || '',
                 middle_name: patient.middle_name || '',
-                date_of_birth: patient.date_of_birth || '',
+                date_of_birth: formattedDate,
             });
             setGender(patient.gender || '');
         }
