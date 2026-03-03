@@ -1,6 +1,6 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, FormEvent } from 'react';
 import AddPatientDialog from '@/components/patients/add-patient-dialog';
 import EditPatientDialog from '@/components/patients/edit-patient-dialog';
 import ViewPatientDialog from '@/components/patients/view-patient-dialog';
@@ -28,62 +28,70 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-export default function PatientList() {
-    const [patients, setPatients] = useState<PaginatedData<Patient> | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterValue, setFilterValue] = useState('all');
-    const [isLoading, setIsLoading] = useState(true);
+type PageProps = {
+    patients: PaginatedData<Patient>;
+    filters: {
+        search?: string;
+        gender?: string;
+    };
+};
+
+export default function PatientList({ patients, filters }: PageProps) {
+    const [searchQuery, setSearchQuery] = useState(filters.search || '');
+    const [filterValue, setFilterValue] = useState(filters.gender || 'all');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-    const initialMount = useRef(true);
 
-    const fetchPatients = async (page = 1, search = '', filter = 'all') => {
-        setIsLoading(true);
-        try {
-            let url = `/patients?page=${page}&search=${encodeURIComponent(search)}`;
-            if (filter !== 'all') {
-                url += `&gender=${encodeURIComponent(filter)}`;
+    const handleSearch = (e: FormEvent) => {
+        e.preventDefault();
+        router.get(
+            patientsList(),
+            {
+                search: searchQuery || undefined,
+                gender: filterValue !== 'all' ? filterValue : undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
             }
-            const response = await fetch(url);
-            const data = await response.json();
-            setPatients(data);
-        } catch (error) {
-            console.error('Failed to fetch patients:', error);
-        } finally {
-            setIsLoading(false);
-        }
+        );
     };
 
-    // Initial load
-    useEffect(() => {
-        fetchPatients(1, searchQuery, filterValue);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Trigger when filter changes (but not on initial mount)
-    useEffect(() => {
-        if (initialMount.current) {
-            initialMount.current = false;
-            return;
-        }
-        fetchPatients(1, searchQuery, filterValue);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filterValue]);
-
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        fetchPatients(1, searchQuery, filterValue);
+    const handleFilterChange = (value: string) => {
+        setFilterValue(value);
+        router.get(
+            patientsList(),
+            {
+                search: searchQuery || undefined,
+                gender: value !== 'all' ? value : undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
     };
 
     const handlePageChange = (page: number) => {
-        fetchPatients(page, searchQuery, filterValue);
+        router.get(
+            patientsList(),
+            {
+                page,
+                search: searchQuery || undefined,
+                gender: filterValue !== 'all' ? filterValue : undefined,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            }
+        );
     };
 
     const handleAddPatientSuccess = () => {
-        fetchPatients(1, searchQuery, filterValue);
+        router.reload();
     };
 
     const handleViewPatient = (patient: Patient) => {
@@ -102,7 +110,7 @@ export default function PatientList() {
     };
 
     const handleDialogSuccess = () => {
-        fetchPatients(patients?.current_page || 1, searchQuery, filterValue);
+        router.reload();
     };
 
     return (
@@ -139,7 +147,7 @@ export default function PatientList() {
                     <div className="flex gap-2">
                         <Select
                             value={filterValue}
-                            onValueChange={setFilterValue}
+                            onValueChange={handleFilterChange}
                         >
                             <SelectTrigger className="w-32">
                                 <Filter className="size-4" />
@@ -163,8 +171,8 @@ export default function PatientList() {
 
                 {/* Patients Table */}
                 <PatientTable
-                    patients={patients?.data || []}
-                    isLoading={isLoading}
+                    patients={patients.data}
+                    isLoading={false}
                     onView={handleViewPatient}
                     onEdit={handleEditPatient}
                     onDelete={handleDeletePatient}
@@ -192,7 +200,7 @@ export default function PatientList() {
                 />
 
                 {/* Pagination */}
-                {patients && patients.total > 0 && (
+                {patients.total > 0 && (
                     <Pagination
                         currentPage={patients.current_page}
                         lastPage={patients.last_page}
