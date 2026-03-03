@@ -85,7 +85,7 @@ export default function ConsultationConsentPage({ consultation, consent }: Props
                                 </p>
                             </div>
 
-                            <div className="h-[520px] overflow-y-auto px-5 py-4 text-sm leading-relaxed">
+                            <div className="h-520px overflow-y-auto px-5 py-4 text-sm leading-relaxed">
                                 <h2 className="mb-2 text-base font-semibold">
                                     AMPING Telekonsulta — Privacy Notice
                                 </h2>
