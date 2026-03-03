@@ -13,9 +13,12 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'medical.staff'])->group(function () {
 
     // ── Patients ──────────────────────────────────────────────────────────────
-    Route::inertia('patients/list', 'patients/patientList')->name('patients.list');
-
-    Route::apiResource('patients', PatientController::class);
+    Route::get('patients', [PatientController::class, 'index'])->name('patients.list');
+    
+    Route::post('patients', [PatientController::class, 'store'])->name('patients.store');
+    Route::get('patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
+    Route::patch('patients/{patient}', [PatientController::class, 'update'])->name('patients.update');
+    Route::delete('patients/{patient}', [PatientController::class, 'destroy'])->name('patients.destroy');
 
     Route::prefix('patients/{patient}')->name('patients.')->group(function () {
         Route::apiResource('photos', PatientPhotoController::class)
