@@ -17,7 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { list as patientsList } from '@/routes/patients';
+import { index as patientsList } from '@/routes/patients';
 import type { BreadcrumbItem } from '@/types';
 import type { Patient, PaginatedData } from '@/types/patient';
 
