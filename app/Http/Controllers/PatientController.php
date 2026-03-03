@@ -12,7 +12,7 @@ use Inertia\Response;
 
 class PatientController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): Response|JsonResponse
     {
         $this->authorize('viewAny', Patient::class);
 
@@ -34,6 +34,12 @@ class PatientController extends Controller
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
+        // Return JSON for API/test requests
+        if ($request->expectsJson()) {
+            return response()->json($patients);
+        }
+
+        // Return Inertia for browser requests
         return Inertia::render('patients/patientList', [
             'patients' => $patients,
             'filters' => [
