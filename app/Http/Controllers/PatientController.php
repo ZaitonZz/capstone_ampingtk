@@ -30,7 +30,7 @@ class PatientController extends Controller
                 $request->gender,
                 fn ($q, $gender) => $q->where('gender', $gender)
             )
-            ->orderBy('last_name')
+            ->latest()
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
