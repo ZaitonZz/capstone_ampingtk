@@ -197,7 +197,7 @@ export default function ConsultationConsentPage({ consultation, consent }: Props
                                                 id="read_privacy_notice"
                                                 checked={data.read_privacy_notice}
                                                 onCheckedChange={(checked) =>
-                                                    setData('read_privacy_notice', Boolean(checked))
+                                                    setData('read_privacy_notice', checked === true)
                                                 }
                                             />
                                             <Label
