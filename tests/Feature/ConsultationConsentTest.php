@@ -130,7 +130,7 @@ it('creates a consent record and redirects with success flash', function () use 
 
     $this->actingAs($doctor)
         ->post(route('consultations.consent.store', $consultation), $validPayload)
-        ->assertRedirect(route('consultations.show', $consultation))
+        ->assertRedirect(route('consultations.lobby.show', $consultation))
         ->assertSessionHas('success', 'Consent confirmed.');
 
     $this->assertDatabaseHas('consultation_consents', [
@@ -153,7 +153,7 @@ it('upserts consent on a subsequent confirmation', function () use (&$validPaylo
 
     $this->actingAs($doctor)
         ->post(route('consultations.consent.store', $consultation), $validPayload)
-        ->assertRedirect(route('consultations.show', $consultation));
+        ->assertRedirect(route('consultations.lobby.show', $consultation));
 
     expect(
         ConsultationConsent::where([
