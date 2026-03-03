@@ -7,10 +7,12 @@ use App\Http\Requests\UpdatePatientRequest;
 use App\Models\Patient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class PatientController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Patient::class);
 
@@ -29,9 +31,16 @@ class PatientController extends Controller
                 fn ($q, $gender) => $q->where('gender', $gender)
             )
             ->orderBy('last_name')
-            ->paginate($request->integer('per_page', 15));
+            ->paginate($request->integer('per_page', 15))
+            ->withQueryString();
 
-        return response()->json($patients);
+        return Inertia::render('patients/patientList', [
+            'patients' => $patients,
+            'filters' => [
+                'search' => $request->search,
+                'gender' => $request->gender,
+            ],
+        ]);
     }
 
     public function show(Patient $patient): JsonResponse
