@@ -14,7 +14,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { list as patientsList } from '@/routes/patients';
+import { index as patientsList } from '@/routes/patients';
 import { index as consultations } from '@/routes/consultations';
 import type { NavItem } from '@/types';
 
