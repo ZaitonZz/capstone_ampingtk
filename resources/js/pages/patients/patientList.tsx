@@ -2,6 +2,9 @@ import { Head } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import AddPatientDialog from '@/components/patients/add-patient-dialog';
+import EditPatientDialog from '@/components/patients/edit-patient-dialog';
+import ViewPatientDialog from '@/components/patients/view-patient-dialog';
+import DeletePatientDialog from '@/components/patients/delete-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
 import { Button } from '@/components/ui/button';
@@ -30,7 +33,11 @@ export default function PatientList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterValue, setFilterValue] = useState('all');
     const [isLoading, setIsLoading] = useState(true);
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const initialMount = useRef(true);
 
     const fetchPatients = async (page = 1, search = '', filter = 'all') => {
@@ -77,6 +84,25 @@ export default function PatientList() {
 
     const handleAddPatientSuccess = () => {
         fetchPatients(1, searchQuery, filterValue);
+    };
+
+    const handleViewPatient = (patient: Patient) => {
+        setSelectedPatient(patient);
+        setIsViewDialogOpen(true);
+    };
+
+    const handleEditPatient = (patient: Patient) => {
+        setSelectedPatient(patient);
+        setIsEditDialogOpen(true);
+    };
+
+    const handleDeletePatient = (patient: Patient) => {
+        setSelectedPatient(patient);
+        setIsDeleteDialogOpen(true);
+    };
+
+    const handleDialogSuccess = () => {
+        fetchPatients(patients?.current_page || 1, searchQuery, filterValue);
     };
 
     return (
@@ -128,8 +154,8 @@ export default function PatientList() {
                         </Select>
 
                         <AddPatientDialog
-                            open={isDialogOpen}
-                            onOpenChange={setIsDialogOpen}
+                            open={isAddDialogOpen}
+                            onOpenChange={setIsAddDialogOpen}
                             onSuccess={handleAddPatientSuccess}
                         />
                     </div>
@@ -139,9 +165,30 @@ export default function PatientList() {
                 <PatientTable
                     patients={patients?.data || []}
                     isLoading={isLoading}
-                    onView={(patient) => console.log('View', patient)}
-                    onEdit={(patient) => console.log('Edit', patient)}
-                    onDelete={(patient) => console.log('Delete', patient)}
+                    onView={handleViewPatient}
+                    onEdit={handleEditPatient}
+                    onDelete={handleDeletePatient}
+                />
+
+                {/* Dialogs */}
+                <ViewPatientDialog
+                    patient={selectedPatient}
+                    open={isViewDialogOpen}
+                    onOpenChange={setIsViewDialogOpen}
+                />
+
+                <EditPatientDialog
+                    patient={selectedPatient}
+                    open={isEditDialogOpen}
+                    onOpenChange={setIsEditDialogOpen}
+                    onSuccess={handleDialogSuccess}
+                />
+
+                <DeletePatientDialog
+                    patient={selectedPatient}
+                    open={isDeleteDialogOpen}
+                    onOpenChange={setIsDeleteDialogOpen}
+                    onSuccess={handleDialogSuccess}
                 />
 
                 {/* Pagination */}
