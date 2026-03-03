@@ -47,10 +47,6 @@ export default function EditPatientDialog({
 
     useEffect(() => {
         if (patient) {
-            console.log('Patient object received:', patient);
-            console.log('date_of_birth value:', patient.date_of_birth);
-            console.log('date_of_birth type:', typeof patient.date_of_birth);
-            
             // Format date_of_birth to YYYY-MM-DD for date input
             let formattedDate = '';
             if (patient.date_of_birth) {
@@ -65,8 +61,6 @@ export default function EditPatientDialog({
                     }
                 }
             }
-            
-            console.log('Formatted date:', formattedDate);
 
             setFormData({
                 first_name: patient.first_name || '',
