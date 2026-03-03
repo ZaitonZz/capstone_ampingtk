@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationController;
+use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\DeepfakeScanLogController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\PatientController;
@@ -15,7 +16,7 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
 
     // ── Patients ──────────────────────────────────────────────────────────────
     Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
-    
+
     Route::post('patients', [PatientController::class, 'store'])->name('patients.store');
     Route::get('patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
     Route::patch('patients/{patient}', [PatientController::class, 'update'])->name('patients.update');
@@ -57,6 +58,9 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
         // Consent
         Route::get('consent', [ConsultationConsentController::class, 'show'])->name('consent.show');
         Route::post('consent', [ConsultationConsentController::class, 'store'])->name('consent.store');
+
+        // Teleconsultation Lobby
+        Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
     });
 
     // ── Doctor Profile ────────────────────────────────────────────────────────
