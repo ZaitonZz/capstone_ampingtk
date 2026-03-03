@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'medical.staff'])->group(function () {
 
     // ── Patients ──────────────────────────────────────────────────────────────
-    Route::get('patients', [PatientController::class, 'index'])->name('patients.list');
+    Route::get('patients', [PatientController::class, 'index'])->name('patients.index');
     
     Route::post('patients', [PatientController::class, 'store'])->name('patients.store');
     Route::get('patients/{patient}', [PatientController::class, 'show'])->name('patients.show');
