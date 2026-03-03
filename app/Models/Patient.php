@@ -47,9 +47,9 @@ class Patient extends Model
     }
 
     /** Age in years */
-    public function getAgeAttribute(): int
+    public function getAgeAttribute(): ?int
     {
-        return $this->date_of_birth->age;
+        return $this->date_of_birth?->age;
     }
 
     // Relationships
