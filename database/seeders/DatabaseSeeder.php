@@ -39,9 +39,9 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Create 50 patients registered by the test doctor (only if none exist)
+        // Create 100 patients registered by the test doctor (only if none exist)
         if (Patient::where('registered_by', $doctor->id)->count() === 0) {
-            Patient::factory(50)->create([
+            Patient::factory(100)->create([
                 'registered_by' => $doctor->id,
             ]);
         }
