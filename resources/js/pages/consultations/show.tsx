@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Edit, Trash2, CheckCircle } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, ShieldCheck } from 'lucide-react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -97,6 +98,16 @@ export default function ConsultationShow({ consultation }: Props) {
                         )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
+                                href={ConsultationConsentController.show.url(
+                                    consultation.id,
+                                )}
+                            >
+                                <ShieldCheck className="mr-1 h-4 w-4" />
+                                Privacy Notice &amp; Consent
+                            </Link>
+                        </Button>
+                        <Button size="sm" variant="outline" asChild>
+                            <Link
                                 href={ConsultationController.edit.url(
                                     consultation.id,
                                 )}
@@ -131,8 +142,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.scheduled_at
                                 ? new Date(
-                                      consultation.scheduled_at,
-                                  ).toLocaleString()
+                                    consultation.scheduled_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -141,8 +152,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.started_at
                                 ? new Date(
-                                      consultation.started_at,
-                                  ).toLocaleString()
+                                    consultation.started_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -151,8 +162,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.ended_at
                                 ? new Date(
-                                      consultation.ended_at,
-                                  ).toLocaleString()
+                                    consultation.ended_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -170,8 +181,8 @@ export default function ConsultationShow({ consultation }: Props) {
                             consultation.deepfake_verified == null
                                 ? null
                                 : consultation.deepfake_verified
-                                  ? 'Yes'
-                                  : 'No'
+                                    ? 'Yes'
+                                    : 'No'
                         }
                     />
                     {consultation.cancellation_reason && (
