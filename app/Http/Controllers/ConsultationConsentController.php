@@ -44,7 +44,7 @@ class ConsultationConsentController extends Controller
         );
 
         return redirect()
-            ->route('consultations.show', $consultation)
+            ->route('consultations.lobby.show', $consultation)
             ->with('success', 'Consent confirmed.');
     }
 }
