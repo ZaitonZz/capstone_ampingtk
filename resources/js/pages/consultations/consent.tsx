@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -177,6 +178,14 @@ export default function ConsultationConsentPage({ consultation, consent }: Props
                                             </p>
                                         )}
                                     </div>
+
+                                    {consultation.type === 'teleconsultation' && (
+                                        <Button className="w-full" asChild>
+                                            <a href={ConsultationLobbyController.show.url(consultation.id)}>
+                                                Go to Lobby →
+                                            </a>
+                                        </Button>
+                                    )}
 
                                     <Button
                                         variant="outline"

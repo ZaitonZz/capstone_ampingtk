@@ -1,7 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Edit, Trash2, CheckCircle, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -106,6 +107,18 @@ export default function ConsultationShow({ consultation }: Props) {
                                 Privacy Notice &amp; Consent
                             </Link>
                         </Button>
+                        {consultation.type === 'teleconsultation' && (
+                            <Button size="sm" asChild>
+                                <Link
+                                    href={ConsultationLobbyController.show.url(
+                                        consultation.id,
+                                    )}
+                                >
+                                    <Video className="mr-1 h-4 w-4" />
+                                    Start Consultation
+                                </Link>
+                            </Button>
+                        )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
                                 href={ConsultationController.edit.url(
