@@ -13,6 +13,10 @@ class ConsultationLobbyController extends Controller
     {
         $this->authorize('view', $consultation);
 
+        if ($consultation->type !== 'teleconsultation') {
+            abort(404);
+        }
+
         $consultation->load(['patient', 'doctor']);
 
         $consent = ConsultationConsent::query()
