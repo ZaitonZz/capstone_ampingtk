@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\UserRole;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -50,23 +51,29 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'role' => UserRole::class,
         ];
     }
 
     // Role helpers
     public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->role === UserRole::Admin;
     }
 
     public function isDoctor(): bool
     {
-        return $this->role === 'doctor';
+        return $this->role === UserRole::Doctor;
+    }
+
+    public function isNurse(): bool
+    {
+        return $this->role === UserRole::Nurse;
     }
 
     public function isPatient(): bool
     {
-        return $this->role === 'patient';
+        return $this->role === UserRole::Patient;
     }
 
     // Relationships
