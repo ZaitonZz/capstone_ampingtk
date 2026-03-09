@@ -21,7 +21,18 @@ class ConsultationController extends Controller
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
-            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when($request->user()->isPatient(), function ($q) use ($request) {
+                // Patients only see their own consultations
+                $patientProfile = $request->user()->patientProfile;
+                if ($patientProfile) {
+                    $q->where('patient_id', $patientProfile->id);
+                } else {
+                    // If no patient profile, return empty result
+                    $q->whereRaw('1 = 0');
+                }
+            })
+            ->when($request->user()->isDoctor(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            // Nurses and admins see all consultations
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
@@ -126,7 +137,17 @@ class ConsultationController extends Controller
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
-            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when($request->user()->isPatient(), function ($q) use ($request) {
+                // Patients only see their own consultations
+                $patientProfile = $request->user()->patientProfile;
+                if ($patientProfile) {
+                    $q->where('patient_id', $patientProfile->id);
+                } else {
+                    $q->whereRaw('1 = 0');
+                }
+            })
+            ->when($request->user()->isDoctor(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            // Nurses and admins see all consultations
             ->whereNotNull('scheduled_at')
             ->get()
             ->map(fn (Consultation $c) => [
@@ -152,7 +173,7 @@ class ConsultationController extends Controller
 
     public function approve(Consultation $consultation): RedirectResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('approve', $consultation);
 
         abort_unless($consultation->status === 'pending', 422, 'Only pending consultations can be approved.');
 
