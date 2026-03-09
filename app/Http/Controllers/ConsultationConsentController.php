@@ -43,8 +43,12 @@ class ConsultationConsentController extends Controller
             ],
         );
 
+        $redirectRoute = $consultation->type === 'teleconsultation'
+            ? 'consultations.lobby.show'
+            : 'consultations.show';
+
         return redirect()
-            ->route('consultations.lobby.show', $consultation)
+            ->route($redirectRoute, $consultation)
             ->with('success', 'Consent confirmed.');
     }
 }
