@@ -126,7 +126,7 @@ it('rejects a false checkbox value on consent store', function () {
 
 it('creates a consent record and redirects with success flash', function () use (&$validPayload) {
     $doctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->post(route('consultations.consent.store', $consultation), $validPayload)
@@ -142,7 +142,7 @@ it('creates a consent record and redirects with success flash', function () use 
 
 it('upserts consent on a subsequent confirmation', function () use (&$validPayload) {
     $doctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
 
     ConsultationConsent::create([
         'consultation_id' => $consultation->id,
