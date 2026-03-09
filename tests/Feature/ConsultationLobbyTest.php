@@ -29,7 +29,7 @@ it("forbids a doctor from viewing another doctor's consultation lobby", function
 
 it('renders the lobby page without an existing consent record', function () {
     $doctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.lobby.show', $consultation))
@@ -46,7 +46,7 @@ it('renders the lobby page without an existing consent record', function () {
 
 it('renders the lobby page with an unconfirmed consent record', function () {
     $doctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
     ConsultationConsent::create([
         'consultation_id' => $consultation->id,
         'user_id' => $doctor->id,
@@ -69,7 +69,7 @@ it('renders the lobby page with an unconfirmed consent record', function () {
 
 it('renders the lobby page with a confirmed consent record', function () {
     $doctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
     ConsultationConsent::create([
         'consultation_id' => $consultation->id,
         'user_id' => $doctor->id,
