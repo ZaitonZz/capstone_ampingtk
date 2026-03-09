@@ -107,16 +107,18 @@ export default function ConsultationShow({ consultation }: Props) {
                                 Privacy Notice &amp; Consent
                             </Link>
                         </Button>
-                        <Button size="sm" asChild>
-                            <Link
-                                href={ConsultationLobbyController.show.url(
-                                    consultation.id,
-                                )}
-                            >
-                                <Video className="mr-1 h-4 w-4" />
-                                Start Consultation
-                            </Link>
-                        </Button>
+                        {consultation.type === 'teleconsultation' && (
+                            <Button size="sm" asChild>
+                                <Link
+                                    href={ConsultationLobbyController.show.url(
+                                        consultation.id,
+                                    )}
+                                >
+                                    <Video className="mr-1 h-4 w-4" />
+                                    Start Consultation
+                                </Link>
+                            </Button>
+                        )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
                                 href={ConsultationController.edit.url(
