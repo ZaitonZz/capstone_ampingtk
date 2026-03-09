@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'medical.staff' => EnsureMedicalStaff::class,
             'patient' => EnsurePatient::class,
+            'role' => \App\Http\Middleware\EnsureUserHasRole::class,
         ]);
 
         $middleware->web(append: [
