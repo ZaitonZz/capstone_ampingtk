@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ElementType } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -42,7 +42,7 @@ function SessionRow({
     value,
     iconClass = 'bg-primary/10 text-primary',
 }: {
-    icon: React.ElementType;
+    icon: ElementType;
     label: string;
     value: string;
     iconClass?: string;
@@ -68,8 +68,8 @@ function DeviceButton({
     onClick,
 }: {
     on: boolean;
-    onIcon: React.ElementType;
-    offIcon: React.ElementType;
+    onIcon: ElementType;
+    offIcon: ElementType;
     label: string;
     onClick?: () => void;
 }) {
@@ -236,7 +236,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-65">
+                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-[16.25rem]">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
@@ -272,7 +272,13 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                     icon={Video}
                                     label="Mode"
                                     iconClass="bg-emerald-500/10 text-emerald-500"
-                                    value="Video Teleconsult"
+                                    value={
+                                        consultation.type === 'teleconsultation'
+                                            ? 'Video Teleconsult'
+                                            : consultation.type === 'in_person'
+                                                ? 'In-person Consultation'
+                                                : '—'
+                                    }
                                 />
                                 <SessionRow
                                     icon={Calendar}
@@ -359,7 +365,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                     className="w-full gap-2 bg-linear-to-r from-primary to-primary/80 shadow-md shadow-primary/25 hover:shadow-primary/40 transition-shadow"
                                     asChild
                                 >
-                                    <Link href={`/consultations/${consultation.id}/waiting`}>
+                                    <Link href={ConsultationController.show.url(consultation.id)}>
                                         <Video className="h-4 w-4" />
                                         Join Call
                                     </Link>
