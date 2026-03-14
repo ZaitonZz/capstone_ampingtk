@@ -734,7 +734,7 @@ export default function ConsultationLobbyPage({
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex flex-col gap-3 w-80">
+                    <div className="flex flex-col gap-3 w-full lg:w-80">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
