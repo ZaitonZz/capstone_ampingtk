@@ -28,11 +28,12 @@ class SeedAdditionalPatients extends Command
     public function handle(): int
     {
         $targetCount = (int) $this->argument('count');
-        
+
         $doctor = User::where('email', 'doctor@example.com')->first();
-        
+
         if (! $doctor) {
             $this->error('Test doctor account not found. Run db:seed first.');
+
             return 1;
         }
 
@@ -41,17 +42,18 @@ class SeedAdditionalPatients extends Command
 
         if ($needed <= 0) {
             $this->info("Already have {$currentCount} patients. No action needed.");
+
             return 0;
         }
 
         $this->info("Creating {$needed} additional patients...");
-        
+
         Patient::factory($needed)->create([
             'registered_by' => $doctor->id,
         ]);
 
         $this->info("✓ Successfully created {$needed} patients. Total: {$targetCount}");
-        
+
         return 0;
     }
 }
