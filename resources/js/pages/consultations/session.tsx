@@ -209,7 +209,7 @@ export default function ConsultationSessionPage({
                                     audio
                                     video
                                     data-lk-theme="default"
-                                    className="h-155"
+                                    className="h-[620px]"
                                     onDisconnected={() => {
                                         window.sessionStorage.removeItem(
                                             storageKey,
