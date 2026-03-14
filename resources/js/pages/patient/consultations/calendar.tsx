@@ -1,4 +1,4 @@
-﻿import dayGridPlugin from '@fullcalendar/daygrid';
+import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
