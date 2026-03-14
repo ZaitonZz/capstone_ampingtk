@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'livekit' => [
+        'enabled' => (bool) env('LIVEKIT_ENABLED', false),
+        'url' => env('LIVEKIT_API_URL'),
+        'ws_url' => env('LIVEKIT_WS_URL'),
+        'api_key' => env('LIVEKIT_API_KEY'),
+        'api_secret' => env('LIVEKIT_API_SECRET'),
+        'empty_timeout_seconds' => (int) env('LIVEKIT_EMPTY_TIMEOUT_SECONDS', 600),
+        'max_participants' => (int) env('LIVEKIT_MAX_PARTICIPANTS', 3),
+        'participant_ttl_minutes' => (int) env('LIVEKIT_PARTICIPANT_TTL_MINUTES', 120),
+    ],
+
+    'pipeline' => [
+        'secret' => env('PIPELINE_SECRET'),
+    ],
+
 ];

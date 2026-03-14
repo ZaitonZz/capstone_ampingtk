@@ -1,12 +1,13 @@
 import { Head, router } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
-import { useState, FormEvent } from 'react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 import AddPatientDialog from '@/components/patients/add-patient-dialog';
-import EditPatientDialog from '@/components/patients/edit-patient-dialog';
-import ViewPatientDialog from '@/components/patients/view-patient-dialog';
 import DeletePatientDialog from '@/components/patients/delete-patient-dialog';
+import EditPatientDialog from '@/components/patients/edit-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
+import ViewPatientDialog from '@/components/patients/view-patient-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {

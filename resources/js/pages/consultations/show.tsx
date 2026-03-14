@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
