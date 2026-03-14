@@ -276,12 +276,12 @@ export default function PatientConsultationCalendar({
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="">Select doctorâ€¦</option>
+                                    <option value="">Select doctor…</option>
                                     {doctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
                                             {d.doctor_profile?.specialty
-                                                ? ` â€” ${d.doctor_profile.specialty}`
+                                                ? ` — ${d.doctor_profile.specialty}`
                                                 : ''}
                                         </option>
                                     ))}
