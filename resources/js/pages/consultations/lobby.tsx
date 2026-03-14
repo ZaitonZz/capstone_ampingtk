@@ -531,7 +531,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative w-full aspect-video max-h-[130px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="relative w-full aspect-video max-h-[520px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm z-10">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
