@@ -1,7 +1,15 @@
 import { Head, Link } from '@inertiajs/react';
 import '@livekit/components-styles';
-import { LiveKitRoom, VideoConference } from '@livekit/components-react';
+import {
+    ControlBar,
+    isTrackReference,
+    LiveKitRoom,
+    ParticipantTile,
+    RoomAudioRenderer,
+    useTracks,
+} from '@livekit/components-react';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
+import { Track } from 'livekit-client';
 import { useMemo } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
@@ -30,7 +38,54 @@ interface Props {
     livekit: LiveKitSessionProps;
 }
 
-export default function ConsultationSessionPage({ consultation, livekit }: Props) {
+function ConsultationCallStage() {
+    const tracks = useTracks([
+        { source: Track.Source.Camera, withPlaceholder: false },
+        { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ]);
+
+    const activeTracks = tracks.filter((trackRef) =>
+        isTrackReference(trackRef),
+    );
+
+    return (
+        <div className="flex h-full flex-col">
+            <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2 p-2">
+                {activeTracks.length > 0 ? (
+                    activeTracks.map((trackRef) => (
+                        <ParticipantTile
+                            key={`${trackRef.participant.identity}-${trackRef.publication.trackSid}`}
+                            trackRef={trackRef}
+                            className="h-full min-h-48 overflow-hidden rounded-xl bg-zinc-900"
+                        />
+                    ))
+                ) : (
+                    <div className="col-span-full flex min-h-70 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
+                        <p className="text-sm text-zinc-300">
+                            Waiting for participants to publish camera or
+                            screen-share tracks.
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            <RoomAudioRenderer />
+
+            <ControlBar
+                controls={{
+                    chat: false,
+                    settings: false,
+                }}
+                className="border-t border-zinc-800/70 bg-zinc-950/95 px-2 py-2"
+            />
+        </div>
+    );
+}
+
+export default function ConsultationSessionPage({
+    consultation,
+    livekit,
+}: Props) {
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
@@ -63,9 +118,9 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
     const serverUrl = payload?.ws_url ?? livekit.ws_url;
     const canStartCall = Boolean(
         livekit.enabled &&
-            payload?.participant_token &&
-            payload?.room_name &&
-            serverUrl,
+        payload?.participant_token &&
+        payload?.room_name &&
+        serverUrl,
     );
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -95,7 +150,9 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
             <div className="p-4 md:p-6">
                 <div className="mb-4 flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Teleconsultation Session</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            Teleconsultation Session
+                        </h1>
                         <p className="text-sm text-muted-foreground">
                             {consultation.patient?.full_name
                                 ? `Live call workspace for ${consultation.patient.full_name}`
@@ -104,7 +161,11 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                     </div>
 
                     <Button variant="outline" asChild onClick={leaveSession}>
-                        <Link href={ConsultationLobbyController.show.url(consultation.id)}>
+                        <Link
+                            href={ConsultationLobbyController.show.url(
+                                consultation.id,
+                            )}
+                        >
                             <LogOut className="h-4 w-4" />
                             Back to Lobby
                         </Link>
@@ -117,7 +178,10 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                             <AlertTriangle className="h-4 w-4" />
                             LiveKit is disabled
                         </div>
-                        <p className="text-sm">Enable LiveKit in environment config to start the call UI.</p>
+                        <p className="text-sm">
+                            Enable LiveKit in environment config to start the
+                            call UI.
+                        </p>
                     </div>
                 )}
 
@@ -128,7 +192,8 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                             Session credentials not found
                         </div>
                         <p className="text-sm">
-                            Join from the lobby first so the app can request a fresh participant token.
+                            Join from the lobby first so the app can request a
+                            fresh participant token.
                         </p>
                     </div>
                 )}
@@ -144,20 +209,25 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                                     audio
                                     video
                                     data-lk-theme="default"
-                                    className="h-[620px]"
+                                    className="h-155"
                                     onDisconnected={() => {
-                                        window.sessionStorage.removeItem(storageKey);
+                                        window.sessionStorage.removeItem(
+                                            storageKey,
+                                        );
                                     }}
                                 >
-                                    <VideoConference />
+                                    <ConsultationCallStage />
                                 </LiveKitRoom>
                             </div>
                         ) : (
-                            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
+                            <div className="flex min-h-105 items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
                                 <div className="max-w-md p-6 text-center">
-                                    <h2 className="mb-2 text-lg font-semibold">Call cannot start yet</h2>
+                                    <h2 className="mb-2 text-lg font-semibold">
+                                        Call cannot start yet
+                                    </h2>
                                     <p className="text-sm text-zinc-300">
-                                        Missing token or LiveKit server URL. Go back to lobby and click Join Call again.
+                                        Missing token or LiveKit server URL. Go
+                                        back to lobby and click Join Call again.
                                     </p>
                                 </div>
                             </div>
@@ -173,11 +243,15 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                             <div className="mt-2 space-y-2 text-sm">
                                 <p>
                                     <span className="font-medium">Room:</span>{' '}
-                                    {payload?.room_name ?? livekit.room_name ?? '—'}
+                                    {payload?.room_name ??
+                                        livekit.room_name ??
+                                        '—'}
                                 </p>
                                 <p>
                                     <span className="font-medium">Status:</span>{' '}
-                                    {payload?.room_status ?? livekit.room_status ?? '—'}
+                                    {payload?.room_status ??
+                                        livekit.room_status ??
+                                        '—'}
                                 </p>
                                 <p className="break-all">
                                     <span className="font-medium">WS:</span>{' '}
@@ -196,7 +270,10 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                                     <CheckCircle2 className="h-4 w-4" />
                                     Session credentials loaded
                                 </div>
-                                <p className="text-sm">LiveKit call UI is mounted with your current participant token.</p>
+                                <p className="text-sm">
+                                    LiveKit call UI is mounted with your current
+                                    participant token.
+                                </p>
                             </div>
                         )}
 
@@ -206,7 +283,8 @@ export default function ConsultationSessionPage({ consultation, livekit }: Props
                                 Security Note
                             </div>
                             <p className="text-sm text-muted-foreground">
-                                Token is stored in session storage only and removed when you leave the session page.
+                                Token is stored in session storage only and
+                                removed when you leave the session page.
                             </p>
                         </div>
                     </div>
