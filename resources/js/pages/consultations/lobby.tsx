@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect, type ElementType } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -13,8 +12,10 @@ import {
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import { useState, useRef, useEffect  } from 'react';
+import type {ElementType} from 'react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -187,6 +188,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 audioContextRef.current.close();
                 audioContextRef.current = null;
             }
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setMicLevel(0);
             return;
         }
@@ -366,9 +368,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                 {/* Live mic level meter */}
                                 {/* Minimal mic level indicator */}
                                 {(() => {
-
-                                    const hasAudio = (streamRef.current?.getAudioTracks()?.length ?? 0) > 0;
-                                    const active = cameraOn && micOn && hasAudio;
+                                    const hasAudioTrack = mediaStream && mediaStream.getAudioTracks().length > 0;
+                                    const active = cameraOn && micOn && hasAudioTrack;
 
                                     // 3 bars like a speaker icon level meter
                                     const thresholds = [0.15, 0.35, 0.6];
