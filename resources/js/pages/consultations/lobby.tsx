@@ -274,7 +274,10 @@ export default function ConsultationLobbyPage({
                 analyserRef.current.disconnect();
                 analyserRef.current = null;
             }
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            if (
+                audioContextRef.current &&
+                audioContextRef.current.state !== 'closed'
+            ) {
                 audioContextRef.current.close();
                 audioContextRef.current = null;
             }
@@ -284,14 +287,18 @@ export default function ConsultationLobbyPage({
         }
 
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const resume = () => audioContext.resume().catch(() => { });
+            const audioContext = new (
+                window.AudioContext || (window as any).webkitAudioContext
+            )();
+            const resume = () => audioContext.resume().catch(() => {});
 
             void resume();
 
             const resumeOnce = () => resume();
             if (audioContext.state === 'suspended') {
-                window.addEventListener('pointerdown', resumeOnce, { once: true });
+                window.addEventListener('pointerdown', resumeOnce, {
+                    once: true,
+                });
                 window.addEventListener('keydown', resumeOnce, { once: true });
             }
 
@@ -341,7 +348,10 @@ export default function ConsultationLobbyPage({
                     analyserRef.current.disconnect();
                     analyserRef.current = null;
                 }
-                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                if (
+                    audioContextRef.current &&
+                    audioContextRef.current.state !== 'closed'
+                ) {
                     audioContextRef.current.close();
                     audioContextRef.current = null;
                 }
@@ -452,9 +462,13 @@ export default function ConsultationLobbyPage({
             );
 
             setConnectState('connected');
-            toast.success('Session credentials issued. Redirecting to call UI...');
+            toast.success(
+                'Session credentials issued. Redirecting to call UI...',
+            );
 
-            router.visit(ConsultationSessionController.show.url(consultation.id));
+            router.visit(
+                ConsultationSessionController.show.url(consultation.id),
+            );
         } catch (error) {
             const message =
                 error instanceof Error
