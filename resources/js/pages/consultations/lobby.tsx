@@ -12,8 +12,8 @@ import {
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import { useState, useRef, useEffect  } from 'react';
-import type {ElementType} from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { ElementType } from 'react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
@@ -218,7 +218,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
             // Throttle UI updates to avoid React re-renders on every animation frame
             const updateInterval = 100; // ms (10 fps)
-            let lastUpdateTime = performance.now();
+            let lastUpdateTime = 0;
 
             const updateLevel = () => {
                 analyser.getByteFrequencyData(dataArray);
@@ -232,10 +232,10 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 // Normalize to 0.0-1.0 (255 is max possible value)
                 const normalizedLevel = rms / 255;
 
-                const now = performance.now();
-                if (now - lastUpdateTime >= updateInterval) {
+                const currentTime = performance.now();
+                if (currentTime - lastUpdateTime >= updateInterval) {
                     setMicLevel(normalizedLevel);
-                    lastUpdateTime = now;
+                    lastUpdateTime = currentTime;
                 }
 
                 animationFrameRef.current = requestAnimationFrame(updateLevel);
