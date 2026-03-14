@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect, type ElementType } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -13,8 +12,10 @@ import {
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import { useState, useRef, useEffect  } from 'react';
+import type {ElementType} from 'react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -119,11 +120,13 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                     video: true,
                     audio: micOn,
                 });
-                // Guard against stale async resolution after toggle/unmount
-                if (cancelled) {
+
+                // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
+                if (cancelled || !cameraOn) {
                     stream.getTracks().forEach((track) => track.stop());
                     return;
                 }
+
                 streamRef.current = stream;
                 setMediaStream(stream);
                 if (videoRef.current) {
@@ -143,10 +146,12 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 } else {
                     setCameraError('Camera unavailable');
                 }
+                setPermissionDenied(true);
             }
         };
 
         const stopCamera = () => {
+            cancelled = true;
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
                 streamRef.current = null;
@@ -167,7 +172,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             cancelled = true;
             stopCamera();
         };
-    }, [cameraOn]);
+    }, [cameraOn, micOn]);
 
     // Handle mic on/off (only toggle audio track if camera is already running)
     useEffect(() => {
@@ -195,6 +200,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 audioContextRef.current.close();
                 audioContextRef.current = null;
             }
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setMicLevel(0);
             return;
         }
@@ -223,6 +229,10 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
             let lastUpdate = 0;
 
+            // Throttle UI updates to avoid React re-renders on every animation frame
+            const updateInterval = 100; // ms (10 fps)
+            let lastUpdateTime = performance.now();
+
             const updateLevel = () => {
                 analyser.getByteFrequencyData(dataArray);
 
@@ -240,6 +250,16 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                     const normalizedLevel = rms / 255;
                     setMicLevel(normalizedLevel);
                 }
+                const rms = Math.sqrt(sum / dataArray.length);
+                // Normalize to 0.0-1.0 (255 is max possible value)
+                const normalizedLevel = rms / 255;
+
+                const now = performance.now();
+                if (now - lastUpdateTime >= updateInterval) {
+                    setMicLevel(normalizedLevel);
+                    lastUpdateTime = now;
+                }
+
                 animationFrameRef.current = requestAnimationFrame(updateLevel);
             };
 
@@ -370,9 +390,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                 {/* Live mic level meter */}
                                 {/* Minimal mic level indicator */}
                                 {(() => {
-
-                                    const hasAudio = (streamRef.current?.getAudioTracks()?.length ?? 0) > 0;
-                                    const active = cameraOn && micOn && hasAudio;
+                                    const hasAudioTrack = mediaStream && mediaStream.getAudioTracks().length > 0;
+                                    const active = cameraOn && micOn && hasAudioTrack;
 
                                     // 3 bars like a speaker icon level meter
                                     const thresholds = [0.15, 0.35, 0.6];
