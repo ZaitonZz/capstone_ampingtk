@@ -220,7 +220,7 @@ export default function ConsultationSessionPage({
                                 </LiveKitRoom>
                             </div>
                         ) : (
-                            <div className="flex min-h-105 items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
+                            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
                                 <div className="max-w-md p-6 text-center">
                                     <h2 className="mb-2 text-lg font-semibold">
                                         Call cannot start yet
