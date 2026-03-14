@@ -51,7 +51,9 @@ export default function AddPatientDialog({
 
         try {
             // Get CSRF token from meta tag
-            const csrfElement = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
+            const csrfElement = document.querySelector(
+                'meta[name="csrf-token"]',
+            ) as HTMLMetaElement;
             const csrfToken = csrfElement?.content || '';
 
             if (!csrfToken) {
@@ -64,7 +66,7 @@ export default function AddPatientDialog({
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
@@ -87,9 +89,13 @@ export default function AddPatientDialog({
                 if (responseData.errors) {
                     // Laravel validation errors come as {field: [message]}
                     const formattedErrors: Record<string, string> = {};
-                    Object.entries(responseData.errors).forEach(([key, value]) => {
-                        formattedErrors[key] = Array.isArray(value) ? value[0] : (value as string);
-                    });
+                    Object.entries(responseData.errors).forEach(
+                        ([key, value]) => {
+                            formattedErrors[key] = Array.isArray(value)
+                                ? value[0]
+                                : (value as string);
+                        },
+                    );
                     setErrors(formattedErrors);
                     error('Please check the form for errors');
                 } else {
@@ -99,20 +105,22 @@ export default function AddPatientDialog({
             }
 
             success('Patient added successfully!');
-            
+
             // Reset form before closing dialog
             try {
                 e.currentTarget.reset();
             } catch (resetError) {
                 console.error('Error resetting form:', resetError);
             }
-            
+
             onOpenChange(false);
             onSuccess();
             setGender(''); // Reset gender state
         } catch (err) {
             console.error('Fetch error:', err);
-            error(`An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            error(
+                `An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`,
+            );
         } finally {
             setProcessing(false);
         }
@@ -135,7 +143,7 @@ export default function AddPatientDialog({
                     Add Patient
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogTitle>Add New Patient</DialogTitle>
                 <DialogDescription>
                     Enter patient information to create a new record.
@@ -197,8 +205,7 @@ export default function AddPatientDialog({
 
                         <div className="space-y-2 sm:col-span-2">
                             <Label htmlFor="gender">
-                                Sex{' '}
-                                <span className="text-destructive">*</span>
+                                Sex <span className="text-destructive">*</span>
                             </Label>
                             <Select
                                 value={gender}

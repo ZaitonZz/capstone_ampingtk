@@ -33,7 +33,9 @@ export default function DeletePatientDialog({
         setProcessing(true);
 
         try {
-            const csrfElement = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
+            const csrfElement = document.querySelector(
+                'meta[name="csrf-token"]',
+            ) as HTMLMetaElement;
             const csrfToken = csrfElement?.content || '';
 
             if (!csrfToken) {
@@ -45,7 +47,7 @@ export default function DeletePatientDialog({
             const response = await fetch(`/patients/${patient.id}`, {
                 method: 'DELETE',
                 headers: {
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
@@ -73,7 +75,9 @@ export default function DeletePatientDialog({
             onSuccess();
         } catch (err) {
             console.error('Fetch error:', err);
-            error(`An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            error(
+                `An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`,
+            );
         } finally {
             setProcessing(false);
         }
@@ -90,24 +94,29 @@ export default function DeletePatientDialog({
                 </DialogDescription>
 
                 <div className="py-4">
-                    <div className="bg-muted rounded-lg p-4">
+                    <div className="rounded-lg bg-muted p-4">
                         <p className="text-sm font-medium">
                             {patient.last_name}, {patient.first_name}
-                            {patient.middle_name && ` ${patient.middle_name.charAt(0)}.`}
+                            {patient.middle_name &&
+                                ` ${patient.middle_name.charAt(0)}.`}
                         </p>
                         <p className="text-sm text-muted-foreground">
                             MRN: {patient.id.toString().padStart(6, '0')}
                         </p>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-4">
-                        This action will soft-delete the patient record. The data will be
-                        archived and can be recovered if needed.
+                    <p className="mt-4 text-sm text-muted-foreground">
+                        This action will soft-delete the patient record. The
+                        data will be archived and can be recovered if needed.
                     </p>
                 </div>
 
                 <DialogFooter className="gap-2">
                     <DialogClose asChild>
-                        <Button type="button" variant="secondary" disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={processing}
+                        >
                             Cancel
                         </Button>
                     </DialogClose>

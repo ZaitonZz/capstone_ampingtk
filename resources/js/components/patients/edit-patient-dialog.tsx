@@ -51,7 +51,10 @@ export default function EditPatientDialog({
             let formattedDate = '';
             if (patient.date_of_birth) {
                 // If already in YYYY-MM-DD format, use it directly
-                if (typeof patient.date_of_birth === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(patient.date_of_birth)) {
+                if (
+                    typeof patient.date_of_birth === 'string' &&
+                    /^\d{4}-\d{2}-\d{2}$/.test(patient.date_of_birth)
+                ) {
                     formattedDate = patient.date_of_birth;
                 } else {
                     // Otherwise, try to parse and format it
@@ -85,7 +88,9 @@ export default function EditPatientDialog({
         };
 
         try {
-            const csrfElement = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement;
+            const csrfElement = document.querySelector(
+                'meta[name="csrf-token"]',
+            ) as HTMLMetaElement;
             const csrfToken = csrfElement?.content || '';
 
             if (!csrfToken) {
@@ -98,7 +103,7 @@ export default function EditPatientDialog({
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
+                    Accept: 'application/json',
                     'X-CSRF-TOKEN': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
@@ -120,9 +125,13 @@ export default function EditPatientDialog({
             if (!response.ok) {
                 if (responseData.errors) {
                     const formattedErrors: Record<string, string> = {};
-                    Object.entries(responseData.errors).forEach(([key, value]) => {
-                        formattedErrors[key] = Array.isArray(value) ? value[0] : (value as string);
-                    });
+                    Object.entries(responseData.errors).forEach(
+                        ([key, value]) => {
+                            formattedErrors[key] = Array.isArray(value)
+                                ? value[0]
+                                : (value as string);
+                        },
+                    );
                     setErrors(formattedErrors);
                     error('Please check the form for errors');
                 } else {
@@ -136,7 +145,9 @@ export default function EditPatientDialog({
             onSuccess();
         } catch (err) {
             console.error('Fetch error:', err);
-            error(`An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            error(
+                `An error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`,
+            );
         } finally {
             setProcessing(false);
         }
@@ -151,7 +162,7 @@ export default function EditPatientDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogTitle>Edit Patient</DialogTitle>
                 <DialogDescription>
                     Update patient information.
@@ -167,7 +178,12 @@ export default function EditPatientDialog({
                             <Input
                                 id="edit_first_name"
                                 value={formData.first_name}
-                                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        first_name: e.target.value,
+                                    })
+                                }
                                 required
                                 maxLength={100}
                             />
@@ -182,7 +198,12 @@ export default function EditPatientDialog({
                             <Input
                                 id="edit_last_name"
                                 value={formData.last_name}
-                                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        last_name: e.target.value,
+                                    })
+                                }
                                 required
                                 maxLength={100}
                             />
@@ -190,11 +211,18 @@ export default function EditPatientDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="edit_middle_name">Middle Name</Label>
+                            <Label htmlFor="edit_middle_name">
+                                Middle Name
+                            </Label>
                             <Input
                                 id="edit_middle_name"
                                 value={formData.middle_name}
-                                onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        middle_name: e.target.value,
+                                    })
+                                }
                                 maxLength={100}
                             />
                             <InputError message={errors.middle_name} />
@@ -208,7 +236,12 @@ export default function EditPatientDialog({
                             <Input
                                 id="edit_date_of_birth"
                                 value={formData.date_of_birth}
-                                onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                                onChange={(e) =>
+                                    setFormData({
+                                        ...formData,
+                                        date_of_birth: e.target.value,
+                                    })
+                                }
                                 type="date"
                                 required
                             />
@@ -217,8 +250,7 @@ export default function EditPatientDialog({
 
                         <div className="space-y-2 sm:col-span-2">
                             <Label htmlFor="edit_gender">
-                                Sex{' '}
-                                <span className="text-destructive">*</span>
+                                Sex <span className="text-destructive">*</span>
                             </Label>
                             <Select
                                 value={gender}

@@ -32,7 +32,7 @@ export default function ViewPatientDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                 <DialogTitle>Patient Details</DialogTitle>
                 <DialogDescription>
                     MRN: {patient.id.toString().padStart(6, '0')}
@@ -44,14 +44,18 @@ export default function ViewPatientDialog({
                             <dt className="text-sm font-medium text-muted-foreground">
                                 First Name
                             </dt>
-                            <dd className="mt-1 text-sm">{patient.first_name}</dd>
+                            <dd className="mt-1 text-sm">
+                                {patient.first_name}
+                            </dd>
                         </div>
 
                         <div>
                             <dt className="text-sm font-medium text-muted-foreground">
                                 Last Name
                             </dt>
-                            <dd className="mt-1 text-sm">{patient.last_name}</dd>
+                            <dd className="mt-1 text-sm">
+                                {patient.last_name}
+                            </dd>
                         </div>
 
                         {patient.middle_name && (
@@ -78,7 +82,9 @@ export default function ViewPatientDialog({
                             <dt className="text-sm font-medium text-muted-foreground">
                                 Age
                             </dt>
-                            <dd className="mt-1 text-sm">{patient.age} years</dd>
+                            <dd className="mt-1 text-sm">
+                                {patient.age} years
+                            </dd>
                         </div>
 
                         <div>
@@ -117,7 +123,9 @@ export default function ViewPatientDialog({
                                 <dt className="text-sm font-medium text-muted-foreground">
                                     Email
                                 </dt>
-                                <dd className="mt-1 text-sm">{patient.email}</dd>
+                                <dd className="mt-1 text-sm">
+                                    {patient.email}
+                                </dd>
                             </div>
                         )}
 
@@ -126,7 +134,9 @@ export default function ViewPatientDialog({
                                 <dt className="text-sm font-medium text-muted-foreground">
                                     Blood Type
                                 </dt>
-                                <dd className="mt-1 text-sm">{patient.blood_type}</dd>
+                                <dd className="mt-1 text-sm">
+                                    {patient.blood_type}
+                                </dd>
                             </div>
                         )}
                     </div>
@@ -145,13 +155,15 @@ export default function ViewPatientDialog({
                             <dt className="text-sm font-medium text-muted-foreground">
                                 Known Allergies
                             </dt>
-                            <dd className="mt-1 text-sm">{patient.known_allergies}</dd>
+                            <dd className="mt-1 text-sm">
+                                {patient.known_allergies}
+                            </dd>
                         </div>
                     )}
 
                     {patient.emergency_contact_name && (
-                        <div className="pt-4 border-t">
-                            <h4 className="text-sm font-medium mb-3">
+                        <div className="border-t pt-4">
+                            <h4 className="mb-3 text-sm font-medium">
                                 Emergency Contact
                             </h4>
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -177,8 +189,8 @@ export default function ViewPatientDialog({
                         </div>
                     )}
 
-                    <div className="pt-4 border-t">
-                        <div className="grid gap-4 sm:grid-cols-2 text-xs text-muted-foreground">
+                    <div className="border-t pt-4">
+                        <div className="grid gap-4 text-xs text-muted-foreground sm:grid-cols-2">
                             <div>
                                 <dt className="font-medium">Created</dt>
                                 <dd className="mt-1">

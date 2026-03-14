@@ -274,24 +274,31 @@ export default function ConsultationLobbyPage({
                 analyserRef.current.disconnect();
                 analyserRef.current = null;
             }
-            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+            if (
+                audioContextRef.current &&
+                audioContextRef.current.state !== 'closed'
+            ) {
                 audioContextRef.current.close();
                 audioContextRef.current = null;
             }
-             
+
             setMicLevel(0);
             return;
         }
 
         try {
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const resume = () => audioContext.resume().catch(() => { });
+            const audioContext = new (
+                window.AudioContext || (window as any).webkitAudioContext
+            )();
+            const resume = () => audioContext.resume().catch(() => {});
 
             void resume();
 
             const resumeOnce = () => resume();
             if (audioContext.state === 'suspended') {
-                window.addEventListener('pointerdown', resumeOnce, { once: true });
+                window.addEventListener('pointerdown', resumeOnce, {
+                    once: true,
+                });
                 window.addEventListener('keydown', resumeOnce, { once: true });
             }
 
@@ -341,7 +348,10 @@ export default function ConsultationLobbyPage({
                     analyserRef.current.disconnect();
                     analyserRef.current = null;
                 }
-                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                if (
+                    audioContextRef.current &&
+                    audioContextRef.current.state !== 'closed'
+                ) {
                     audioContextRef.current.close();
                     audioContextRef.current = null;
                 }
@@ -442,9 +452,13 @@ export default function ConsultationLobbyPage({
             );
 
             setConnectState('connected');
-            toast.success('Session credentials issued. Redirecting to call UI...');
+            toast.success(
+                'Session credentials issued. Redirecting to call UI...',
+            );
 
-            router.visit(ConsultationSessionController.show.url(consultation.id));
+            router.visit(
+                ConsultationSessionController.show.url(consultation.id),
+            );
         } catch (error) {
             const message =
                 error instanceof Error
@@ -558,14 +572,17 @@ export default function ConsultationLobbyPage({
                                 )}
 
                                 {(() => {
-                                    const hasAudioTrack = mediaStream && mediaStream.getAudioTracks().length > 0;
-                                    const active = cameraOn && micOn && hasAudioTrack;
+                                    const hasAudioTrack =
+                                        mediaStream &&
+                                        mediaStream.getAudioTracks().length > 0;
+                                    const active =
+                                        cameraOn && micOn && hasAudioTrack;
 
                                     const thresholds = [0.15, 0.35, 0.6];
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
-                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 backdrop-blur-sm ring-1 ring-white/10">
+                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 ring-1 ring-white/10 backdrop-blur-sm">
                                             {active ? (
                                                 <Mic className="h-3.5 w-3.5 text-white/80" />
                                             ) : (
@@ -579,7 +596,10 @@ export default function ConsultationLobbyPage({
                                                         className={[
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
-                                                            active && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
+                                                            active &&
+                                                            micLevel >= t
+                                                                ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                                                : 'bg-white/10',
                                                         ].join(' ')}
                                                     />
                                                 ))}
