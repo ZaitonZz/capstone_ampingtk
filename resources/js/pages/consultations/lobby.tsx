@@ -14,8 +14,8 @@ import {
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import { useMemo, useState  } from 'react';
-import type {ElementType} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ElementType } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -164,6 +164,16 @@ export default function ConsultationLobbyPage({
     const [cameraOn, setCameraOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
     const [deviceTestOpen, setDeviceTestOpen] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [micLevel, setMicLevel] = useState(0);
+    const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [connectError, setConnectError] = useState<string | null>(null);
     const isConsentConfirmed = consent?.consent_confirmed === true;
@@ -177,6 +187,169 @@ export default function ConsultationLobbyPage({
             ConsultationLiveKitController.connect.url(consultation.id),
         [consultation.id, livekit?.connect_url],
     );
+
+    // Handle camera on/off
+    useEffect(() => {
+        let cancelled = false;
+
+        const startCamera = async () => {
+            try {
+                setCameraError(null);
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: micOn,
+                });
+
+                // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
+                if (cancelled || !cameraOn) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
+                streamRef.current = stream;
+                setMediaStream(stream);
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Failed to access camera:', error);
+                if (error instanceof DOMException) {
+                    if (error.name === 'NotAllowedError') {
+                        setCameraError('Camera permission denied');
+                    } else if (error.name === 'NotFoundError') {
+                        setCameraError('No camera device found');
+                    } else {
+                        setCameraError('Camera unavailable');
+                    }
+                } else {
+                    setCameraError('Camera unavailable');
+                }
+            }
+        };
+
+        const stopCamera = () => {
+            cancelled = true;
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+            }
+            setMediaStream(null);
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+        };
+
+        if (cameraOn) {
+            startCamera();
+        } else {
+            stopCamera();
+        }
+
+        return () => {
+            cancelled = true;
+            stopCamera();
+        };
+    }, [cameraOn, micOn]);
+
+    // Handle mic on/off (only toggle audio track if camera is already running)
+    useEffect(() => {
+        if (streamRef.current && cameraOn) {
+            const audioTracks = streamRef.current.getAudioTracks();
+            audioTracks.forEach((track) => {
+                track.enabled = micOn;
+            });
+        }
+    }, [micOn, cameraOn]);
+
+    // Setup audio analyzer for mic level when mic is on
+    useEffect(() => {
+        if (!micOn || !mediaStream) {
+            // Cleanup if mic is off or no media stream
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
+            if (analyserRef.current) {
+                analyserRef.current.disconnect();
+                analyserRef.current = null;
+            }
+            if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close();
+                audioContextRef.current = null;
+            }
+             
+            setMicLevel(0);
+            return;
+        }
+
+        try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const resume = () => audioContext.resume().catch(() => { });
+
+            void resume();
+
+            const resumeOnce = () => resume();
+            if (audioContext.state === 'suspended') {
+                window.addEventListener('pointerdown', resumeOnce, { once: true });
+                window.addEventListener('keydown', resumeOnce, { once: true });
+            }
+
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+
+            const source = audioContext.createMediaStreamSource(mediaStream);
+            source.connect(analyser);
+
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let lastUpdate = 0;
+
+            const updateLevel = () => {
+                analyser.getByteFrequencyData(dataArray);
+
+                // Throttle React state updates to ~12fps to avoid excessive re-renders
+                const now = performance.now();
+                if (now - lastUpdate >= 80) {
+                    lastUpdate = now;
+                    // Calculate RMS (Root Mean Square) for mic level
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i] * dataArray[i];
+                    }
+                    const rms = Math.sqrt(sum / dataArray.length);
+                    // Normalize to 0.0-1.0 (255 is max possible value)
+                    const normalizedLevel = rms / 255;
+                    setMicLevel(normalizedLevel);
+                }
+
+                animationFrameRef.current = requestAnimationFrame(updateLevel);
+            };
+
+            animationFrameRef.current = requestAnimationFrame(updateLevel);
+
+            return () => {
+                window.removeEventListener('pointerdown', resumeOnce);
+                window.removeEventListener('keydown', resumeOnce);
+                if (animationFrameRef.current) {
+                    cancelAnimationFrame(animationFrameRef.current);
+                    animationFrameRef.current = null;
+                }
+                if (analyserRef.current) {
+                    analyserRef.current.disconnect();
+                    analyserRef.current = null;
+                }
+                if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+                    audioContextRef.current.close();
+                    audioContextRef.current = null;
+                }
+            };
+        } catch (error) {
+            console.error('Failed to setup audio analyzer:', error);
+        }
+    }, [micOn, mediaStream]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -351,14 +524,28 @@ export default function ConsultationLobbyPage({
                                 </span>
 
                                 {cameraOn ? (
-                                    <div className="flex flex-col items-center gap-4">
-                                        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-linear-to-br from-zinc-600 to-zinc-700 text-zinc-300 ring-2 ring-white/10">
-                                            <User className="h-10 w-10" />
-                                        </div>
-                                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-zinc-400">
-                                            Camera preview unavailable
-                                        </span>
-                                    </div>
+                                    <>
+                                        {cameraError ? (
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-950 text-rose-700 ring-2 ring-white/5">
+                                                    <VideoOff className="h-12 w-12" />
+                                                </div>
+                                                <div className="text-center">
+                                                    <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-rose-400">
+                                                        {cameraError}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <video
+                                                ref={videoRef}
+                                                autoPlay
+                                                playsInline
+                                                muted
+                                                className="h-full w-full object-cover"
+                                            />
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="flex flex-col items-center gap-4">
                                         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zinc-900 text-zinc-700 ring-2 ring-white/5">
@@ -370,12 +557,36 @@ export default function ConsultationLobbyPage({
                                     </div>
                                 )}
 
-                                {micOn && (
-                                    <span className="absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-500/30 backdrop-blur-sm">
-                                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                                        Mic active
-                                    </span>
-                                )}
+                                {(() => {
+                                    const hasAudioTrack = mediaStream && mediaStream.getAudioTracks().length > 0;
+                                    const active = cameraOn && micOn && hasAudioTrack;
+
+                                    const thresholds = [0.15, 0.35, 0.6];
+                                    const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
+
+                                    return (
+                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 backdrop-blur-sm ring-1 ring-white/10">
+                                            {active ? (
+                                                <Mic className="h-3.5 w-3.5 text-white/80" />
+                                            ) : (
+                                                <MicOff className="h-3.5 w-3.5 text-white/40" />
+                                            )}
+
+                                            <div className="flex items-end gap-0.5">
+                                                {thresholds.map((t, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className={[
+                                                            'w-0.5 rounded-full transition-all duration-75',
+                                                            heights[i],
+                                                            active && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
+                                                        ].join(' ')}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="mt-4 flex shrink-0 items-center justify-between">
