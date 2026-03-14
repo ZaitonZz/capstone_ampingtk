@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -14,10 +14,12 @@ import {
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ElementType } from 'react';
+import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
 import { Button } from '@/components/ui/button';
@@ -276,7 +278,7 @@ export default function ConsultationLobbyPage({
                 audioContextRef.current.close();
                 audioContextRef.current = null;
             }
-             
+
             setMicLevel(0);
             return;
         }
@@ -632,16 +634,16 @@ export default function ConsultationLobbyPage({
     const statusLabel = !isLiveKitEnabled
         ? 'LiveKit disabled'
         : isAdminUser
-          ? 'Admin audit access'
-          : isConsentConfirmed
-            ? 'Ready to join'
-            : 'Consent required';
+            ? 'Admin audit access'
+            : isConsentConfirmed
+                ? 'Ready to join'
+                : 'Consent required';
 
     const statusPillClass = !isLiveKitEnabled
         ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
         : canJoinSession
-          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
-          : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
+            : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -694,7 +696,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative w-full aspect-video max-h-[520px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="relative w-full aspect-video max-h-130 overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm z-10">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -814,7 +816,7 @@ export default function ConsultationLobbyPage({
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex flex-col gap-3 lg:col-span-1 lg:min-w-[16.25rem]">
+                    <div className="flex flex-col gap-3 w-80">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
@@ -854,8 +856,8 @@ export default function ConsultationLobbyPage({
                                         consultation.type === 'teleconsultation'
                                             ? 'Video Teleconsult'
                                             : consultation.type === 'in_person'
-                                              ? 'In-person Consultation'
-                                              : '—'
+                                                ? 'In-person Consultation'
+                                                : '—'
                                     }
                                 />
                                 <SessionRow
@@ -865,8 +867,8 @@ export default function ConsultationLobbyPage({
                                     value={
                                         consultation.scheduled_at
                                             ? new Date(
-                                                  consultation.scheduled_at,
-                                              ).toLocaleString()
+                                                consultation.scheduled_at,
+                                            ).toLocaleString()
                                             : '—'
                                     }
                                 />
