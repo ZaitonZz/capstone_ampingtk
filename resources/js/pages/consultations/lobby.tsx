@@ -389,10 +389,10 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                 {/* Minimal mic level indicator */}
                                 {(() => {
                                     const micActive = micOn;
-                                    const showLevelBars = cameraOn && micActive;
+                                    const showLevelBars = micActive;
 
                                     // 3 bars like a speaker icon level meter
-                                    const thresholds = [0.15, 0.35, 0.6];
+                                    const thresholds = [0.10, 0.1, 0.2];
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
