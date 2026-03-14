@@ -215,6 +215,10 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
+            // Throttle UI updates to avoid React re-renders on every animation frame
+            const updateInterval = 100; // ms (10 fps)
+            let lastUpdateTime = performance.now();
+
             const updateLevel = () => {
                 analyser.getByteFrequencyData(dataArray);
 
@@ -227,7 +231,12 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 // Normalize to 0.0-1.0 (255 is max possible value)
                 const normalizedLevel = rms / 255;
 
-                setMicLevel(normalizedLevel);
+                const now = performance.now();
+                if (now - lastUpdateTime >= updateInterval) {
+                    setMicLevel(normalizedLevel);
+                    lastUpdateTime = now;
+                }
+
                 animationFrameRef.current = requestAnimationFrame(updateLevel);
             };
 
