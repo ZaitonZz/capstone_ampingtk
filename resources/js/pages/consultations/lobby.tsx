@@ -197,7 +197,7 @@ export default function ConsultationLobbyPage({
                 setCameraError(null);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
-                    audio: true,
+                    audio: micOn,
                 });
 
                 // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
@@ -250,7 +250,7 @@ export default function ConsultationLobbyPage({
             cancelled = true;
             stopCamera();
         };
-    }, [cameraOn]);
+    }, [cameraOn, micOn]);
 
     // Handle mic on/off (only toggle audio track if camera is already running)
     useEffect(() => {
@@ -531,7 +531,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative w-full aspect-video max-h-130 overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="relative w-full aspect-video max-h-[130px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm z-10">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -575,11 +575,11 @@ export default function ConsultationLobbyPage({
                                 {/* Live mic level meter */}
                                 {/* Minimal mic level indicator */}
                                 {(() => {
-                                    const micActive = micOn;
+                                    const micActive = micOn && micLevel > 0;
                                     const showLevelBars = micActive;
 
                                     // 3 bars like a speaker icon level meter
-                                    const thresholds = [0.10, 0.1, 0.2];
+                                    const thresholds = [0.05, 0.15, 0.3];
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
@@ -651,7 +651,7 @@ export default function ConsultationLobbyPage({
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex flex-col gap-3 w-80">
+                    <div className="flex flex-col gap-3 w-full lg:w-80">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
