@@ -149,7 +149,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         return () => {
             stopCamera();
         };
-    }, [cameraOn]);
+    }, [cameraOn, micOn]);
 
     // Handle mic on/off (only toggle audio track if camera is already running)
     useEffect(() => {
