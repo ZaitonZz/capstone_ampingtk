@@ -1,21 +1,27 @@
-import { useState, type ElementType } from 'react';
-import { Head, Link } from '@inertiajs/react';
+﻿import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
     CheckCircle2,
+    LoaderCircle,
     Mic,
     MicOff,
     Monitor,
+    Shield,
     Stethoscope,
     User,
     Video,
     VideoOff,
     Volume2,
 } from 'lucide-react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import { useMemo, useState  } from 'react';
+import type {ElementType} from 'react';
+import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
+import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -31,10 +37,41 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { Consultation, ConsultationConsent } from '@/types/consultation';
 
+interface LiveKitLobbyProps {
+    enabled: boolean;
+    room_status: string | null;
+    room_name: string | null;
+    connect_url: string;
+    ws_url: string | null;
+}
+
+interface LiveKitConnectPayload {
+    room_name: string;
+    room_status: string;
+    participant_token: string;
+    ws_url: string | null;
+    role: string;
+}
+
+interface AuthUser {
+    id: number;
+    role: string;
+}
+
+interface PageProps {
+    [key: string]: unknown;
+    auth?: {
+        user?: AuthUser;
+    };
+}
+
 interface Props {
     consultation: Consultation;
     consent: ConsultationConsent | null;
+    livekit?: LiveKitLobbyProps;
 }
+
+type ConnectState = 'idle' | 'connecting' | 'connected' | 'error';
 
 function SessionRow({
     icon: Icon,
@@ -49,12 +86,16 @@ function SessionRow({
 }) {
     return (
         <div className="flex items-start gap-2.5">
-            <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
+            <div
+                className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconClass}`}
+            >
                 <Icon className="h-3.5 w-3.5" />
             </div>
             <div>
-                <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">{label}</p>
-                <p className="text-xs font-medium leading-snug">{value}</p>
+                <p className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </p>
+                <p className="text-xs leading-snug font-medium">{value}</p>
             </div>
         </div>
     );
@@ -74,13 +115,14 @@ function DeviceButton({
     onClick?: () => void;
 }) {
     const Icon = on ? OnIcon : OffIcon;
+
     return (
         <button
             type="button"
             onClick={onClick}
             title={label}
             className={[
-                'flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-semibold transition-all duration-200 shadow-xs',
+                'flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-[11px] font-semibold shadow-xs transition-all duration-200',
                 on
                     ? 'bg-primary/10 text-primary ring-1 ring-primary/25 hover:bg-primary/20 hover:ring-primary/40'
                     : 'bg-rose-50 text-rose-600 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-950 dark:text-rose-400 dark:ring-rose-800',
@@ -92,12 +134,49 @@ function DeviceButton({
     );
 }
 
-export default function ConsultationLobbyPage({ consultation, consent }: Props) {
+function getMetaCsrfToken(): string {
+    const element = document.querySelector(
+        'meta[name="csrf-token"]',
+    ) as HTMLMetaElement | null;
+
+    return element?.content ?? '';
+}
+
+function getCookie(name: string): string | null {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = document.cookie.match(
+        new RegExp('(?:^|; )' + escapedName + '=([^;]*)'),
+    );
+
+    if (!match || match[1] === undefined) {
+        return null;
+    }
+
+    return decodeURIComponent(match[1]);
+}
+
+export default function ConsultationLobbyPage({
+    consultation,
+    consent,
+    livekit,
+}: Props) {
+    const page = usePage<PageProps>();
     const [cameraOn, setCameraOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
     const [deviceTestOpen, setDeviceTestOpen] = useState(false);
-
+    const [connectState, setConnectState] = useState<ConnectState>('idle');
+    const [connectError, setConnectError] = useState<string | null>(null);
     const isConsentConfirmed = consent?.consent_confirmed === true;
+    const isAdminUser = page.props.auth?.user?.role === 'admin';
+    const canJoinSession = isConsentConfirmed || isAdminUser;
+    const isLiveKitEnabled = livekit?.enabled === true;
+
+    const connectEndpoint = useMemo(
+        () =>
+            livekit?.connect_url ??
+            ConsultationLiveKitController.connect.url(consultation.id),
+        [consultation.id, livekit?.connect_url],
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -111,15 +190,123 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         },
     ];
 
+    async function handleJoinCall(): Promise<void> {
+        if (!canJoinSession) {
+            toast.error(
+                'Consent is required before joining this teleconsultation.',
+            );
+
+            return;
+        }
+
+        if (!isLiveKitEnabled) {
+            toast.error('LiveKit is not enabled yet in this environment.');
+
+            return;
+        }
+
+        const csrfToken = getMetaCsrfToken();
+        const xsrfToken = getCookie('XSRF-TOKEN');
+
+        if (csrfToken === '' && !xsrfToken) {
+            setConnectState('error');
+            setConnectError(
+                'Security token is missing. Please refresh the page and try again.',
+            );
+
+            return;
+        }
+
+        setConnectState('connecting');
+        setConnectError(null);
+
+        try {
+            const response = await fetch(connectEndpoint, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    ...(csrfToken !== '' ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                    ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({}),
+            });
+
+            const payload =
+                (await response.json()) as Partial<LiveKitConnectPayload> & {
+                    message?: string;
+                };
+
+            if (!response.ok) {
+                const message =
+                    payload.message ??
+                    'Unable to connect to the teleconsultation room.';
+
+                throw new Error(message);
+            }
+
+            if (
+                !payload.room_name ||
+                !payload.participant_token ||
+                !payload.room_status
+            ) {
+                throw new Error('The server response is incomplete.');
+            }
+
+            const sessionPayload: LiveKitConnectPayload = {
+                room_name: payload.room_name,
+                room_status: payload.room_status,
+                participant_token: payload.participant_token,
+                ws_url: payload.ws_url ?? livekit?.ws_url ?? null,
+                role: payload.role ?? 'participant',
+            };
+
+            window.sessionStorage.setItem(
+                `livekit-connect-${consultation.id}`,
+                JSON.stringify(sessionPayload),
+            );
+
+            setConnectState('connected');
+            toast.success('Session credentials issued. Redirecting to call UI...');
+
+            router.visit(ConsultationSessionController.show.url(consultation.id));
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Unexpected connection error.';
+            setConnectState('error');
+            setConnectError(message);
+            toast.error(message);
+        }
+    }
+
+    const statusLabel = !isLiveKitEnabled
+        ? 'LiveKit disabled'
+        : isAdminUser
+          ? 'Admin audit access'
+          : isConsentConfirmed
+            ? 'Ready to join'
+            : 'Consent required';
+
+    const statusPillClass = !isLiveKitEnabled
+        ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
+        : canJoinSession
+          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
+          : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Teleconsultation Lobby" />
 
             <div className="flex h-[calc(100svh-4rem)] flex-col overflow-hidden p-4 md:p-6">
-                {/* ── Page header ──────────────────────────────────────────── */}
                 <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Teleconsultation Lobby</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">
+                            Teleconsultation Lobby
+                        </h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">
                             {consultation.patient?.full_name
                                 ? `Preparing session for ${consultation.patient.full_name}`
@@ -127,28 +314,25 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                         </p>
                     </div>
 
-                    {/* Ready status pill */}
                     <div
                         className={[
-                            'flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold ring-1 shadow-xs',
-                            isConsentConfirmed
-                                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
-                                : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700',
+                            'flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold shadow-xs ring-1',
+                            statusPillClass,
                         ].join(' ')}
                     >
                         <span
                             className={[
-                                'h-2 w-2 rounded-full',
-                                isConsentConfirmed ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-pulse',
+                                'h-2 w-2 animate-pulse rounded-full',
+                                canJoinSession
+                                    ? 'bg-emerald-500'
+                                    : 'bg-amber-500',
                             ].join(' ')}
                         />
-                        {isConsentConfirmed ? 'Ready to join' : 'Consent required'}
+                        {statusLabel}
                     </div>
                 </div>
 
-                {/* ── Main 2-column layout ──────────────────────────────────── */}
                 <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-4">
-                    {/* ── LEFT (3 cols): Camera & Mic ──────────────────────── */}
                     <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
                         <div className="flex min-h-0 flex-1 flex-col rounded-2xl border bg-card p-5 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
@@ -156,13 +340,11 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                     <Video className="h-3 w-3 text-primary" />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Camera &amp; Mic Check
+                                    Camera and Mic Check
                                 </p>
                             </div>
 
-                            {/* Dark video preview */}
-                            <div className="relative min-h-0 flex-1 w-full overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
-                                {/* Corner label */}
+                            <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
                                 <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                     Preview
@@ -182,27 +364,31 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zinc-900 text-zinc-700 ring-2 ring-white/5">
                                             <VideoOff className="h-12 w-12" />
                                         </div>
-                                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-zinc-500">Camera is off</span>
+                                        <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-zinc-500">
+                                            Camera is off
+                                        </span>
                                     </div>
                                 )}
 
-                                {/* Live mic indicator */}
                                 {micOn && (
                                     <span className="absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-500/30 backdrop-blur-sm">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
                                         Mic active
                                     </span>
                                 )}
                             </div>
 
-                            {/* Device controls */}
-                            <div className="mt-4 shrink-0 flex items-center justify-between">
+                            <div className="mt-4 flex shrink-0 items-center justify-between">
                                 <div className="flex gap-2.5">
                                     <DeviceButton
                                         on={cameraOn}
                                         onIcon={Video}
                                         offIcon={VideoOff}
-                                        label={cameraOn ? 'Camera On' : 'Camera Off'}
+                                        label={
+                                            cameraOn
+                                                ? 'Camera On'
+                                                : 'Camera Off'
+                                        }
                                         onClick={() => setCameraOn((p) => !p)}
                                     />
                                     <DeviceButton
@@ -235,9 +421,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                         </div>
                     </div>
 
-                    {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-[16.25rem]">
-                        {/* Session Details card */}
+                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-65">
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-500/10">
@@ -276,8 +460,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                         consultation.type === 'teleconsultation'
                                             ? 'Video Teleconsult'
                                             : consultation.type === 'in_person'
-                                                ? 'In-person Consultation'
-                                                : '—'
+                                              ? 'In-person Consultation'
+                                              : '—'
                                     }
                                 />
                                 <SessionRow
@@ -286,39 +470,60 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                     iconClass="bg-orange-500/10 text-orange-500"
                                     value={
                                         consultation.scheduled_at
-                                            ? new Date(consultation.scheduled_at).toLocaleString()
+                                            ? new Date(
+                                                  consultation.scheduled_at,
+                                              ).toLocaleString()
                                             : '—'
+                                    }
+                                />
+                                <SessionRow
+                                    icon={Shield}
+                                    label="Room"
+                                    iconClass="bg-indigo-500/10 text-indigo-500"
+                                    value={
+                                        livekit?.room_name ??
+                                        'Will be created by server'
                                     }
                                 />
                             </div>
                         </div>
 
-                        {/* Privacy & Consent card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
-                                <div className={`flex h-5 w-5 items-center justify-center rounded-md ${isConsentConfirmed ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}>
-                                    <CheckCircle2 className={`h-3 w-3 ${isConsentConfirmed ? 'text-emerald-500' : 'text-amber-500'}`} />
+                                <div
+                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${canJoinSession ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
+                                >
+                                    <CheckCircle2
+                                        className={`h-3 w-3 ${canJoinSession ? 'text-emerald-500' : 'text-amber-500'}`}
+                                    />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                    Privacy &amp; Consent
+                                    Privacy and Consent
                                 </p>
                             </div>
 
-                            {/* Consent status banner */}
-                            {isConsentConfirmed ? (
+                            {canJoinSession ? (
                                 <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
                                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-semibold">Consent confirmed</span>
-                                    {consent?.confirmed_at && (
+                                    <span className="font-semibold">
+                                        {isAdminUser
+                                            ? 'Admin audit mode ready'
+                                            : 'Consent confirmed'}
+                                    </span>
+                                    {consent?.confirmed_at && !isAdminUser && (
                                         <span className="ml-auto opacity-60">
-                                            {new Date(consent.confirmed_at).toLocaleDateString()}
+                                            {new Date(
+                                                consent.confirmed_at,
+                                            ).toLocaleDateString()}
                                         </span>
                                     )}
                                 </div>
                             ) : (
                                 <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800">
                                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-medium">Consent required before joining.</span>
+                                    <span className="font-medium">
+                                        Consent required before joining.
+                                    </span>
                                 </div>
                             )}
 
@@ -326,14 +531,18 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                 {[
                                     'Telemedicine consent',
                                     'Data Privacy Act notice',
-                                    'Recording policy (if enabled)',
                                     'Identity Guard verification',
                                 ].map((item) => (
-                                    <li key={item} className="flex items-center gap-2">
+                                    <li
+                                        key={item}
+                                        className="flex items-center gap-2"
+                                    >
                                         <CheckCircle2
                                             className={[
                                                 'h-3 w-3 shrink-0',
-                                                isConsentConfirmed ? 'text-emerald-500' : 'text-muted-foreground/30',
+                                                canJoinSession
+                                                    ? 'text-emerald-500'
+                                                    : 'text-muted-foreground/30',
                                             ].join(' ')}
                                         />
                                         {item}
@@ -346,43 +555,75 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="lobby-consent-check"
-                                    checked={isConsentConfirmed}
+                                    checked={canJoinSession}
                                     disabled
                                 />
                                 <Label
                                     htmlFor="lobby-consent-check"
                                     className="cursor-not-allowed text-xs leading-snug"
                                 >
-                                    I agree to the Privacy Notice and Consent
+                                    {isAdminUser
+                                        ? 'Audit access enabled for admin'
+                                        : 'I agree to the Privacy Notice and Consent'}
                                 </Label>
                             </div>
                         </div>
 
-                        {/* Actions */}
+                        {connectState === 'error' && connectError && (
+                            <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 shadow-sm dark:border-rose-800 dark:bg-rose-950/40">
+                                <p className="text-xs font-semibold tracking-wider text-rose-700 uppercase dark:text-rose-300">
+                                    Connection Error
+                                </p>
+                                <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">
+                                    {connectError}
+                                </p>
+                            </div>
+                        )}
+
                         <div className="flex flex-col gap-2">
-                            {isConsentConfirmed ? (
-                                <Button
-                                    className="w-full gap-2 bg-linear-to-r from-primary to-primary/80 shadow-md shadow-primary/25 hover:shadow-primary/40 transition-shadow"
-                                    asChild
-                                >
-                                    <Link href={ConsultationController.show.url(consultation.id)}>
+                            <Button
+                                className="w-full gap-2 bg-linear-to-r from-primary to-primary/80 shadow-md shadow-primary/25 transition-shadow hover:shadow-primary/40"
+                                onClick={() => {
+                                    void handleJoinCall();
+                                }}
+                                disabled={
+                                    !canJoinSession ||
+                                    !isLiveKitEnabled ||
+                                    connectState === 'connecting'
+                                }
+                            >
+                                {connectState === 'connecting' ? (
+                                    <>
+                                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                                        Connecting...
+                                    </>
+                                ) : (
+                                    <>
                                         <Video className="h-4 w-4" />
-                                        Join Call
-                                    </Link>
-                                </Button>
-                            ) : (
-                                <>
-                                    <Button className="w-full gap-2" disabled>
-                                        <Video className="h-4 w-4" />
-                                        Join Call
-                                    </Button>
-                                    <p className="text-center text-xs text-muted-foreground">
-                                        Complete consent to enable.
-                                    </p>
-                                </>
+                                        {connectState === 'connected'
+                                            ? 'Reconnect Session'
+                                            : 'Join Call'}
+                                    </>
+                                )}
+                            </Button>
+
+                            {!canJoinSession && (
+                                <p className="text-center text-xs text-muted-foreground">
+                                    Complete consent to enable joining.
+                                </p>
                             )}
-                            <Button variant="outline" size="sm" className="w-full shadow-xs" asChild>
-                                <Link href={ConsultationConsentController.show.url(consultation.id)}>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full shadow-xs"
+                                asChild
+                            >
+                                <Link
+                                    href={ConsultationConsentController.show.url(
+                                        consultation.id,
+                                    )}
+                                >
                                     View Full Consent
                                 </Link>
                             </Button>
@@ -391,12 +632,14 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 </div>
             </div>
 
-            {/* Test Devices modal */}
             <Dialog open={deviceTestOpen} onOpenChange={setDeviceTestOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Device Test</DialogTitle>
-                        <DialogDescription>Device test coming soon.</DialogDescription>
+                        <DialogDescription>
+                            Camera and microphone test automation will be added
+                            in the next slice.
+                        </DialogDescription>
                     </DialogHeader>
                 </DialogContent>
             </Dialog>
