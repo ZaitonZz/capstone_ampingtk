@@ -18,7 +18,11 @@ class ConsultationPolicy
 
     public function view(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin() || $consultation->doctor_id === $user->id;
+        if ($user->isAdmin() || $consultation->doctor_id === $user->id) {
+            return true;
+        }
+
+        return $consultation->patient()->where('user_id', $user->id)->exists();
     }
 
     public function create(User $user): bool
