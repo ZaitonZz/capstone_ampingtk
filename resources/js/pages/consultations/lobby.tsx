@@ -96,7 +96,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
     const [cameraOn, setCameraOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
     const [deviceTestOpen, setDeviceTestOpen] = useState(false);
-    const [permissionDenied, setPermissionDenied] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
     const [micLevel, setMicLevel] = useState(0);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
 
@@ -110,22 +110,39 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
     // Handle camera on/off
     useEffect(() => {
+        let cancelled = false;
+
         const startCamera = async () => {
             try {
-                setPermissionDenied(false);
+                setCameraError(null);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
                     audio: micOn,
                 });
+                // Guard against stale async resolution after toggle/unmount
+                if (cancelled) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
                 streamRef.current = stream;
                 setMediaStream(stream);
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                 }
             } catch (error) {
+                if (cancelled) return;
                 console.error('Failed to access camera:', error);
-                setPermissionDenied(true);
-                setCameraOn(false);
+                if (error instanceof DOMException) {
+                    if (error.name === 'NotAllowedError') {
+                        setCameraError('Camera permission denied');
+                    } else if (error.name === 'NotFoundError') {
+                        setCameraError('No camera device found');
+                    } else {
+                        setCameraError('Camera unavailable');
+                    }
+                } else {
+                    setCameraError('Camera unavailable');
+                }
             }
         };
 
@@ -147,6 +164,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         }
 
         return () => {
+            cancelled = true;
             stopCamera();
         };
     }, [cameraOn]);
@@ -203,20 +221,25 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             analyserRef.current = analyser;
 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let lastUpdate = 0;
 
             const updateLevel = () => {
                 analyser.getByteFrequencyData(dataArray);
 
-                // Calculate RMS (Root Mean Square) for mic level
-                let sum = 0;
-                for (let i = 0; i < dataArray.length; i++) {
-                    sum += dataArray[i] * dataArray[i];
+                // Throttle React state updates to ~12fps to avoid excessive re-renders
+                const now = performance.now();
+                if (now - lastUpdate >= 80) {
+                    lastUpdate = now;
+                    // Calculate RMS (Root Mean Square) for mic level
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i] * dataArray[i];
+                    }
+                    const rms = Math.sqrt(sum / dataArray.length);
+                    // Normalize to 0.0-1.0 (255 is max possible value)
+                    const normalizedLevel = rms / 255;
+                    setMicLevel(normalizedLevel);
                 }
-                const rms = Math.sqrt(sum / dataArray.length);
-                // Normalize to 0.0-1.0 (255 is max possible value)
-                const normalizedLevel = rms / 255;
-
-                setMicLevel(normalizedLevel);
                 animationFrameRef.current = requestAnimationFrame(updateLevel);
             };
 
@@ -314,14 +337,14 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
                                 {cameraOn ? (
                                     <>
-                                        {permissionDenied ? (
+                                        {cameraError ? (
                                             <div className="flex flex-col items-center gap-4">
                                                 <div className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-950 text-rose-700 ring-2 ring-white/5">
                                                     <VideoOff className="h-12 w-12" />
                                                 </div>
                                                 <div className="text-center">
                                                     <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-rose-400">
-                                                        Camera permission denied
+                                                        {cameraError}
                                                     </span>
                                                 </div>
                                             </div>
