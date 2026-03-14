@@ -112,6 +112,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
     // Handle camera on/off
     useEffect(() => {
         let cancelled = false;
+        const video = videoRef.current;
 
         const startCamera = async () => {
             try {
@@ -129,8 +130,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
                 streamRef.current = stream;
                 setMediaStream(stream);
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
+                if (video) {
+                    video.srcObject = stream;
                 }
             } catch (error) {
                 if (cancelled) return;
@@ -152,12 +153,11 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         const stopCamera = () => {
             cancelled = true;
             if (streamRef.current) {
-                streamRef.current.getTracks().forEach((track) => track.stop());
-                streamRef.current = null;
+                // Only stop video tracks, keep audio tracks alive for the analyzer
+                streamRef.current.getVideoTracks().forEach((track) => track.stop());
             }
-            setMediaStream(null);
-            if (videoRef.current) {
-                videoRef.current.srcObject = null;
+            if (video) {
+                video.srcObject = null;
             }
         };
 
@@ -169,7 +169,15 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
         return () => {
             cancelled = true;
-            stopCamera();
+            if (streamRef.current) {
+                // On unmount, stop all tracks
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+            }
+            setMediaStream(null);
+            if (video) {
+                video.srcObject = null;
+            }
         };
     }, [cameraOn]);
 
