@@ -110,6 +110,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
     // Handle camera on/off
     useEffect(() => {
+        let cancelled = false;
+
         const startCamera = async () => {
             try {
                 setPermissionDenied(false);
@@ -117,6 +119,13 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                     video: true,
                     audio: micOn,
                 });
+
+                // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
+                if (cancelled || !cameraOn) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
                 streamRef.current = stream;
                 setMediaStream(stream);
                 if (videoRef.current) {
@@ -130,6 +139,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         };
 
         const stopCamera = () => {
+            cancelled = true;
             if (streamRef.current) {
                 streamRef.current.getTracks().forEach((track) => track.stop());
                 streamRef.current = null;
@@ -147,6 +157,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         }
 
         return () => {
+            cancelled = true;
             stopCamera();
         };
     }, [cameraOn, micOn]);
