@@ -1,8 +1,6 @@
 <?php
 
-use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationController;
-use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\DeepfakeScanLogController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\PatientController;
@@ -55,12 +53,6 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
         Route::get('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'show'])->name('deepfake-scans.show');
         Route::patch('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'update'])->name('deepfake-scans.update');
 
-        // Consent
-        Route::get('consent', [ConsultationConsentController::class, 'show'])->name('consent.show');
-        Route::post('consent', [ConsultationConsentController::class, 'store'])->name('consent.store');
-
-        // Teleconsultation Lobby
-        Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
     });
 
     // ── Doctor Profile ────────────────────────────────────────────────────────

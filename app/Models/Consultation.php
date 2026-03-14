@@ -23,6 +23,13 @@ class Consultation extends Model
         'started_at',
         'ended_at',
         'session_token',
+        'livekit_room_name',
+        'livekit_room_sid',
+        'livekit_room_status',
+        'livekit_room_created_at',
+        'livekit_last_activity_at',
+        'livekit_ended_at',
+        'livekit_last_error',
         'deepfake_verified',
         'cancellation_reason',
     ];
@@ -35,6 +42,9 @@ class Consultation extends Model
             'scheduled_at' => 'datetime',
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
+            'livekit_room_created_at' => 'datetime',
+            'livekit_last_activity_at' => 'datetime',
+            'livekit_ended_at' => 'datetime',
             'deepfake_verified' => 'boolean',
         ];
     }
