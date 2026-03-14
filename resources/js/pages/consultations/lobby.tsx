@@ -351,16 +351,6 @@ export default function ConsultationLobbyPage({
         }
     }, [micOn, mediaStream]);
 
-    // Handle mic on/off (only toggle audio track if camera is already running)
-    useEffect(() => {
-        if (streamRef.current && cameraOn) {
-            const audioTracks = streamRef.current.getAudioTracks();
-            audioTracks.forEach((track) => {
-                track.enabled = micOn;
-            });
-        }
-    }, [micOn, cameraOn]);
-
     // Setup audio analyzer for mic level when mic is on
     useEffect(() => {
         if (!micOn || !mediaStream) {
