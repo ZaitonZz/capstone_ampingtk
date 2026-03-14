@@ -197,7 +197,7 @@ export default function ConsultationLobbyPage({
                 setCameraError(null);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
-                    audio: micOn,
+                    audio: true,
                 });
 
                 // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
