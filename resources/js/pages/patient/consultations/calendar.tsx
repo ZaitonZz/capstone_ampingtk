@@ -1,4 +1,4 @@
-import dayGridPlugin from '@fullcalendar/daygrid';
+﻿import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
@@ -111,13 +111,7 @@ export default function PatientConsultationCalendar({
         openRequestModal(dt);
     }
 
-    function handleEventClick(info: {
-        event: {
-            title: string;
-            startStr: string;
-            extendedProps: CalendarEvent['extendedProps'];
-        };
-    }) {
+    function handleEventClick(info: any) {
         const props = info.event
             .extendedProps as CalendarEvent['extendedProps'];
         setSelectedEvent({
@@ -282,12 +276,12 @@ export default function PatientConsultationCalendar({
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="">Select doctor…</option>
+                                    <option value="">Select doctorâ€¦</option>
                                     {doctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
                                             {d.doctor_profile?.specialty
-                                                ? ` — ${d.doctor_profile.specialty}`
+                                                ? ` â€” ${d.doctor_profile.specialty}`
                                                 : ''}
                                         </option>
                                     ))}
@@ -363,7 +357,7 @@ export default function PatientConsultationCalendar({
                                     }
                                     rows={3}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                    placeholder="Briefly describe your concern…"
+                                    placeholder="Briefly describe your concernâ€¦"
                                 />
                             </div>
 
@@ -379,7 +373,7 @@ export default function PatientConsultationCalendar({
                                     className="flex-1"
                                 >
                                     {processing
-                                        ? 'Submitting…'
+                                        ? 'Submittingâ€¦'
                                         : 'Submit Request'}
                                 </Button>
                                 <Button
