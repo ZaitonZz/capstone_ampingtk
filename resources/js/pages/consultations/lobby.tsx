@@ -134,7 +134,6 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             } catch (error) {
                 console.error('Failed to access camera:', error);
                 setPermissionDenied(true);
-                setCameraOn(false);
             }
         };
 
