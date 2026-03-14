@@ -658,11 +658,11 @@ export default function ConsultationLobbyPage({
                                 {/* Live mic level meter */}
                                 {/* Minimal mic level indicator */}
                                 {(() => {
-                                    const micActive = micOn;
+                                    const micActive = micOn && micLevel > 0;
                                     const showLevelBars = micActive;
 
                                     // 3 bars like a speaker icon level meter
-                                    const thresholds = [0.10, 0.1, 0.2];
+                                    const thresholds = [0.05, 0.15, 0.3];
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
