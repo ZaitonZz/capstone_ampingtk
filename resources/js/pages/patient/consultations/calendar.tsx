@@ -357,7 +357,7 @@ export default function PatientConsultationCalendar({
                                     }
                                     rows={3}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                    placeholder="Briefly describe your concernâ€¦"
+                                    placeholder="Briefly describe your concern..."
                                 />
                             </div>
 
@@ -373,7 +373,7 @@ export default function PatientConsultationCalendar({
                                     className="flex-1"
                                 >
                                     {processing
-                                        ? 'Submittingâ€¦'
+                                        ? 'Submitting..'
                                         : 'Submit Request'}
                                 </Button>
                                 <Button
