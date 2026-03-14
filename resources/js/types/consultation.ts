@@ -1,4 +1,4 @@
-﻿export type ConsultationStatus =
+export type ConsultationStatus =
     | 'pending'
     | 'scheduled'
     | 'ongoing'
