@@ -118,7 +118,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 setCameraError(null);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
-                    audio: micOn,
+                    audio: true,
                 });
 
                 // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
@@ -146,7 +146,6 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 } else {
                     setCameraError('Camera unavailable');
                 }
-                setPermissionDenied(true);
             }
         };
 
@@ -172,7 +171,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             cancelled = true;
             stopCamera();
         };
-    }, [cameraOn, micOn]);
+    }, [cameraOn]);
 
     // Handle mic on/off (only toggle audio track if camera is already running)
     useEffect(() => {
@@ -227,7 +226,6 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             analyserRef.current = analyser;
 
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            let lastUpdate = 0;
 
             // Throttle UI updates to avoid React re-renders on every animation frame
             const updateInterval = 100; // ms (10 fps)
@@ -236,24 +234,16 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
             const updateLevel = () => {
                 analyser.getByteFrequencyData(dataArray);
 
-                // Throttle React state updates to ~12fps to avoid excessive re-renders
-                const now = performance.now();
-                if (now - lastUpdate >= 80) {
-                    lastUpdate = now;
-                    // Calculate RMS (Root Mean Square) for mic level
-                    let sum = 0;
-                    for (let i = 0; i < dataArray.length; i++) {
-                        sum += dataArray[i] * dataArray[i];
-                    }
-                    const rms = Math.sqrt(sum / dataArray.length);
-                    // Normalize to 0.0-1.0 (255 is max possible value)
-                    const normalizedLevel = rms / 255;
-                    setMicLevel(normalizedLevel);
+                // Calculate RMS (Root Mean Square) for mic level
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i] * dataArray[i];
                 }
                 const rms = Math.sqrt(sum / dataArray.length);
                 // Normalize to 0.0-1.0 (255 is max possible value)
                 const normalizedLevel = rms / 255;
 
+                // Throttle React state updates to ~10fps to avoid excessive re-renders
                 const currentTime = performance.now();
                 if (currentTime - lastUpdateTime >= updateInterval) {
                     setMicLevel(normalizedLevel);
@@ -390,8 +380,8 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                 {/* Live mic level meter */}
                                 {/* Minimal mic level indicator */}
                                 {(() => {
-                                    const hasAudioTrack = mediaStream && mediaStream.getAudioTracks().length > 0;
-                                    const active = cameraOn && micOn && hasAudioTrack;
+                                    const micActive = micOn;
+                                    const showLevelBars = cameraOn && micActive;
 
                                     // 3 bars like a speaker icon level meter
                                     const thresholds = [0.15, 0.35, 0.6];
@@ -399,7 +389,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
 
                                     return (
                                         <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 backdrop-blur-sm ring-1 ring-white/10">
-                                            {active ? (
+                                            {micActive ? (
                                                 <Mic className="h-3.5 w-3.5 text-white/80" />
                                             ) : (
                                                 <MicOff className="h-3.5 w-3.5 text-white/40" />
@@ -412,7 +402,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                                                         className={[
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
-                                                            active && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
+                                                            showLevelBars && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
                                                         ].join(' ')}
                                                     />
                                                 ))}
