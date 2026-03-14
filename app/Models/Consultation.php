@@ -34,6 +34,12 @@ class Consultation extends Model
         'cancellation_reason',
     ];
 
+    protected $hidden = [
+        'session_token',
+        'livekit_room_sid',
+        'livekit_last_error',
+    ];
+
     protected $appends = ['duration_minutes'];
 
     protected function casts(): array
