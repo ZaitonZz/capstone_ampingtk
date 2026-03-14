@@ -60,7 +60,7 @@ function ConsultationCallStage() {
                         />
                     ))
                 ) : (
-                    <div className="col-span-full flex min-h-70 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
+                    <div className="col-span-full flex min-h-[280px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
                         <p className="text-sm text-zinc-300">
                             Waiting for participants to publish camera or
                             screen-share tracks.
