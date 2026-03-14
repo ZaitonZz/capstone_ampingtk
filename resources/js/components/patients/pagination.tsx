@@ -19,18 +19,18 @@ export default function Pagination({
 }: PaginationProps) {
     const getPageNumbers = () => {
         const pages: number[] = [];
-        
+
         // Calculate the range to show (current page and 1 on each side = 3 total)
         let startPage = Math.max(1, currentPage - 1);
         let endPage = Math.min(lastPage, currentPage + 1);
-        
+
         // Adjust if we're at the beginning or end
         if (currentPage === 1) {
             endPage = Math.min(3, lastPage);
         } else if (currentPage === lastPage) {
             startPage = Math.max(1, lastPage - 2);
         }
-        
+
         // Ensure we always show 3 pages if possible
         if (endPage - startPage < 2) {
             if (startPage === 1) {
@@ -39,11 +39,11 @@ export default function Pagination({
                 startPage = Math.max(1, lastPage - 2);
             }
         }
-        
+
         for (let i = startPage; i <= endPage; i++) {
             pages.push(i);
         }
-        
+
         return pages;
     };
 

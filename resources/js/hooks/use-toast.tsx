@@ -22,7 +22,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             const newToast: Toast = { id, message, type, duration };
             setToasts((prev) => [...prev, newToast]);
         },
-        []
+        [],
     );
 
     const removeToast = useCallback((id: string) => {
@@ -30,23 +30,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const success = useCallback(
-        (message: string, duration?: number) => addToast(message, 'success', duration),
-        [addToast]
+        (message: string, duration?: number) =>
+            addToast(message, 'success', duration),
+        [addToast],
     );
 
     const error = useCallback(
-        (message: string, duration?: number) => addToast(message, 'error', duration),
-        [addToast]
+        (message: string, duration?: number) =>
+            addToast(message, 'error', duration),
+        [addToast],
     );
 
     const warning = useCallback(
-        (message: string, duration?: number) => addToast(message, 'warning', duration),
-        [addToast]
+        (message: string, duration?: number) =>
+            addToast(message, 'warning', duration),
+        [addToast],
     );
 
     const info = useCallback(
-        (message: string, duration?: number) => addToast(message, 'info', duration),
-        [addToast]
+        (message: string, duration?: number) =>
+            addToast(message, 'info', duration),
+        [addToast],
     );
 
     const value: ToastContextType = {
@@ -60,9 +64,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <ToastContext.Provider value={value}>
-            {children}
-        </ToastContext.Provider>
+        <ToastContext.Provider value={value}>{children}</ToastContext.Provider>
     );
 }
 
