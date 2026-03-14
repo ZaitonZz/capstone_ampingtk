@@ -115,9 +115,9 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Teleconsultation Lobby" />
 
-            <div className="flex h-[calc(100svh-4rem)] flex-col overflow-hidden p-4 md:p-6">
+            <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
                 {/* ── Page header ──────────────────────────────────────────── */}
-                <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Teleconsultation Lobby</h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">
@@ -147,10 +147,10 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                 </div>
 
                 {/* ── Main 2-column layout ──────────────────────────────────── */}
-                <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
                     {/* ── LEFT (3 cols): Camera & Mic ──────────────────────── */}
-                    <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
-                        <div className="flex min-h-0 flex-1 flex-col rounded-2xl border bg-card p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 lg:col-span-3">
+                        <div className="flex flex-col rounded-2xl border bg-card p-5 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
                                     <Video className="h-3 w-3 text-primary" />
@@ -161,7 +161,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative min-h-0 flex-1 w-full overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="relative w-full aspect-video max-h-[520px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -236,7 +236,7 @@ export default function ConsultationLobbyPage({ consultation, consent }: Props) 
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-[16.25rem]">
+                    <div className="flex flex-col gap-3 lg:col-span-1 lg:min-w-[16.25rem]">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
