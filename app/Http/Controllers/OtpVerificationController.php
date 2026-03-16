@@ -11,7 +11,7 @@ class OtpVerificationController extends Controller
     /**
      * Verify the OTP code submitted by the user
      *
-     * Development mode: Uses fixed OTP "123456" stored in session
+     * Development mode: Uses fixed OTP "123456" generated and stored in session via resend()
      */
     public function verify(Request $request)
     {
@@ -32,14 +32,22 @@ class OtpVerificationController extends Controller
             ]);
         }
 
-        // Get OTP from session (defaults to 123456 for development testing)
-        $storedOtp = session('otp_code', '123456');
+        // Get OTP from session
+        $storedOtp = session('otp_code');
+
+        // Check if OTP is missing (expired or invalid)
+        if (is_null($storedOtp)) {
+            RateLimiter::hit($throttleKey);
+            throw ValidationException::withMessages([
+                'otp_code' => 'Verification code has expired or is invalid. Please request a new code.',
+            ]);
+        }
 
         // Compare OTP codes
         if ($storedOtp !== $validated['otp_code']) {
             RateLimiter::hit($throttleKey);
             throw ValidationException::withMessages([
-                'otp_code' => 'Invalid verification code. For testing, use: 123456',
+                'otp_code' => 'Invalid verification code.',
             ]);
         }
 
