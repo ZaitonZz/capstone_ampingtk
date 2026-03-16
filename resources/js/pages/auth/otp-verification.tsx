@@ -1,6 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import TelemedicineLoginLayout from '@/layouts/auth/telemedicine-login-layout';
@@ -13,7 +12,7 @@ type Props = {
     is_fresh_otp?: boolean;
 };
 
-export default function OtpVerification({ status, email, phone, otp_generated_at, is_fresh_otp }: Props) {
+export default function OtpVerification({ email, phone, otp_generated_at, is_fresh_otp }: Props) {
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [isVerifying, setIsVerifying] = useState(false);
     const [generalError, setGeneralError] = useState('');
@@ -255,7 +254,7 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
                 setGeneralError('An unexpected error occurred. Please try again.');
                 setIsVerifying(false);
             }
-        } catch (error) {
+        } catch {
             setGeneralError('An error occurred during verification. Please try again.');
             setIsVerifying(false);
         }
@@ -331,7 +330,7 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
                 setCooldownSeconds(60); // 60 seconds cooldown
                 inputRefs.current[0]?.focus();
             }
-        } catch (error) {
+        } catch {
             setGeneralError('An error occurred. Please try again.');
         } finally {
             setIsResending(false);
