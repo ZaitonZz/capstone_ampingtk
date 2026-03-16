@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsureMedicalStaff;
 use App\Http\Middleware\EnsurePatient;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireOtpVerification;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'patient' => EnsurePatient::class,
             'doctor' => EnsureDoctor::class,
             'admin' => EnsureAdmin::class,
+            'require-otp' => RequireOtpVerification::class,
         ]);
 
         $middleware->web(append: [
