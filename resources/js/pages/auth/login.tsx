@@ -1,4 +1,4 @@
-import { Form, Head, usePage } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
@@ -19,11 +19,9 @@ type Props = {
 };
 
 export default function Login({
-    status,
     canResetPassword,
     canRegister,
 }: Props) {
-    const { errors: serverErrors } = usePage().props;
     const [showPassword, setShowPassword] = useState(false);
     const [generalError, setGeneralError] = useState('');
     const [facialRecognitionLoading, setFacialRecognitionLoading] = useState(false);
@@ -43,7 +41,7 @@ export default function Login({
             // 3. Capture face data
             // 4. Send to backend for verification
             // 5. Redirect based on role
-        } catch (error) {
+        } catch {
             setGeneralError('Facial recognition is not available at this time.');
         } finally {
             setFacialRecognitionLoading(false);
