@@ -108,8 +108,8 @@ class OtpVerificationController extends Controller
         // Log OTP for development/debugging
         logger('OTP test code: ' . $otp);
 
-        // Clear rate limiter on successful resend
-        RateLimiter::clear($throttleKey);
+        // Increment rate limiter on successful resend
+        RateLimiter::hit($throttleKey);
 
         return response()->json([
             'message' => 'Verification code sent successfully.',
