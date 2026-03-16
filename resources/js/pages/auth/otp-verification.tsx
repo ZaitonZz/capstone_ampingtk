@@ -10,9 +10,10 @@ type Props = {
     email?: string;
     phone?: string;
     otp_generated_at?: number;
+    is_fresh_otp?: boolean;
 };
 
-export default function OtpVerification({ status, email, phone, otp_generated_at }: Props) {
+export default function OtpVerification({ status, email, phone, otp_generated_at, is_fresh_otp }: Props) {
     const { errors: serverErrors } = usePage().props;
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [isVerifying, setIsVerifying] = useState(false);
@@ -33,6 +34,15 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
         }
         // Otherwise, use timestamp from props (for initial page load)
         else if (otp_generated_at) {
+            generatedAt = otp_generated_at;
+            sessionStorage.setItem('otp_generated_at', otp_generated_at.toString());
+        }
+
+        // If we have a generated timestamp from props, validate/update sessionStorage
+        if (otp_generated_at && otp_generated_at !== generatedAt) {
+            // OTP timestamp from server differs from stored - we're in a new session
+            // Clear old sessionStorage entries
+            sessionStorage.removeItem('otp_resend_at');
             generatedAt = otp_generated_at;
             sessionStorage.setItem('otp_generated_at', otp_generated_at.toString());
         }
@@ -62,15 +72,42 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
 
     // Initialize resend cooldown timer from sessionStorage
     useEffect(() => {
+        // If this is a fresh OTP, clear any old resend timer immediately
+        if (is_fresh_otp) {
+            sessionStorage.removeItem('otp_resend_at');
+            setCooldownSeconds(0);
+            return;
+        }
+
         const resendAtTimestamp = sessionStorage.getItem('otp_resend_at');
-        if (resendAtTimestamp) {
+        const storedOtpGeneratedAt = sessionStorage.getItem('otp_generated_at');
+
+        if (resendAtTimestamp && storedOtpGeneratedAt) {
+            // Validate that the stored OTP timestamp matches current session's OTP timestamp
+            const storedOtpTime = parseInt(storedOtpGeneratedAt, 10);
+            const currentOtpTime = otp_generated_at || storedOtpTime;
+
+            // If OTP timestamps don't match, we're in a new session - clear old resend timer
+            if (storedOtpTime !== currentOtpTime) {
+                sessionStorage.removeItem('otp_resend_at');
+                setCooldownSeconds(0);
+                return;
+            }
+
             const resendAt = parseInt(resendAtTimestamp, 10);
             const now = Math.floor(Date.now() / 1000);
             const elapsedSeconds = now - resendAt;
             const remainingCooldown = Math.max(0, 60 - elapsedSeconds);
-            setCooldownSeconds(remainingCooldown);
+
+            // Only set cooldown if time is still remaining
+            if (remainingCooldown > 0) {
+                setCooldownSeconds(remainingCooldown);
+            } else {
+                // Cooldown expired, clear the timestamp
+                sessionStorage.removeItem('otp_resend_at');
+            }
         }
-    }, []);
+    }, [otp_generated_at, is_fresh_otp]);
 
     // Resend cooldown timer - auto clear when expired
     useEffect(() => {
@@ -228,31 +265,37 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
     /**
      * Handle logout and clear OTP session by logging out user
      */
-    const handleClearOtp = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleClearOtp = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
         e.stopPropagation();
 
-        // Clear all sessionStorage immediately
-        sessionStorage.removeItem('otp_generated_at');
-        sessionStorage.removeItem('otp_resend_at');
+        // Clear all sessionStorage immediately before form submission
+        sessionStorage.clear();
 
-        try {
-            // POST to clear OTP endpoint to clear server session
-            await fetch('/clear-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': document
-                        .querySelector('meta[name="csrf-token"]')
-                        ?.getAttribute('content') || '',
-                },
-            });
-        } catch (error) {
-            console.error('Error clearing OTP session:', error);
-        }
+        // Give the browser a moment to process the sessionStorage clear before navigating
+        setTimeout(() => {
+            // Create a form and submit to logout POST endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/clear-otp';
+            form.style.display = 'none';
 
-        // Navigate to login regardless of fetch result
-        window.location.href = '/login';
+            // Add CSRF token
+            const csrfToken = document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute('content') || '';
+
+            if (csrfToken) {
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '_token';
+                tokenInput.value = csrfToken;
+                form.appendChild(tokenInput);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }, 100); // 100ms delay ensures sessionStorage.clear() is processed
     };
 
     /**
