@@ -6,18 +6,28 @@ export default function TestAgentVerify({ result }: { result: any }) {
     usePoll(1000, { only: ['result'] });
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'LiveKit Agent Verification', href: '/test-agent-verify' }]}>
+        <AppLayout
+            breadcrumbs={[
+                {
+                    title: 'LiveKit Agent Verification',
+                    href: '/test-agent-verify',
+                },
+            ]}
+        >
             <Head title="LiveKit Agent Verify" />
-            
+
             <div className="flex h-full flex-col gap-6 p-6">
-                <div className="rounded-lg border border-sidebar-border/50 p-6 bg-card text-card-foreground">
-                    <h2 className="text-xl font-semibold mb-4">Python Pipeline Inference Stream</h2>
-                    <p className="text-sm text-muted-foreground mb-6">
-                        This page automatically polls for new frames processed by the LiveKit Python agent.
-                        Start your camera in a consultation room to trigger the pipeline.
+                <div className="rounded-lg border border-sidebar-border/50 bg-card p-6 text-card-foreground">
+                    <h2 className="mb-4 text-xl font-semibold">
+                        Python Pipeline Inference Stream
+                    </h2>
+                    <p className="mb-6 text-sm text-muted-foreground">
+                        This page automatically polls for new frames processed
+                        by the LiveKit Python agent. Start your camera in a
+                        consultation room to trigger the pipeline.
                     </p>
 
-                    <div className="bg-neutral-950 p-4 rounded-md overflow-auto border border-neutral-800">
+                    <div className="overflow-auto rounded-md border border-neutral-800 bg-neutral-950 p-4">
                         {result ? (
                             <pre className="text-sm text-green-400">
                                 {JSON.stringify(result, null, 2)}
@@ -25,38 +35,59 @@ export default function TestAgentVerify({ result }: { result: any }) {
                         ) : (
                             <div className="flex items-center gap-2 text-yellow-500">
                                 <span className="relative flex h-3 w-3">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-yellow-500"></span>
                                 </span>
                                 Waiting for data from LiveKit Agent...
                             </div>
                         )}
                     </div>
-                    
+
                     {result?.ml_results?.model_A?.bounding_boxes && (
                         <div className="mt-8 border-t border-sidebar-border/50 pt-6">
-                            <h3 className="text-lg font-medium mb-3">Simulated Render</h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                                Detected Faces: {result.ml_results.model_A.faces_detected}
+                            <h3 className="mb-3 text-lg font-medium">
+                                Simulated Render
+                            </h3>
+                            <p className="mb-4 text-sm text-muted-foreground">
+                                Detected Faces:{' '}
+                                {result.ml_results.model_A.faces_detected}
                             </p>
-                            <div className="relative border border-dashed border-gray-600 bg-black" style={{ width: 400, height: 300 }}>
-                                <div className="absolute inset-0 flex items-center justify-center text-gray-700">Video Feed (Hidden)</div>
-                                {result.ml_results.model_A.bounding_boxes.map((box: any, i: number) => (
-                                    <div 
-                                        key={i} 
-                                        className="absolute border-2 border-green-500 bg-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
-                                        style={{
-                                            left: `${box[0]}px`,
-                                            top: `${box[1]}px`,
-                                            width: `${box[2] - box[0]}px`,
-                                            height: `${box[3] - box[1]}px`,
-                                        }}
-                                    >
-                                        <span className="bg-green-500 text-black text-xs font-bold px-1 absolute -top-5 left-0">
-                                            {Math.round(box[4] * 100)}%
-                                        </span>
+                            <div
+                                className="relative inline-block max-h-[800px] max-w-full overflow-auto border border-dashed border-gray-600 bg-black"
+                                style={{
+                                    width: result.width || 640,
+                                    height: result.height || 480,
+                                }}
+                            >
+                                {result.image ? (
+                                    <img
+                                        src={result.image}
+                                        alt="Stream Frame"
+                                        className="absolute inset-0 h-full w-full object-contain"
+                                    />
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center text-gray-700">
+                                        Waiting for Video Feed
                                     </div>
-                                ))}
+                                )}
+                                {result.ml_results.model_A.bounding_boxes.map(
+                                    (box: any, i: number) => (
+                                        <div
+                                            key={i}
+                                            className="absolute border-2 border-green-500 bg-green-500/20 shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                                            style={{
+                                                left: `${box[0]}px`,
+                                                top: `${box[1]}px`,
+                                                width: `${box[2] - box[0]}px`,
+                                                height: `${box[3] - box[1]}px`,
+                                            }}
+                                        >
+                                            <span className="absolute -top-5 left-0 bg-green-500 px-1 text-xs font-bold text-black">
+                                                {Math.round(box[4] * 100)}%
+                                            </span>
+                                        </div>
+                                    ),
+                                )}
                             </div>
                         </div>
                     )}

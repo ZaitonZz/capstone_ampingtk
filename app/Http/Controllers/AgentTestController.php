@@ -18,6 +18,7 @@ class AgentTestController extends Controller
             'timestamp' => 'required|numeric',
             'width' => 'required|integer',
             'height' => 'required|integer',
+            'image' => 'nullable|string',
             'ml_results' => 'required|array',
         ]);
 
