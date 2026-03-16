@@ -23,8 +23,8 @@ class OtpVerificationController extends Controller
             'otp_code.regex' => 'Verification code must be exactly 6 digits',
         ]);
 
-        // Rate limiting for OTP verification attempts
-        $throttleKey = 'otp-verify:' . $request->ip();
+        // Rate limiting for OTP verification attempts (per user + IP)
+        $throttleKey = 'otp-verify:' . (auth()->id() ?? 'guest') . ':' . $request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             throw ValidationException::withMessages([
@@ -87,8 +87,8 @@ class OtpVerificationController extends Controller
      */
     public function resend(Request $request)
     {
-        // Rate limiting for resend attempts
-        $throttleKey = 'otp-resend:' . $request->ip();
+        // Rate limiting for resend attempts (per user + IP)
+        $throttleKey = 'otp-resend:' . (auth()->id() ?? 'guest') . ':' . $request->ip();
 
         if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
             throw ValidationException::withMessages([
