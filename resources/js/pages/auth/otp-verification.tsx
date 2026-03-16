@@ -18,7 +18,6 @@ export default function OtpVerification({ status, email, phone, otp_generated_at
     const [isVerifying, setIsVerifying] = useState(false);
     const [generalError, setGeneralError] = useState('');
     const [isResending, setIsResending] = useState(false);
-    const [isResending, setIsResending] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
     const [expirationSeconds, setExpirationSeconds] = useState(600); // 10 minutes
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
