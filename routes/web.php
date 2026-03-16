@@ -23,10 +23,21 @@ Route::get('/verify-otp', function () {
     if (!auth()->check()) {
         return redirect()->route('login');
     }
+    
+    $isFirstTime = false;
+    // Initialize OTP only if not already set
+    if (!session('otp_code')) {
+        session(['otp_code' => '123456']);
+        session(['otp_generated_at' => now()->timestamp]);
+        logger('OTP test code initialized: 123456');
+        $isFirstTime = true;
+    }
+    
     return inertia('auth/otp-verification', [
         'email' => auth()->user()->email,
         'phone' => null, // For future SMS implementation
         'otp_generated_at' => session('otp_generated_at'), // Pass timestamp for timer persistence
+        'is_fresh_otp' => $isFirstTime, // Signal to frontend that this is a fresh OTP
     ]);
 })->middleware('auth')->name('verify-otp');
 
@@ -39,10 +50,12 @@ Route::post('/resend-otp', [OtpVerificationController::class, 'resend'])
     ->name('resend-otp');
 
 Route::post('/clear-otp', function () {
-    // Fully logout user and clear all session data
-    session()->flush();
+    // Clear OTP-related session keys specifically
+    session()->forget(['otp_code', 'otp_generated_at', 'otp_verified']);
+    // Logout user
     auth()->logout();
-    return response()->json(['success' => true, 'message' => 'Logged out successfully']);
+    // Redirect to login page
+    return redirect()->route('login');
 })->middleware('auth')->name('clear-otp');
 
 // ── Authenticated Dashboard Routes ────────────────────────────────────────────
