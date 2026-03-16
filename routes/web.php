@@ -61,6 +61,9 @@ Route::post('/clear-otp', function () {
     session()->forget(['otp_code', 'otp_generated_at', 'otp_verified']);
     // Logout user
     auth()->logout();
+    // Invalidate the session and regenerate CSRF token to prevent session fixation
+    session()->invalidate();
+    session()->regenerateToken();
     // Redirect to login page
     return redirect()->route('login');
 })->middleware('auth')->name('clear-otp');
