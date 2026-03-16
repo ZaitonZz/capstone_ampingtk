@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsurePatient;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RequireOtpVerification;
+use App\Http\Middleware\VerifyPipelineSignature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,12 +22,19 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        $middleware->validateCsrfTokens(except: [
+            'livekit/webhook',
+            'internal/pipeline/*',
+            'api/frame-results',
+        ]);
+
         $middleware->alias([
             'medical.staff' => EnsureMedicalStaff::class,
             'patient' => EnsurePatient::class,
             'doctor' => EnsureDoctor::class,
             'admin' => EnsureAdmin::class,
             'require-otp' => RequireOtpVerification::class,
+            'pipeline.internal' => VerifyPipelineSignature::class,
         ]);
 
         $middleware->web(append: [

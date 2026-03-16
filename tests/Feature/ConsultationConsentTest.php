@@ -3,6 +3,7 @@
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
 
 $validPayload = [
     'read_privacy_notice' => true,
@@ -168,4 +169,30 @@ it('upserts consent on a subsequent confirmation', function () use (&$validPaylo
             'user_id' => $doctor->id,
         ])->value('consent_confirmed'),
     )->toBeTrue();
+});
+
+it('provisions a LiveKit room after consent when integration is enabled', function () use (&$validPayload) {
+    config()->set('services.livekit.enabled', true);
+    config()->set('services.livekit.url', 'https://livekit.test');
+    config()->set('services.livekit.api_key', 'test-api-key');
+    config()->set('services.livekit.api_secret', 'test-api-secret');
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/CreateRoom' => Http::response([
+            'sid' => 'RM_test_room_sid',
+        ], 200),
+    ]);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    $this->actingAs($doctor)
+        ->post(route('consultations.consent.store', $consultation), $validPayload)
+        ->assertRedirect(route('consultations.lobby.show', $consultation));
+
+    $consultation->refresh();
+
+    expect($consultation->livekit_room_name)->not->toBeNull();
+    expect($consultation->livekit_room_sid)->toBe('RM_test_room_sid');
+    expect($consultation->livekit_room_status)->toBe('room_ready');
 });

@@ -3,9 +3,9 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
+import { ToastContainer } from '@/components/ui/toast';
 import { initializeTheme } from '@/hooks/use-appearance';
 import { ToastProvider, useToast } from '@/hooks/use-toast';
-import { ToastContainer } from '@/components/ui/toast';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

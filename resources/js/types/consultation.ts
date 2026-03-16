@@ -33,6 +33,13 @@ export interface Consultation {
     started_at: string | null;
     ended_at: string | null;
     session_token: string | null;
+    livekit_room_name: string | null;
+    livekit_room_sid: string | null;
+    livekit_room_status: string | null;
+    livekit_room_created_at: string | null;
+    livekit_last_activity_at: string | null;
+    livekit_ended_at: string | null;
+    livekit_last_error: string | null;
     deepfake_verified: boolean | null;
     cancellation_reason: string | null;
     duration_minutes: number | null;

@@ -77,13 +77,14 @@ export default function PatientTable({
                             patients.map((patient) => (
                                 <tr
                                     key={patient.id}
-                                    className="hover:bg-muted/30 transition-colors"
+                                    className="transition-colors hover:bg-muted/30"
                                 >
                                     <td className="px-4 py-3 text-sm">
                                         {patient.id.toString().padStart(6, '0')}
                                     </td>
                                     <td className="px-4 py-3 text-sm font-medium">
-                                        {patient.last_name}, {patient.first_name}
+                                        {patient.last_name},{' '}
+                                        {patient.first_name}
                                         {patient.middle_name &&
                                             ` ${patient.middle_name.charAt(0)}.`}
                                     </td>
@@ -108,7 +109,9 @@ export default function PatientTable({
                                                     size="icon"
                                                     variant="ghost"
                                                     className="size-8"
-                                                    onClick={() => onView(patient)}
+                                                    onClick={() =>
+                                                        onView(patient)
+                                                    }
                                                     aria-label="View patient details"
                                                 >
                                                     <Eye className="size-4" />
@@ -119,7 +122,9 @@ export default function PatientTable({
                                                     size="icon"
                                                     variant="ghost"
                                                     className="size-8"
-                                                    onClick={() => onEdit(patient)}
+                                                    onClick={() =>
+                                                        onEdit(patient)
+                                                    }
                                                     aria-label="Edit patient information"
                                                 >
                                                     <Edit className="size-4" />
@@ -130,7 +135,9 @@ export default function PatientTable({
                                                     size="icon"
                                                     variant="ghost"
                                                     className="size-8 text-destructive hover:text-destructive"
-                                                    onClick={() => onDelete(patient)}
+                                                    onClick={() =>
+                                                        onDelete(patient)
+                                                    }
                                                     aria-label="Delete patient"
                                                 >
                                                     <Trash2 className="size-4" />
