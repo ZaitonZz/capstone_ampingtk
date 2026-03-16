@@ -106,7 +106,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // ── Patient-facing routes ─────────────────────────────────────────────────────
-Route::middleware(['auth', 'verified', 'patient'])->group(function () {
+Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(function () {
     Route::get('patient/consultations/calendar', [PatientConsultationController::class, 'calendar'])
         ->name('patient.consultations.calendar');
     Route::post('patient/consultations/request', [PatientConsultationController::class, 'store'])
