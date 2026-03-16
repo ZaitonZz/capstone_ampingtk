@@ -1,4 +1,4 @@
-import { Head, usePage, Link } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,10 @@ type Props = {
 };
 
 export default function OtpVerification({ status, email, phone, otp_generated_at, is_fresh_otp }: Props) {
-    const { errors: serverErrors } = usePage().props;
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [isVerifying, setIsVerifying] = useState(false);
     const [generalError, setGeneralError] = useState('');
+    const [isResending, setIsResending] = useState(false);
     const [isResending, setIsResending] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
     const [expirationSeconds, setExpirationSeconds] = useState(600); // 10 minutes
