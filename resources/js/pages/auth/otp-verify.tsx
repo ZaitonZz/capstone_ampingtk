@@ -1,6 +1,5 @@
-import { Form, Head } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +40,7 @@ export default function OtpVerify({ email }: Props) {
             // Example: const response = await fetch('/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp }) })
             console.log('OTP Verification:', { email, otp });
             // TODO: Handle successful verification and redirect to dashboard
-        } catch (error) {
+        } catch {
             setOtpError('Invalid or expired OTP. Please try again.');
         } finally {
             setIsSubmitting(false);
@@ -55,7 +54,7 @@ export default function OtpVerify({ email }: Props) {
             // TODO: POST /resend-otp with { email }
             console.log('Resending OTP to:', email);
             setShowResendOptions(false);
-        } catch (error) {
+        } catch {
             setOtpError('Failed to resend OTP. Please try again.');
         } finally {
             setIsSubmitting(false);
