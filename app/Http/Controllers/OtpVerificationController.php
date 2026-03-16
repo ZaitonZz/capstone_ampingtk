@@ -39,7 +39,7 @@ class OtpVerificationController extends Controller
         if ($storedOtp !== $validated['otp_code']) {
             RateLimiter::hit($throttleKey);
             throw ValidationException::withMessages([
-                'otp_code' => 'Invalid verification code. For testing, use: 123456',
+                'otp_code' => 'Invalid verification code.',
             ]);
         }
 
@@ -104,7 +104,7 @@ class OtpVerificationController extends Controller
         RateLimiter::clear($throttleKey);
 
         return response()->json([
-            'message' => 'Verification code sent. (Development mode: 123456)',
+            'message' => 'Verification code sent successfully.',
             'otp_generated_at' => now()->timestamp,
         ]);
     }
