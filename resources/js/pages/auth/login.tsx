@@ -120,10 +120,10 @@ export default function Login({
                 >
                     {({ processing, errors }) => (
                         <>
-                            {/* Username/Email Field */}
+                            {/* Email Field */}
                             <div className="space-y-2">
                                 <Label htmlFor="email" className="text-sm font-medium">
-                                    Username or Email
+                                    Email address
                                 </Label>
                                 <Input
                                     id="email"
