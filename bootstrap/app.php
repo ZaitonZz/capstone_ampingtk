@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'livekit/webhook',
             'internal/pipeline/*',
+            'api/frame-results',
         ]);
 
         $middleware->alias([

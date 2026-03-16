@@ -50,5 +50,9 @@ Route::prefix('internal/pipeline')
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
     });
 
+// ── Agent Testing Endpoints ──────────────────────────────────────────
+Route::post('api/frame-results', [\App\Http\Controllers\AgentTestController::class, 'storeResult'])->name('agent.store-result');
+Route::get('test-agent-verify', [\App\Http\Controllers\AgentTestController::class, 'verifyPage'])->name('agent.verify');
+
 require __DIR__.'/settings.php';
 require __DIR__.'/emr.php';
