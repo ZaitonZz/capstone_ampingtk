@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -17,8 +18,35 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
+// ── OTP Verification Routes (Authentication Flow) ─────────────────────────────
+Route::get('/verify-otp', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    return inertia('auth/otp-verification', [
+        'email' => auth()->user()->email,
+        'phone' => null, // For future SMS implementation
+        'otp_generated_at' => session('otp_generated_at'), // Pass timestamp for timer persistence
+    ]);
+})->middleware('auth')->name('verify-otp');
+
+Route::post('/verify-otp', [OtpVerificationController::class, 'verify'])
+    ->middleware('auth')
+    ->name('verify-otp-post');
+
+Route::post('/resend-otp', [OtpVerificationController::class, 'resend'])
+    ->middleware('auth')
+    ->name('resend-otp');
+
+Route::post('/clear-otp', function () {
+    // Fully logout user and clear all session data
+    session()->flush();
+    auth()->logout();
+    return response()->json(['success' => true, 'message' => 'Logged out successfully']);
+})->middleware('auth')->name('clear-otp');
+
 // ── Authenticated Dashboard Routes ────────────────────────────────────────────
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Default dashboard (accessible by all authenticated users)
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
 
