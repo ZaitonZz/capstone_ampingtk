@@ -7,7 +7,7 @@ use App\Models\ConsultationConsent;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class ConsultationLobbyController extends Controller
+class ConsultationSessionController extends Controller
 {
     public function show(Consultation $consultation): Response
     {
@@ -19,20 +19,29 @@ class ConsultationLobbyController extends Controller
 
         $consultation->load(['patient', 'doctor']);
 
+        $user = auth()->user();
+        $isConsultationDoctor = $user !== null && $consultation->doctor_id === $user->id;
+        $isConsultationPatient = $user !== null && $consultation->patient()->where('user_id', $user->id)->exists();
+        $isAdminAudit = $user?->isAdmin() && ! $isConsultationDoctor && ! $isConsultationPatient;
+
         $consent = ConsultationConsent::query()
             ->where('consultation_id', $consultation->id)
-            ->where('user_id', auth()->user()?->id)
+            ->where('user_id', $user?->id)
             ->first();
 
-        return Inertia::render('consultations/lobby', [
+        $canEnterSession = $isAdminAudit || $consent?->consent_confirmed === true;
+
+        if (! $canEnterSession) {
+            abort(403);
+        }
+
+        return Inertia::render('consultations/session', [
             'consultation' => $consultation,
-            'consent' => $consent,
             'livekit' => [
                 'enabled' => (bool) config('services.livekit.enabled', false),
-                'room_status' => $consultation->livekit_room_status,
-                'room_name' => $consultation->livekit_room_name,
-                'connect_url' => route('consultations.livekit.connect', $consultation),
                 'ws_url' => config('services.livekit.ws_url'),
+                'room_name' => $consultation->livekit_room_name,
+                'room_status' => $consultation->livekit_room_status,
             ],
         ]);
     }

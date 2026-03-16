@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Models\Patient;
 use App\Models\User;
 
 // ── Guard: guests ─────────────────────────────────────────────────────────────
@@ -68,6 +69,8 @@ it('renders the lobby page with an unconfirmed consent record', function () {
 // ── Show page: consent confirmed ─────────────────────────────────────────────
 
 it('renders the lobby page with a confirmed consent record', function () {
+    config()->set('services.livekit.enabled', false);
+
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
     ConsultationConsent::create([
@@ -84,6 +87,28 @@ it('renders the lobby page with a confirmed consent record', function () {
             fn ($page) => $page
                 ->component('consultations/lobby')
                 ->has('consultation')
-                ->where('consent.consent_confirmed', true),
+                ->where('consent.consent_confirmed', true)
+                ->where('livekit.enabled', false),
+        );
+});
+
+it('allows the consultation patient to view the teleconsultation lobby', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+    ]);
+
+    $this->actingAs($patientUser)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/lobby')
+                ->has('consultation')
+                ->has('livekit.connect_url'),
         );
 });

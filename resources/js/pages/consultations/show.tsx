@@ -1,7 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -155,8 +155,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.scheduled_at
                                 ? new Date(
-                                    consultation.scheduled_at,
-                                ).toLocaleString()
+                                      consultation.scheduled_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -165,8 +165,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.started_at
                                 ? new Date(
-                                    consultation.started_at,
-                                ).toLocaleString()
+                                      consultation.started_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -175,8 +175,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.ended_at
                                 ? new Date(
-                                    consultation.ended_at,
-                                ).toLocaleString()
+                                      consultation.ended_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -194,8 +194,8 @@ export default function ConsultationShow({ consultation }: Props) {
                             consultation.deepfake_verified == null
                                 ? null
                                 : consultation.deepfake_verified
-                                    ? 'Yes'
-                                    : 'No'
+                                  ? 'Yes'
+                                  : 'No'
                         }
                     />
                     {consultation.cancellation_reason && (

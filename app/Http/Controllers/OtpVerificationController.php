@@ -112,7 +112,7 @@ class OtpVerificationController extends Controller
         RateLimiter::clear($throttleKey);
 
         return response()->json([
-            'message' => 'Verification code sent. (Development mode: 123456)',
+            'message' => 'Verification code sent successfully.',
             'otp_generated_at' => now()->timestamp,
         ]);
     }

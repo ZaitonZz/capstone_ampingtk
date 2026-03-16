@@ -1,12 +1,13 @@
 import { Head, router } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
-import { useState, FormEvent } from 'react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 import AddPatientDialog from '@/components/patients/add-patient-dialog';
-import EditPatientDialog from '@/components/patients/edit-patient-dialog';
-import ViewPatientDialog from '@/components/patients/view-patient-dialog';
 import DeletePatientDialog from '@/components/patients/delete-patient-dialog';
+import EditPatientDialog from '@/components/patients/edit-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
+import ViewPatientDialog from '@/components/patients/view-patient-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -43,7 +44,9 @@ export default function PatientList({ patients, filters }: PageProps) {
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(
+        null,
+    );
 
     const handleSearch = (e: FormEvent) => {
         e.preventDefault();
@@ -56,7 +59,7 @@ export default function PatientList({ patients, filters }: PageProps) {
             {
                 preserveState: true,
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -71,7 +74,7 @@ export default function PatientList({ patients, filters }: PageProps) {
             {
                 preserveState: true,
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -86,7 +89,7 @@ export default function PatientList({ patients, filters }: PageProps) {
             {
                 preserveState: true,
                 preserveScroll: true,
-            }
+            },
         );
     };
 
@@ -120,7 +123,9 @@ export default function PatientList({ patients, filters }: PageProps) {
             <div className="space-y-6 p-6">
                 <div className="space-y-1">
                     <h1 className="text-2xl font-semibold">Patients</h1>
-                    <p className="text-sm text-muted-foreground">Manage patient records</p>
+                    <p className="text-sm text-muted-foreground">
+                        Manage patient records
+                    </p>
                 </div>
 
                 {/* Search and Actions Bar */}

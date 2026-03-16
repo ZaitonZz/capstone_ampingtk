@@ -1,7 +1,7 @@
 import type { ImgHTMLAttributes } from 'react';
 
 export default function AppLogoIcon(
-    props: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'>
+    props: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'>,
 ) {
     return (
         <img

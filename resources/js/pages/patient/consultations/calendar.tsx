@@ -1,6 +1,7 @@
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
+import type { EventClickArg } from '@fullcalendar/core';
 import FullCalendar from '@fullcalendar/react';
 import { Head } from '@inertiajs/react';
 import { useForm } from '@inertiajs/react';
@@ -111,13 +112,7 @@ export default function PatientConsultationCalendar({
         openRequestModal(dt);
     }
 
-    function handleEventClick(info: {
-        event: {
-            title: string;
-            startStr: string;
-            extendedProps: CalendarEvent['extendedProps'];
-        };
-    }) {
+    function handleEventClick(info: EventClickArg) {
         const props = info.event
             .extendedProps as CalendarEvent['extendedProps'];
         setSelectedEvent({
@@ -363,7 +358,7 @@ export default function PatientConsultationCalendar({
                                     }
                                     rows={3}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                    placeholder="Briefly describe your concern…"
+                                    placeholder="Briefly describe your concern..."
                                 />
                             </div>
 
@@ -379,7 +374,7 @@ export default function PatientConsultationCalendar({
                                     className="flex-1"
                                 >
                                     {processing
-                                        ? 'Submitting…'
+                                        ? 'Submitting..'
                                         : 'Submit Request'}
                                 </Button>
                                 <Button
