@@ -25,7 +25,7 @@ export default function Login({
 }: Props) {
     const { errors: serverErrors } = usePage().props;
     const [showPassword, setShowPassword] = useState(false);
-    const [generalError, setGeneralError] = useState(status || '');
+    const [generalError, setGeneralError] = useState('');
     const [facialRecognitionLoading, setFacialRecognitionLoading] = useState(false);
     const [otpRequired, setOtpRequired] = useState(false);
     const [otpCode, setOtpCode] = useState('');
