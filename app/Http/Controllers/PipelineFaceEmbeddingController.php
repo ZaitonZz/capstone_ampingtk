@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreFaceEmbeddingRequest;
+use App\Models\PatientPhoto;
+use Illuminate\Http\JsonResponse;
+
 class PipelineFaceEmbeddingController extends Controller
 {
-    public function store(\App\Http\Requests\StoreFaceEmbeddingRequest $request, \App\Models\PatientPhoto $patientPhoto): \Illuminate\Http\JsonResponse
+    public function store(StoreFaceEmbeddingRequest $request, PatientPhoto $patientPhoto): JsonResponse
     {
         $patientPhoto->update(['face_embedding' => $request->validated('embedding')]);
 
