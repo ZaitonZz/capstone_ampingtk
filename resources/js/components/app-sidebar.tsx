@@ -100,16 +100,6 @@ export function AppSidebar() {
             href: '/patient/prescriptions',
             icon: Pill,
         });
-        mainNavItems.push({
-            title: 'Profile',
-            href: '/patient/profile',
-            icon: UserRound,
-        });
-        mainNavItems.push({
-            title: 'Settings',
-            href: '/settings/profile',
-            icon: Settings,
-        });
     }
 
     return (

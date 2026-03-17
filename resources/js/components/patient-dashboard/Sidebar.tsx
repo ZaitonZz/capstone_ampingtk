@@ -4,10 +4,8 @@ import {
     CalendarDays,
     ClipboardList,
     LayoutGrid,
-    Settings,
     ShieldCheck,
     Stethoscope,
-    UserRound,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,16 +41,7 @@ const menuItems: MenuItem[] = [
         href: '/patient/prescriptions',
         icon: ShieldCheck,
     },
-    {
-        label: 'Profile',
-        href: '/patient/profile',
-        icon: UserRound,
-    },
-    {
-        label: 'Settings',
-        href: '/settings/profile',
-        icon: Settings,
-    },
+   
 ];
 
 export function Sidebar() {
