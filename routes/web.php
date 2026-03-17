@@ -1,16 +1,18 @@
 <?php
 
-use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\ConsultationSessionController;
+use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
+use App\Http\Controllers\PipelineFaceEmbeddingController;
+use App\Http\Controllers\PipelineFaceMatchResultController;
+use App\Http\Controllers\PipelinePatientFaceController;
 use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -22,24 +24,25 @@ Route::get('/', function () {
             default => redirect()->route('dashboard'),
         };
     }
+
     return redirect()->route('login');
 })->name('home');
 
 // ── OTP Verification Routes (Authentication Flow) ─────────────────────────────
 Route::get('/verify-otp', function () {
-    if (!auth()->check()) {
+    if (! auth()->check()) {
         return redirect()->route('login');
     }
-    
+
     $isFirstTime = false;
     // Initialize OTP only if not already set
-    if (!session('otp_code')) {
+    if (! session('otp_code')) {
         session(['otp_code' => '123456']);
         session(['otp_generated_at' => now()->timestamp]);
         logger('OTP test code initialized: 123456');
         $isFirstTime = true;
     }
-    
+
     return inertia('auth/otp-verification', [
         'email' => auth()->user()->email,
         'phone' => null, // For future SMS implementation
@@ -64,6 +67,7 @@ Route::post('/clear-otp', function () {
     // Invalidate the session and regenerate CSRF token to prevent session fixation
     session()->invalidate();
     session()->regenerateToken();
+
     // Redirect to login page
     return redirect()->route('login');
 })->middleware('auth')->name('clear-otp');
@@ -128,6 +132,9 @@ Route::prefix('internal/pipeline')
     ->group(function () {
         Route::get('rooms', [PipelineRoomsController::class, 'index'])->name('rooms');
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
+        Route::get('consultation/{roomName}/patient-face', [PipelinePatientFaceController::class, 'show'])->name('patient-face.show');
+        Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
+        Route::post('face-match-results', [PipelineFaceMatchResultController::class, 'store'])->name('face-match-results.store');
     });
 
 // ── Agent Testing Endpoints ──────────────────────────────────────────
