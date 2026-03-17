@@ -107,10 +107,14 @@ Route::middleware(['auth'])->group(function () {
 
 // ── Patient-facing routes ─────────────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(function () {
+    Route::get('patient/consultations', [PatientConsultationController::class, 'index'])
+        ->name('patient.consultations.index');
     Route::get('patient/consultations/calendar', [PatientConsultationController::class, 'calendar'])
         ->name('patient.consultations.calendar');
     Route::post('patient/consultations/request', [PatientConsultationController::class, 'store'])
         ->name('patient.consultations.request');
+    Route::get('patient/consultations/{consultation}', [PatientConsultationController::class, 'show'])
+        ->name('patient.consultations.show');
 });
 
 // ── LiveKit server-to-server webhook (CSRF-exempt, signature-verified) ────────

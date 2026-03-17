@@ -13,6 +13,46 @@ use Inertia\Response;
 
 class PatientConsultationController extends Controller
 {
+    public function index(Request $request): Response
+    {
+        $patient = $request->user()->patientProfile;
+
+        abort_unless($patient !== null, 403, 'Patient profile not found.');
+
+        $perPage = max(1, min(100, $request->integer('per_page', 15)));
+
+        $consultations = Consultation::query()
+            ->with(['doctor' => fn ($q) => $q->select('id', 'name')])
+            ->where('patient_id', $patient->id)
+            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
+            ->when($request->type, fn ($q, $t) => $q->where('type', $t))
+            ->orderByDesc('scheduled_at')
+            ->paginate($perPage)
+            ->withQueryString();
+
+        return Inertia::render('patient/consultations/index', [
+            'consultations' => $consultations,
+            'filters' => $request->only(['status', 'type']),
+        ]);
+    }
+
+    public function show(Consultation $consultation): Response
+    {
+        $this->authorize('view', $consultation);
+
+        $consultation->load([
+            'patient',
+            'doctor' => fn ($q) => $q->select('id', 'name')
+                ->with(['doctorProfile' => fn ($q) => $q->select('user_id', 'specialty')]),
+            'prescriptions',
+            'vitalSigns',
+        ]);
+
+        return Inertia::render('patient/consultations/show', [
+            'consultation' => $consultation,
+        ]);
+    }
+
     public function calendar(Request $request): Response
     {
         $patient = $request->user()->patientProfile;

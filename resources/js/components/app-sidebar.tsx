@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     FolderGit2,
@@ -21,26 +21,9 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as consultations } from '@/routes/consultations';
+import { index as patientConsultations } from '@/routes/patient/consultations';
 import { index as patientsList } from '@/routes/patients';
 import type { NavItem } from '@/types';
-
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Patient List',
-        href: patientsList(),
-        icon: ClipboardList,
-    },
-    {
-        title: 'Consultations',
-        href: consultations(),
-        icon: ContactRound,
-    },
-];
 
 const footerNavItems: NavItem[] = [
     {
@@ -56,6 +39,39 @@ const footerNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const user = usePage().props.auth.user;
+    const isPatient = user.role === 'patient';
+    const isMedicalStaff = user.role === 'doctor' || user.role === 'admin';
+
+    const mainNavItems: NavItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard(),
+            icon: LayoutGrid,
+        },
+    ];
+
+    if (isMedicalStaff) {
+        mainNavItems.push({
+            title: 'Patient List',
+            href: patientsList(),
+            icon: ClipboardList,
+        });
+        mainNavItems.push({
+            title: 'Consultations',
+            href: consultations(),
+            icon: ContactRound,
+        });
+    }
+
+    if (isPatient) {
+        mainNavItems.push({
+            title: 'My Consultations',
+            href: patientConsultations(),
+            icon: ContactRound,
+        });
+    }
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
