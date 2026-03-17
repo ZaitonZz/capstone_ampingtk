@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureDoctor;
 use App\Http\Middleware\EnsureMedicalStaff;
 use App\Http\Middleware\EnsurePatient;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireOtpVerification;
 use App\Http\Middleware\VerifyPipelineSignature;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'medical.staff' => EnsureMedicalStaff::class,
             'patient' => EnsurePatient::class,
+            'doctor' => EnsureDoctor::class,
+            'admin' => EnsureAdmin::class,
+            'require-otp' => RequireOtpVerification::class,
             'pipeline.internal' => VerifyPipelineSignature::class,
         ]);
 
