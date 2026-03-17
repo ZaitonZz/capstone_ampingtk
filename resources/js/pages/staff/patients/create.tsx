@@ -303,6 +303,12 @@ export default function PatientCreate() {
 
                             <canvas ref={canvasRef} className="hidden" />
 
+                            {!data.profile_photo && (
+                                <p className="text-sm text-muted-foreground">
+                                    Capture a profile photo to continue.
+                                </p>
+                            )}
+
                             {cameraError && <p className="text-sm text-destructive">{cameraError}</p>}
                             {errors.profile_photo && <p className="text-sm text-destructive">{errors.profile_photo}</p>}
                         </div>
@@ -310,7 +316,7 @@ export default function PatientCreate() {
 
                     {/* Actions */}
                     <div className="flex gap-3">
-                        <Button type="submit" disabled={processing}>
+                        <Button type="submit" disabled={processing || !data.profile_photo}>
                             {processing ? 'Creating…' : 'Create Patient'}
                         </Button>
                         <Button variant="ghost" asChild>
