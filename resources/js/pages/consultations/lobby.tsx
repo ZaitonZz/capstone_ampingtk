@@ -197,7 +197,7 @@ export default function ConsultationLobbyPage({
                 setCameraError(null);
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: true,
-                    audio: micOn,
+                    audio: true,
                 });
 
                 // Guard against late-resolving getUserMedia after camera was turned off or component unmounted
@@ -250,7 +250,7 @@ export default function ConsultationLobbyPage({
             cancelled = true;
             stopCamera();
         };
-    }, [cameraOn, micOn]);
+    }, [cameraOn]);
 
     // Handle mic on/off (only toggle audio track if camera is already running)
     useEffect(() => {
@@ -360,6 +360,16 @@ export default function ConsultationLobbyPage({
             console.error('Failed to setup audio analyzer:', error);
         }
     }, [micOn, mediaStream]);
+
+    // Handle mic on/off (only toggle audio track if camera is already running)
+    useEffect(() => {
+        if (streamRef.current && cameraOn) {
+            const audioTracks = streamRef.current.getAudioTracks();
+            audioTracks.forEach((track) => {
+                track.enabled = micOn;
+            });
+        }
+    }, [micOn, cameraOn]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -473,23 +483,24 @@ export default function ConsultationLobbyPage({
     const statusLabel = !isLiveKitEnabled
         ? 'LiveKit disabled'
         : isAdminUser
-          ? 'Admin audit access'
-          : isConsentConfirmed
-            ? 'Ready to join'
-            : 'Consent required';
+            ? 'Admin audit access'
+            : isConsentConfirmed
+                ? 'Ready to join'
+                : 'Consent required';
 
     const statusPillClass = !isLiveKitEnabled
         ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
         : canJoinSession
-          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
-          : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
+            : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Teleconsultation Lobby" />
 
-            <div className="flex h-[calc(100svh-4rem)] flex-col overflow-hidden p-4 md:p-6">
-                <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+            <div className="mx-auto w-full max-w-7xl p-4 md:p-6">
+                {/* ── Page header ──────────────────────────────────────────── */}
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">
                             Teleconsultation Lobby
@@ -519,9 +530,11 @@ export default function ConsultationLobbyPage({
                     </div>
                 </div>
 
-                <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-4">
-                    <div className="flex min-h-0 flex-col gap-4 lg:col-span-3">
-                        <div className="flex min-h-0 flex-1 flex-col rounded-2xl border bg-card p-5 shadow-sm">
+                {/* ── Main 2-column layout ──────────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+                    {/* ── LEFT (3 cols): Camera & Mic ──────────────────────── */}
+                    <div className="flex flex-col gap-4 lg:col-span-3">
+                        <div className="flex flex-col rounded-2xl border bg-card p-5 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
                                     <Video className="h-3 w-3 text-primary" />
@@ -531,8 +544,10 @@ export default function ConsultationLobbyPage({
                                 </p>
                             </div>
 
-                            <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
-                                <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
+                            {/* Dark video preview */}
+                            <div className="relative w-full aspect-video max-h-[550px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                                {/* Corner label */}
+                                <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm z-10">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                     Preview
                                 </span>
@@ -571,19 +586,19 @@ export default function ConsultationLobbyPage({
                                     </div>
                                 )}
 
+                                {/* Live mic level meter */}
+                                {/* Minimal mic level indicator */}
                                 {(() => {
-                                    const hasAudioTrack =
-                                        mediaStream &&
-                                        mediaStream.getAudioTracks().length > 0;
-                                    const active =
-                                        cameraOn && micOn && hasAudioTrack;
+                                    const micActive = micOn && micLevel > 0;
+                                    const showLevelBars = micActive;
 
-                                    const thresholds = [0.15, 0.35, 0.6];
+                                    // 3 bars like a speaker icon level meter
+                                    const thresholds = [0.05, 0.15, 0.3];
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
-                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 ring-1 ring-white/10 backdrop-blur-sm">
-                                            {active ? (
+                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 backdrop-blur-sm ring-1 ring-white/10">
+                                            {micActive ? (
                                                 <Mic className="h-3.5 w-3.5 text-white/80" />
                                             ) : (
                                                 <MicOff className="h-3.5 w-3.5 text-white/40" />
@@ -596,10 +611,7 @@ export default function ConsultationLobbyPage({
                                                         className={[
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
-                                                            active &&
-                                                            micLevel >= t
-                                                                ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
-                                                                : 'bg-white/10',
+                                                            showLevelBars && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
                                                         ].join(' ')}
                                                     />
                                                 ))}
@@ -652,7 +664,9 @@ export default function ConsultationLobbyPage({
                         </div>
                     </div>
 
-                    <div className="flex min-h-0 flex-col gap-3 overflow-y-auto lg:col-span-1 lg:min-w-65">
+                    {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
+                    <div className="flex flex-col gap-3 w-full lg:w-80">
+                        {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
                                 <div className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-500/10">
@@ -691,8 +705,8 @@ export default function ConsultationLobbyPage({
                                         consultation.type === 'teleconsultation'
                                             ? 'Video Teleconsult'
                                             : consultation.type === 'in_person'
-                                              ? 'In-person Consultation'
-                                              : '—'
+                                                ? 'In-person Consultation'
+                                                : '—'
                                     }
                                 />
                                 <SessionRow
@@ -702,8 +716,8 @@ export default function ConsultationLobbyPage({
                                     value={
                                         consultation.scheduled_at
                                             ? new Date(
-                                                  consultation.scheduled_at,
-                                              ).toLocaleString()
+                                                consultation.scheduled_at,
+                                            ).toLocaleString()
                                             : '—'
                                     }
                                 />

@@ -97,7 +97,7 @@ it('patient can view their own consultation calendar', function () {
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.calendar'))
         ->assertOk()
         ->assertInertia(
@@ -112,7 +112,7 @@ it('patient can submit an appointment request which creates a pending consultati
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
             'type' => 'in_person',
@@ -132,7 +132,7 @@ it('patient appointment request requires a future scheduled_at', function () {
     Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
             'type' => 'in_person',
@@ -144,7 +144,7 @@ it('patient appointment request requires a future scheduled_at', function () {
 it('medical staff cannot access the patient appointment request route', function () {
     $doctor = User::factory()->doctor()->create();
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->post(route('patient.consultations.request'), [])
         ->assertForbidden();
 });

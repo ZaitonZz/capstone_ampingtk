@@ -1,7 +1,11 @@
 <?php
 
-test('returns a successful response', function () {
-    $response = $this->get(route('home'));
+use App\Models\User;
 
-    $response->assertOk();
+test('returns a successful response', function () {
+    $user = User::factory()->create();
+    $response = $this->actingAsVerified($user)->get(route('home'));
+
+    // Home route redirects authenticated users to their dashboard
+    $response->assertRedirect();
 });
