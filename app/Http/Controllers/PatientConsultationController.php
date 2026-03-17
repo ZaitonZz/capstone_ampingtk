@@ -19,13 +19,15 @@ class PatientConsultationController extends Controller
 
         abort_unless($patient !== null, 403, 'Patient profile not found.');
 
+        $perPage = max(1, min(100, $request->integer('per_page', 15)));
+
         $consultations = Consultation::query()
-            ->with(['doctor'])
+            ->with(['doctor' => fn ($q) => $q->select('id', 'name')])
             ->where('patient_id', $patient->id)
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
             ->when($request->type, fn ($q, $t) => $q->where('type', $t))
             ->orderByDesc('scheduled_at')
-            ->paginate($request->integer('per_page', 15))
+            ->paginate($perPage)
             ->withQueryString();
 
         return Inertia::render('patient/consultations/index', [
@@ -40,7 +42,8 @@ class PatientConsultationController extends Controller
 
         $consultation->load([
             'patient',
-            'doctor.doctorProfile',
+            'doctor' => fn ($q) => $q->select('id', 'name')
+                ->with(['doctorProfile' => fn ($q) => $q->select('user_id', 'specialty')]),
             'prescriptions',
             'vitalSigns',
         ]);
