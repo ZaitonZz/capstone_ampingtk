@@ -1,16 +1,17 @@
 <?php
 
-use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\ConsultationSessionController;
+use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
 use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
+use App\Models\Consultation;
+use App\Models\DeepfakeScanLog;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -22,24 +23,25 @@ Route::get('/', function () {
             default => redirect()->route('dashboard'),
         };
     }
+
     return redirect()->route('login');
 })->name('home');
 
 // ── OTP Verification Routes (Authentication Flow) ─────────────────────────────
 Route::get('/verify-otp', function () {
-    if (!auth()->check()) {
+    if (! auth()->check()) {
         return redirect()->route('login');
     }
-    
+
     $isFirstTime = false;
     // Initialize OTP only if not already set
-    if (!session('otp_code')) {
+    if (! session('otp_code')) {
         session(['otp_code' => '123456']);
         session(['otp_generated_at' => now()->timestamp]);
         logger('OTP test code initialized: 123456');
         $isFirstTime = true;
     }
-    
+
     return inertia('auth/otp-verification', [
         'email' => auth()->user()->email,
         'phone' => null, // For future SMS implementation
@@ -64,6 +66,7 @@ Route::post('/clear-otp', function () {
     // Invalidate the session and regenerate CSRF token to prevent session fixation
     session()->invalidate();
     session()->regenerateToken();
+
     // Redirect to login page
     return redirect()->route('login');
 })->middleware('auth')->name('clear-otp');
@@ -83,7 +86,72 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Patient-specific dashboard
     Route::middleware('patient')->group(function () {
         Route::get('patient/dashboard', function () {
-            return inertia('dashboard');
+            $user = auth()->user();
+            $patient = $user?->patientProfile;
+
+            $upcomingAppointment = null;
+            $recentConsultations = collect();
+            $lastDeepfakeCheckAt = null;
+            $isIdentityVerified = false;
+
+            if ($patient) {
+                $consultationQuery = Consultation::query()
+                    ->where('patient_id', $patient->id)
+                    ->with(['doctor:id,name']);
+
+                $upcoming = (clone $consultationQuery)
+                    ->whereIn('status', ['scheduled', 'pending'])
+                    ->orderBy('scheduled_at')
+                    ->first();
+
+                $upcomingAppointment = $upcoming
+                    ? [
+                        'doctor_name' => 'Dr. '.($upcoming->doctor?->name ?? 'Assigned Doctor'),
+                        'date_time' => $upcoming->scheduled_at
+                            ? $upcoming->scheduled_at->format('M d, Y g:i A')
+                            : 'To be announced',
+                        'status' => $upcoming->status === 'scheduled' ? 'confirmed' : 'pending',
+                    ]
+                    : null;
+
+                $recentConsultations = (clone $consultationQuery)
+                    ->latest('scheduled_at')
+                    ->limit(3)
+                    ->get()
+                    ->map(fn (Consultation $consultation) => [
+                        'id' => $consultation->id,
+                        'doctor_name' => 'Dr. '.($consultation->doctor?->name ?? 'Assigned Doctor'),
+                        'date' => $consultation->scheduled_at
+                            ? $consultation->scheduled_at->format('M d, Y')
+                            : 'No date set',
+                        'status' => str($consultation->status)->replace('_', ' ')->title()->value(),
+                    ]);
+
+                $lastDeepfakeCheck = DeepfakeScanLog::query()
+                    ->whereHas('consultation', fn ($query) => $query->where('patient_id', $patient->id))
+                    ->latest('scanned_at')
+                    ->first();
+
+                $lastDeepfakeCheckAt = $lastDeepfakeCheck?->scanned_at?->format('M d, Y g:i A');
+                $hasFaceEnrollment = $patient->photos()->exists();
+                $isIdentityVerified = $hasFaceEnrollment && ($lastDeepfakeCheck?->result !== 'fake');
+            }
+
+            return inertia('patient/dashboard', [
+                'identity_guard' => [
+                    'status' => $isIdentityVerified ? 'Verified' : 'Pending',
+                    'description' => $isIdentityVerified
+                        ? 'Your identity is verified. This session is protected from impersonation and deepfakes.'
+                        : 'Identity verification is in progress. Complete face enrollment to secure your teleconsultation session.',
+                    'last_check_at' => $lastDeepfakeCheckAt,
+                ],
+                'upcoming_appointment' => $upcomingAppointment,
+                'recent_consultations' => $recentConsultations,
+                'notifications' => [
+                    'Your consultation starts in 10 minutes',
+                    'Identity verified successfully',
+                ],
+            ]);
         })->name('patient.dashboard');
     });
 
@@ -107,6 +175,58 @@ Route::middleware(['auth'])->group(function () {
 
 // ── Patient-facing routes ─────────────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(function () {
+    Route::get('patient/lobby', function () {
+        $user = auth()->user();
+        $patient = $user?->patientProfile;
+
+        if (! $patient) {
+            return redirect()
+                ->route('patient.consultations.index')
+                ->with('error', 'No patient profile found for this account.');
+        }
+
+        $consultation = Consultation::query()
+            ->where('patient_id', $patient->id)
+            ->where('type', 'teleconsultation')
+            ->whereIn('status', ['ongoing', 'scheduled', 'pending'])
+            ->orderByRaw("case when status = 'ongoing' then 0 when status = 'scheduled' then 1 else 2 end")
+            ->orderBy('scheduled_at')
+            ->first();
+
+        if (! $consultation) {
+            return redirect()
+                ->route('patient.consultations.index')
+                ->with('error', 'No teleconsultation is available to join yet.');
+        }
+
+        return redirect()->route('consultations.lobby.show', $consultation);
+    })->name('patient.lobby');
+
+    Route::get('patient/consultation/live', function () {
+        return inertia('patient/consultation-live');
+    })->name('patient.consultation.live');
+
+    Route::get('patient/profile', function () {
+        $user = auth()->user();
+        $patient = $user?->patientProfile;
+
+        $latestFacePhoto = $patient?->photos()->latest('updated_at')->first();
+        $isFaceEnrollmentCompleted = $latestFacePhoto !== null;
+
+        return inertia('patient/profile', [
+            'face_enrollment_status' => $isFaceEnrollmentCompleted ? 'Completed' : 'Not Completed',
+            'face_enrollment_last_updated' => $latestFacePhoto?->updated_at?->format('M d, Y g:i A'),
+        ]);
+    })->name('patient.profile');
+
+    Route::get('patient/medical-records', function () {
+        return inertia('patient/medical-records');
+    })->name('patient.medical-records');
+
+    Route::get('patient/prescriptions', function () {
+        return inertia('patient/prescriptions');
+    })->name('patient.prescriptions');
+
     Route::get('patient/consultations', [PatientConsultationController::class, 'index'])
         ->name('patient.consultations.index');
     Route::get('patient/consultations/calendar', [PatientConsultationController::class, 'calendar'])
