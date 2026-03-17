@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { show as patientShow } from '@/actions/App/Http/Controllers/PatientController';
 import { index as patientsList } from '@/routes/patients';
 import type { BreadcrumbItem } from '@/types';
 import type { Patient, PaginatedData } from '@/types/patient';
@@ -97,9 +98,27 @@ export default function PatientList({ patients, filters }: PageProps) {
         router.reload();
     };
 
-    const handleViewPatient = (patient: Patient) => {
+    const handleViewPatient = async (patient: Patient) => {
         setSelectedPatient(patient);
         setIsViewDialogOpen(true);
+
+        try {
+            const response = await fetch(patientShow.url(patient.id), {
+                headers: {
+                    Accept: 'application/json',
+                },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const freshPatient = (await response.json()) as Patient;
+            setSelectedPatient(freshPatient);
+        } catch {
+            // Keep existing selected patient data if live fetch fails
+        }
     };
 
     const handleEditPatient = (patient: Patient) => {
