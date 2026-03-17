@@ -146,7 +146,8 @@ class PatientController extends Controller
         $user = User::create([
             'name' => trim("{$firstName} {$lastName}"),
             'email' => $email,
-            'password' => bcrypt('password'),
+            'password' => 'password',
+            'email_verified_at' => now(),
             'role' => 'patient',
         ]);
 
