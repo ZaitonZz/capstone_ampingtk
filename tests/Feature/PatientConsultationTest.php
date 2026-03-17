@@ -11,7 +11,7 @@ it('allows a patient to see their own consultations index', function () {
     Consultation::factory(3)->create(['patient_id' => $patient->id]);
     Consultation::factory(2)->create(); // other
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.index'))
         ->assertOk()
         ->assertInertia(
@@ -26,7 +26,7 @@ it('allows a patient to view a specific consultation', function () {
     $patient = Patient::factory()->create(['user_id' => $user->id]);
     $consultation = Consultation::factory()->create(['patient_id' => $patient->id]);
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.show', $consultation))
         ->assertOk()
         ->assertInertia(
@@ -43,7 +43,7 @@ it('filters consultations by status', function () {
     Consultation::factory(2)->create(['patient_id' => $patient->id, 'status' => 'pending']);
     Consultation::factory(3)->create(['patient_id' => $patient->id, 'status' => 'completed']);
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.index', ['status' => 'pending']))
         ->assertOk()
         ->assertInertia(
@@ -61,7 +61,7 @@ it('filters consultations by type', function () {
     Consultation::factory(2)->create(['patient_id' => $patient->id, 'type' => 'in_person']);
     Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.index', ['type' => 'teleconsultation']))
         ->assertOk()
         ->assertInertia(
@@ -78,7 +78,7 @@ it('preserves filters in pagination links', function () {
 
     Consultation::factory(5)->create(['patient_id' => $patient->id, 'status' => 'scheduled']);
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.index', ['status' => 'scheduled', 'per_page' => 2]))
         ->assertOk()
         ->assertInertia(
@@ -95,7 +95,7 @@ it('prevents a patient from viewing another patient\'s consultation', function (
     Patient::factory()->create(['user_id' => $user->id]);
     $otherConsultation = Consultation::factory()->create();
 
-    $this->actingAs($user)
+    $this->actingAsVerified($user)
         ->get(route('patient.consultations.show', $otherConsultation))
         ->assertForbidden();
 });
