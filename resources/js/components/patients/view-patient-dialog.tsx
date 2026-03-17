@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -22,6 +23,33 @@ export default function ViewPatientDialog({
 }: ViewPatientDialogProps) {
     if (!patient) return null;
 
+    const [imageFailed, setImageFailed] = useState(false);
+
+    useEffect(() => {
+        setImageFailed(false);
+    }, [patient.id, patient.profile_photo_path, patient.profile_photo_url]);
+
+    const profilePhotoUrl = useMemo(() => {
+        if (patient.profile_photo_url) {
+            return patient.profile_photo_url;
+        }
+
+        if (!patient.profile_photo_path) {
+            return null;
+        }
+
+        if (
+            patient.profile_photo_path.startsWith('http://') ||
+            patient.profile_photo_path.startsWith('https://')
+        ) {
+            return patient.profile_photo_path;
+        }
+
+        return `/storage/${patient.profile_photo_path.replace(/^\/+/, '')}`;
+    }, [patient.profile_photo_path, patient.profile_photo_url]);
+
+    const initials = `${patient.first_name.charAt(0)}${patient.last_name.charAt(0)}`.toUpperCase();
+
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
@@ -39,6 +67,21 @@ export default function ViewPatientDialog({
                 </DialogDescription>
 
                 <div className="space-y-6 py-4">
+                    <div className="flex justify-center">
+                        {profilePhotoUrl && !imageFailed ? (
+                            <img
+                                src={profilePhotoUrl}
+                                alt={`${patient.first_name} ${patient.last_name} profile`}
+                                className="h-32 w-32 rounded-full border border-input object-cover"
+                                onError={() => setImageFailed(true)}
+                            />
+                        ) : (
+                            <div className="flex h-32 w-32 items-center justify-center rounded-full border border-input bg-muted text-2xl font-semibold text-muted-foreground">
+                                {initials}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <dt className="text-sm font-medium text-muted-foreground">
