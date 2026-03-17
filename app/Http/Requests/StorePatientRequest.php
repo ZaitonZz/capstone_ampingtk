@@ -24,7 +24,7 @@ class StorePatientRequest extends FormRequest
             'contact_number' => ['nullable', 'string', 'max:30'],
             'email' => ['required', 'email', 'max:191', 'unique:patients,email', 'unique:users,email'],
             'address' => ['nullable', 'string'],
-            'profile_photo' => ['nullable', 'image'],
+            'profile_photo' => ['required', 'image'],
             'blood_type' => ['nullable', 'string', 'max:5'],
             'emergency_contact_name' => ['nullable', 'string', 'max:191'],
             'emergency_contact_number' => ['nullable', 'string', 'max:30'],
