@@ -83,10 +83,8 @@ export default function PatientTable({
                                         {patient.id.toString().padStart(6, '0')}
                                     </td>
                                     <td className="px-4 py-3 text-sm font-medium">
-                                        {patient.last_name},{' '}
-                                        {patient.first_name}
-                                        {patient.middle_name &&
-                                            ` ${patient.middle_name.charAt(0)}.`}
+                                        {patient.last_name}, {patient.first_name}
+                                        {patient.middle_name && ` ${patient.middle_name.charAt(0)}.`}
                                     </td>
                                     <td className="px-4 py-3 text-sm">
                                         {patient.age}
