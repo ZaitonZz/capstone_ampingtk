@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Patient extends Model
 {
@@ -33,7 +34,7 @@ class Patient extends Model
         'known_allergies',
     ];
 
-    protected $appends = ['age', 'full_name'];
+    protected $appends = ['age', 'full_name', 'profile_photo_url'];
 
     protected function casts(): array
     {
@@ -52,6 +53,19 @@ class Patient extends Model
     public function getAgeAttribute(): ?int
     {
         return $this->date_of_birth?->age;
+    }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        if ($this->profile_photo_path) {
+            return Storage::disk('public')->url($this->profile_photo_path);
+        }
+
+        if ($this->primaryPhoto?->file_path) {
+            return Storage::disk($this->primaryPhoto->disk ?: 'public')->url($this->primaryPhoto->file_path);
+        }
+
+        return null;
     }
 
     // Relationships
