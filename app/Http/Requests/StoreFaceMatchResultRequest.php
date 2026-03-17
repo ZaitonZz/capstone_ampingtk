@@ -22,7 +22,7 @@ class StoreFaceMatchResultRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'consultation_id' => ['required', 'integer', 'exists:consultations,id'],
+            'consultation_id' => ['required', 'integer', 'exists:consultations,id,deleted_at,NULL'],
             'matched' => ['required', 'boolean'],
             'face_match_score' => ['required', 'numeric', 'between:0,1'],
             'flagged' => ['sometimes', 'boolean'],
