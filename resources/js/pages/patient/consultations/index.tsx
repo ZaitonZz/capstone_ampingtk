@@ -91,6 +91,7 @@ export default function PatientConsultationsIndex({
                     <select
                         value={status}
                         onChange={(e) => setStatus(e.target.value)}
+                        aria-label="Filter by status"
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All statuses</option>
@@ -105,6 +106,7 @@ export default function PatientConsultationsIndex({
                     <select
                         value={type}
                         onChange={(e) => setType(e.target.value)}
+                        aria-label="Filter by type"
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All types</option>
