@@ -3,6 +3,8 @@
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 it('redirects guests to login', function () {
     $this->get(route('patients.index'))->assertRedirect(route('login'));
@@ -60,15 +62,20 @@ it('returns a patient with relationships on show', function () {
 });
 
 it('stores a new patient and sets registered_by to auth user', function () {
+    Storage::fake('public');
+
     $doctor = User::factory()->doctor()->create();
 
     $this->actingAs($doctor)
-        ->postJson(route('patients.store'), [
+        ->post(route('patients.store'), [
             'first_name' => 'Juan',
             'last_name' => 'Dela Cruz',
             'email' => 'juan@example.com',
             'date_of_birth' => '1990-05-15',
             'gender' => 'male',
+            'profile_photo' => UploadedFile::fake()->image('juan.jpg'),
+        ], [
+            'Accept' => 'application/json',
         ])
         ->assertCreated()
         ->assertJsonFragment(['first_name' => 'Juan']);
@@ -85,20 +92,25 @@ it('returns 422 when required fields are missing on store', function () {
     $this->actingAs($doctor)
         ->postJson(route('patients.store'), [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['first_name', 'last_name', 'date_of_birth', 'gender', 'email']);
+        ->assertJsonValidationErrors(['first_name', 'last_name', 'gender', 'email', 'profile_photo']);
 });
 
 it('auto-generates a user account when patient is created with email', function () {
+    Storage::fake('public');
+
     $doctor = User::factory()->doctor()->create();
     $email = 'newpatient@example.com';
 
     $this->actingAs($doctor)
-        ->postJson(route('patients.store'), [
+        ->post(route('patients.store'), [
             'first_name' => 'John',
             'last_name' => 'Doe',
             'email' => $email,
             'date_of_birth' => '1995-08-20',
             'gender' => 'male',
+            'profile_photo' => UploadedFile::fake()->image('john.jpg'),
+        ], [
+            'Accept' => 'application/json',
         ])
         ->assertCreated();
 
