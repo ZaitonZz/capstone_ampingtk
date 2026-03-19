@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -20,7 +21,29 @@ export default function ViewPatientDialog({
     open,
     onOpenChange,
 }: ViewPatientDialogProps) {
+    const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+
     if (!patient) return null;
+
+    let profilePhotoUrl: string | null = null;
+
+    if (patient.profile_photo_url) {
+        profilePhotoUrl = patient.profile_photo_url;
+    } else if (patient.profile_photo_path) {
+        if (
+            patient.profile_photo_path.startsWith('http://') ||
+            patient.profile_photo_path.startsWith('https://')
+        ) {
+            profilePhotoUrl = patient.profile_photo_path;
+        } else {
+            profilePhotoUrl = `/storage/${patient.profile_photo_path.replace(/^\/+/, '')}`;
+        }
+    }
+
+    const shouldShowProfilePhoto =
+        !!profilePhotoUrl && failedPhotoUrl !== profilePhotoUrl;
+
+    const initials = `${patient.first_name.charAt(0)}${patient.last_name.charAt(0)}`.toUpperCase();
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('en-US', {
@@ -39,6 +62,25 @@ export default function ViewPatientDialog({
                 </DialogDescription>
 
                 <div className="space-y-6 py-4">
+                    <div className="flex justify-center">
+                        {shouldShowProfilePhoto ? (
+                            <img
+                                src={profilePhotoUrl!}
+                                alt={`${patient.first_name} ${patient.last_name} profile`}
+                                className="h-32 w-32 rounded-full border border-input object-cover"
+                                onError={() => {
+                                    if (profilePhotoUrl) {
+                                        setFailedPhotoUrl(profilePhotoUrl);
+                                    }
+                                }}
+                            />
+                        ) : (
+                            <div className="flex h-32 w-32 items-center justify-center rounded-full border border-input bg-muted text-2xl font-semibold text-muted-foreground">
+                                {initials}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <dt className="text-sm font-medium text-muted-foreground">
