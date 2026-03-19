@@ -5,19 +5,54 @@ import { Spinner } from '@/components/ui/spinner';
 import TelemedicineLoginLayout from '@/layouts/auth/telemedicine-login-layout';
 
 type Props = {
-    maskedEmail: string;
-    expiresIn: number;
-    resendAvailableIn: number;
+    status?: string;
+    email?: string;
+    phone?: string;
+    otp_generated_at?: number;
+    is_fresh_otp?: boolean;
 };
 
-export default function OtpVerification({ maskedEmail, expiresIn: initialExpiresIn, resendAvailableIn: initialResendAvailableIn }: Props) {
+export default function OtpVerification({ email, phone, otp_generated_at, is_fresh_otp }: Props) {
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [isVerifying, setIsVerifying] = useState(false);
     const [generalError, setGeneralError] = useState('');
     const [isResending, setIsResending] = useState(false);
-    const [expirationSeconds, setExpirationSeconds] = useState(initialExpiresIn);
-    const [cooldownSeconds, setCooldownSeconds] = useState(initialResendAvailableIn);
+    const [cooldownSeconds, setCooldownSeconds] = useState(0);
+    const [expirationSeconds, setExpirationSeconds] = useState(600); // 10 minutes
     const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    // Initialize expiration timer based on OTP generation timestamp
+    useEffect(() => {
+        let generatedAt: number | null = null;
+
+        // Try to get timestamp from sessionStorage (for page refreshes)
+        const storedTimestamp = sessionStorage.getItem('otp_generated_at');
+        if (storedTimestamp) {
+            generatedAt = parseInt(storedTimestamp, 10);
+        }
+        // Otherwise, use timestamp from props (for initial page load)
+        else if (otp_generated_at) {
+            generatedAt = otp_generated_at;
+            sessionStorage.setItem('otp_generated_at', otp_generated_at.toString());
+        }
+
+        // If we have a generated timestamp from props, validate/update sessionStorage
+        if (otp_generated_at && otp_generated_at !== generatedAt) {
+            // OTP timestamp from server differs from stored - we're in a new session
+            // Clear old sessionStorage entries
+            sessionStorage.removeItem('otp_resend_at');
+            generatedAt = otp_generated_at;
+            sessionStorage.setItem('otp_generated_at', otp_generated_at.toString());
+        }
+
+        // Calculate remaining time
+        if (generatedAt) {
+            const now = Math.floor(Date.now() / 1000);
+            const elapsedSeconds = now - generatedAt;
+            const remainingSeconds = Math.max(0, 600 - elapsedSeconds);
+            setExpirationSeconds(remainingSeconds);
+        }
+    }, [otp_generated_at]);
 
     // OTP expiration timer
     useEffect(() => {
@@ -27,20 +62,61 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
         }
 
         const timer = setInterval(() => {
-            setExpirationSeconds((prev) => Math.max(0, prev - 1));
+            setExpirationSeconds((prev) => prev - 1);
         }, 1000);
 
         return () => clearInterval(timer);
     }, [expirationSeconds]);
 
-    // Resend cooldown timer
+    // Initialize resend cooldown timer from sessionStorage
+    useEffect(() => {
+        // If this is a fresh OTP, clear any old resend timer immediately
+        if (is_fresh_otp) {
+            sessionStorage.removeItem('otp_resend_at');
+            setCooldownSeconds(0);
+            return;
+        }
+
+        const resendAtTimestamp = sessionStorage.getItem('otp_resend_at');
+        const storedOtpGeneratedAt = sessionStorage.getItem('otp_generated_at');
+
+        if (resendAtTimestamp && storedOtpGeneratedAt) {
+            // Validate that the stored OTP timestamp matches current session's OTP timestamp
+            const storedOtpTime = parseInt(storedOtpGeneratedAt, 10);
+            const currentOtpTime = otp_generated_at || storedOtpTime;
+
+            // If OTP timestamps don't match, we're in a new session - clear old resend timer
+            if (storedOtpTime !== currentOtpTime) {
+                sessionStorage.removeItem('otp_resend_at');
+                setCooldownSeconds(0);
+                return;
+            }
+
+            const resendAt = parseInt(resendAtTimestamp, 10);
+            const now = Math.floor(Date.now() / 1000);
+            const elapsedSeconds = now - resendAt;
+            const remainingCooldown = Math.max(0, 60 - elapsedSeconds);
+
+            // Only set cooldown if time is still remaining
+            if (remainingCooldown > 0) {
+                setCooldownSeconds(remainingCooldown);
+            } else {
+                // Cooldown expired, clear the timestamp
+                sessionStorage.removeItem('otp_resend_at');
+            }
+        }
+    }, [otp_generated_at, is_fresh_otp]);
+
+    // Resend cooldown timer - auto clear when expired
     useEffect(() => {
         if (cooldownSeconds <= 0) {
+            // Clear sessionStorage when cooldown expires
+            sessionStorage.removeItem('otp_resend_at');
             return;
         }
 
         const timer = setInterval(() => {
-            setCooldownSeconds((prev) => Math.max(0, prev - 1));
+            setCooldownSeconds((prev) => prev - 1);
         }, 1000);
 
         return () => clearInterval(timer);
@@ -51,7 +127,7 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
      */
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
+        const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
@@ -140,15 +216,18 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
         }
 
         setIsVerifying(true);
-        setGeneralError('');
+        setGeneralError(''); // Clear any previous errors
 
         try {
-            const response = await fetch('/auth/verify-otp', {
+            // Submit OTP verification
+            const response = await fetch('/verify-otp', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                    'X-CSRF-Token': document
+                        .querySelector('meta[name="csrf-token"]')
+                        ?.getAttribute('content') || '',
                 },
                 body: JSON.stringify({
                     otp_code: otpCode,
@@ -157,112 +236,101 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
 
             if (!response.ok) {
                 const data = await response.json();
-
-                // Handle validation errors
-                if (data.errors) {
-                    const errorMessages = Object.values(data.errors).flat() as string[];
-                    setGeneralError(errorMessages?.[0] || 'Verification failed');
-                } else {
-                    setGeneralError(data.message || 'Invalid or expired verification code');
-                }
-
-                // Clear OTP fields for retry
-                setOtpDigits(['', '', '', '', '', '']);
-                inputRefs.current[0]?.focus();
+                setGeneralError(
+                    data.message || 'Invalid or expired verification code'
+                );
                 setIsVerifying(false);
                 return;
             }
 
+            // Handle successful verification
             const data = await response.json();
 
             if (data.success && data.redirect_url) {
-                // Redirect to dashboard
+                // Clear session storage and redirect to dashboard
+                sessionStorage.removeItem('otp_generated_at');
                 window.location.href = data.redirect_url;
             } else {
                 setGeneralError('An unexpected error occurred. Please try again.');
                 setIsVerifying(false);
             }
-        } catch (error) {
-            console.error('Verification error:', error);
+        } catch {
             setGeneralError('An error occurred during verification. Please try again.');
             setIsVerifying(false);
         }
     };
 
     /**
-     * Handle cancel OTP verification
+     * Handle logout and clear OTP session by logging out user
      */
-    const handleCancel = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleClearOtp = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
+        e.stopPropagation();
 
-        try {
-            const response = await fetch('/auth/cancel-otp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-                },
-            });
+        // Clear all sessionStorage immediately before form submission
+        sessionStorage.clear();
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                }
+        // Give the browser a moment to process the sessionStorage clear before navigating
+        setTimeout(() => {
+            // Create a form and submit to logout POST endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/clear-otp';
+            form.style.display = 'none';
+
+            // Add CSRF token
+            const csrfToken = document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute('content') || '';
+
+            if (csrfToken) {
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '_token';
+                tokenInput.value = csrfToken;
+                form.appendChild(tokenInput);
             }
-        } catch (error) {
-            console.error('Cancel error:', error);
-            // Fallback redirect
-            window.location.href = '/login';
-        }
+
+            document.body.appendChild(form);
+            form.submit();
+        }, 100); // 100ms delay ensures sessionStorage.clear() is processed
     };
 
     /**
      * Handle resend OTP code
      */
-    const handleResendCode = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-
+    const handleResendCode = async () => {
         setIsResending(true);
         setGeneralError('');
 
         try {
-            const response = await fetch('/auth/resend-otp', {
+            const response = await fetch('/resend-otp', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-Token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                    'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-Token': document
+                        .querySelector('meta[name="csrf-token"]')
+                        ?.getAttribute('content') || '',
                 },
             });
 
             if (!response.ok) {
                 const data = await response.json();
-
-                if (data.resend_available_in) {
-                    // Cooldown is still active
-                    setCooldownSeconds(data.resend_available_in);
-                    setGeneralError(`Please wait ${formatTime(data.resend_available_in)} before requesting a new code.`);
-                } else {
-                    setGeneralError(data.message || 'Failed to resend code');
+                setGeneralError(data.message || 'Failed to resend code');
+            } else {
+                const data = await response.json();
+                // Store OTP generation timestamp from server
+                if (data.otp_generated_at) {
+                    sessionStorage.setItem('otp_generated_at', data.otp_generated_at.toString());
                 }
-
-                setIsResending(false);
-                return;
+                // Store resend timestamp for cooldown persistence across page refreshes
+                sessionStorage.setItem('otp_resend_at', Math.floor(Date.now() / 1000).toString());
+                // Reset OTP fields and timers
+                setOtpDigits(['', '', '', '', '', '']);
+                setExpirationSeconds(600); // Reset to 10 minutes
+                setCooldownSeconds(60); // 60 seconds cooldown
+                inputRefs.current[0]?.focus();
             }
-
-            const data = await response.json();
-
-            // Success - update timers
-            setExpirationSeconds(data.expires_in || 300);
-            setCooldownSeconds(data.resend_available_in || 60);
-
-            // Clear OTP fields for new code
-            setOtpDigits(['', '', '', '', '', '']);
-            inputRefs.current[0]?.focus();
-        } catch (error) {
-            console.error('Resend error:', error);
+        } catch {
             setGeneralError('An error occurred. Please try again.');
         } finally {
             setIsResending(false);
@@ -272,7 +340,7 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
     return (
         <TelemedicineLoginLayout
             title="Verify Your Identity"
-            subtitle="Enter the verification code sent to your email"
+            subtitle="A verification code has been sent to your registered email or phone."
         >
             <Head title="OTP Verification" />
 
@@ -283,10 +351,13 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
                 </div>
             )}
 
-            {/* Email Display */}
-            <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-400">
-                <p>Verification code sent to: <span className="font-semibold">{maskedEmail}</span></p>
-            </div>
+            {/* Contact Information */}
+            {(email || phone) && (
+                <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-400">
+                    {email && <p>Sent to: <span className="font-semibold">{email}</span></p>}
+                    {phone && <p>Sent to: <span className="font-semibold">{phone}</span></p>}
+                </div>
+            )}
 
             {/* OTP Form */}
             <form onSubmit={handleVerify} className="space-y-6">
@@ -308,7 +379,6 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
                                 onKeyDown={(e) => handleKeyDown(index, e)}
                                 onPaste={handlePaste}
                                 disabled={isVerifying}
-                                autoFocus={index === 0}
                                 aria-label={`OTP digit ${index + 1}`}
                                 className="h-12 w-12 border border-gray-300 rounded-lg bg-white text-center text-xl font-bold transition-colors duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:focus:border-emerald-400 dark:focus:ring-emerald-400/20"
                             />
@@ -332,15 +402,24 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
                                     d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                                 />
                             </svg>
-                            <span>Expires in {formatTime(expirationSeconds)}</span>
+                            <span>
+                                Expires in: <span className="font-semibold">{formatTime(expirationSeconds)}</span>
+                            </span>
                         </div>
+
+                        {/* Cooldown Timer (shown only if active) */}
+                        {cooldownSeconds > 0 && (
+                            <span className="text-xs">
+                                Resend available in: <span className="font-semibold">{cooldownSeconds}s</span>
+                            </span>
+                        )}
                     </div>
                 </div>
 
                 {/* Verify Button */}
                 <Button
                     type="submit"
-                    disabled={isVerifying || expirationSeconds === 0}
+                    disabled={isVerifying || expirationSeconds <= 0}
                     className="h-10 w-full bg-emerald-600 font-semibold text-white transition-all duration-200 hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                 >
                     {isVerifying ? (
@@ -353,41 +432,46 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
                     )}
                 </Button>
 
-                {/* Resend Section */}
-                <div className="border-t border-gray-200 pt-4 dark:border-gray-800">
-                    <p className="mb-2 text-center text-xs text-muted-foreground">
-                        Didn't receive the code?
-                    </p>
-                    <Button
+                {/* Resend Code Link */}
+                <div className="text-center">
+                    <button
                         type="button"
                         onClick={handleResendCode}
-                        disabled={isResending || cooldownSeconds > 0 || expirationSeconds === 0}
-                        variant="outline"
-                        className="h-10 w-full"
+                        disabled={cooldownSeconds > 0 || isResending}
+                        className="text-sm font-medium text-emerald-600 hover:text-emerald-700 disabled:text-muted-foreground disabled:cursor-not-allowed dark:text-emerald-500 dark:hover:text-emerald-400"
                     >
                         {isResending ? (
-                            <>
-                                <Spinner />
-                                <span>Sending...</span>
-                            </>
+                            <span className="inline-flex items-center gap-1">
+                                <Spinner className="h-3 w-3" />
+                                Sending...
+                            </span>
                         ) : cooldownSeconds > 0 ? (
-                            `Resend in ${formatTime(cooldownSeconds)}`
+                            `Resend available in ${cooldownSeconds}s`
                         ) : (
                             'Resend Code'
                         )}
-                    </Button>
+                    </button>
                 </div>
 
-                {/* Back to Login Button */}
-                <Button
-                    type="button"
-                    onClick={handleCancel}
-                    variant="ghost"
-                    className="h-10 w-full"
-                >
-                    Back to Login
-                </Button>
+                {/* Help Text */}
+                <div className="text-center text-xs text-muted-foreground">
+                    <p>Didn't receive the code? Check your spam folder or try resending.</p>
+                </div>
             </form>
+
+            {/* Back to Login Link */}
+            <div className="border-t border-gray-200 pt-4 text-center text-sm dark:border-gray-800">
+                <span className="text-muted-foreground">
+                    Need to use a different method?{' '}
+                    <button
+                        type="button"
+                        onClick={handleClearOtp}
+                        className="font-semibold text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
+                    >
+                        Go back to login
+                    </button>
+                </span>
+            </div>
         </TelemedicineLoginLayout>
     );
 }
