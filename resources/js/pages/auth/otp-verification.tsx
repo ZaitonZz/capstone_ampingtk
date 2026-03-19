@@ -160,8 +160,8 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
 
                 // Handle validation errors
                 if (data.errors) {
-                    const errorMessages = Object.values(data.errors).flat();
-                    setGeneralError(Array.isArray(errorMessages) ? errorMessages[0] : 'Verification failed');
+                    const errorMessages = Object.values(data.errors).flat() as string[];
+                    setGeneralError(errorMessages?.[0] || 'Verification failed');
                 } else {
                     setGeneralError(data.message || 'Invalid or expired verification code');
                 }
