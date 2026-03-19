@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,13 +52,6 @@ class PatientController extends Controller
         ]);
     }
 
-    public function create(): Response
-    {
-        $this->authorize('create', Patient::class);
-
-        return Inertia::render('staff/patients/create');
-    }
-
     public function show(Patient $patient): JsonResponse
     {
         $this->authorize('view', $patient);
@@ -77,37 +71,7 @@ class PatientController extends Controller
     {
         $this->authorize('create', Patient::class);
 
-        $validated = $request->validated();
-
-        $profilePhotoPath = null;
-        if ($request->hasFile('profile_photo')) {
-            $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
-        }
-
-        // Auto-generate user account if email is provided and no user_id
-        $userId = null;
-        if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
-            $userId = $this->createPatientUser(
-                $validated['first_name'],
-                $validated['last_name'],
-                $validated['email']
-            );
-        }
-
-        $phone = $validated['phone'] ?? null;
-
-        $patientData = [
-            ...$validated,
-            'user_id' => $userId,
-            'contact_number' => $validated['contact_number'] ?? $phone,
-            'profile_photo_path' => $profilePhotoPath,
-            'gender' => $validated['gender'] ?? 'other',
-            'registered_by' => $request->user()->id,
-        ];
-
-        unset($patientData['profile_photo']);
-
-        $patient = Patient::create($patientData);
+        $patient = $this->createPatient($request->validated(), $request);
 
         // Return JSON for API requests, redirect for browser requests
         if ($request->expectsJson()) {
@@ -116,6 +80,40 @@ class PatientController extends Controller
 
         return redirect()->route('patients.index')
             ->with('success', 'Patient created successfully. User account auto-generated.');
+    }
+
+    protected function createPatient(array $validated, StorePatientRequest $request): Patient
+    {
+        return DB::transaction(function () use ($validated, $request): Patient {
+            $profilePhotoPath = null;
+            if ($request->hasFile('profile_photo')) {
+                $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+            }
+
+            $userId = null;
+            if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
+                $userId = $this->createPatientUser(
+                    $validated['first_name'],
+                    $validated['last_name'],
+                    $validated['email']
+                );
+            }
+
+            $phone = $validated['phone'] ?? null;
+
+            $patientData = [
+                ...$validated,
+                'user_id' => $userId,
+                'contact_number' => $validated['contact_number'] ?? $phone,
+                'profile_photo_path' => $profilePhotoPath,
+                'gender' => $validated['gender'] ?? 'other',
+                'registered_by' => $request->user()->id,
+            ];
+
+            unset($patientData['profile_photo']);
+
+            return Patient::create($patientData);
+        });
     }
 
     public function update(UpdatePatientRequest $request, Patient $patient): JsonResponse
