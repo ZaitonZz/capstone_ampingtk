@@ -94,7 +94,7 @@ export default function PatientList({ patients, filters }: PageProps) {
         );
     };
 
-    const handleAddPatientSuccess = () => {
+    const handleCreatePatientSuccess = () => {
         router.reload();
     };
 
@@ -188,7 +188,7 @@ export default function PatientList({ patients, filters }: PageProps) {
                         <AddPatientDialog
                             open={isAddDialogOpen}
                             onOpenChange={setIsAddDialogOpen}
-                            onSuccess={handleAddPatientSuccess}
+                            onSuccess={handleCreatePatientSuccess}
                         />
                     </div>
                 </div>
