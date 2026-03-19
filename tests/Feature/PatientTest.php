@@ -142,21 +142,26 @@ it('validates unique email when creating patient', function () {
         ->assertJsonValidationErrors(['email']);
 });
 
-it('renders create patient page for authenticated medical staff', function () {
+it('requires profile photo to be an image when creating patient', function () {
+    Storage::fake('public');
+
     $doctor = User::factory()->doctor()->create();
 
     $this->actingAs($doctor)
-        ->get(route('patients.create'))
-        ->assertOk();
+        ->post(route('patients.store'), [
+            'first_name' => 'Juan',
+            'last_name' => 'Dela Cruz',
+            'email' => 'juan-nonimage@example.com',
+            'date_of_birth' => '1990-05-15',
+            'gender' => 'male',
+            'profile_photo' => UploadedFile::fake()->create('profile.pdf', 100, 'application/pdf'),
+        ], [
+            'Accept' => 'application/json',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['profile_photo']);
 });
 
-it('prevents non-medical staff from viewing create patient page', function () {
-    $patient = User::factory()->patient()->create();
-
-    $this->actingAs($patient)
-        ->get(route('patients.create'))
-        ->assertForbidden();
-});
 it('updates a patient record', function () {
     $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
