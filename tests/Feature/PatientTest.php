@@ -142,6 +142,22 @@ it('validates unique email when creating patient', function () {
         ->assertJsonValidationErrors(['email']);
 });
 
+it('renders create patient page for authenticated medical staff', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $this->actingAs($doctor)
+        ->get(route('patients.create'))
+        ->assertOk();
+});
+
+it('prevents non-medical staff from viewing create patient page', function () {
+    $patient = User::factory()->patient()->create();
+
+    $this->actingAs($patient)
+        ->get(route('patients.create'))
+        ->assertForbidden();
+});
+
 it('requires profile photo to be an image when creating patient', function () {
     Storage::fake('public');
 
