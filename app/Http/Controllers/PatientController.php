@@ -52,6 +52,13 @@ class PatientController extends Controller
         ]);
     }
 
+    public function create(): Response
+    {
+        $this->authorize('create', Patient::class);
+
+        return Inertia::render('patients/create');
+    }
+
     public function show(Patient $patient): JsonResponse
     {
         $this->authorize('view', $patient);
