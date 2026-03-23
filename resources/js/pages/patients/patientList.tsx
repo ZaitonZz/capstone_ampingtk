@@ -1,13 +1,13 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
-import AddPatientDialog from '@/components/patients/add-patient-dialog';
 import DeletePatientDialog from '@/components/patients/delete-patient-dialog';
 import EditPatientDialog from '@/components/patients/edit-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
 import ViewPatientDialog from '@/components/patients/view-patient-dialog';
+import * as PatientController from '@/actions/App/Http/Controllers/PatientController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,7 +41,6 @@ type PageProps = {
 export default function PatientList({ patients, filters }: PageProps) {
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
     const [filterValue, setFilterValue] = useState(filters.gender || 'all');
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -92,10 +91,6 @@ export default function PatientList({ patients, filters }: PageProps) {
                 preserveScroll: true,
             },
         );
-    };
-
-    const handleCreatePatientSuccess = () => {
-        router.reload();
     };
 
     const handleViewPatient = async (patient: Patient) => {
@@ -185,11 +180,11 @@ export default function PatientList({ patients, filters }: PageProps) {
                             </SelectContent>
                         </Select>
 
-                        <AddPatientDialog
-                            open={isAddDialogOpen}
-                            onOpenChange={setIsAddDialogOpen}
-                            onSuccess={handleCreatePatientSuccess}
-                        />
+                        <Button asChild>
+                            <Link href={PatientController.create.url()}>
+                                Create Patient
+                            </Link>
+                        </Button>
                     </div>
                 </div>
 
