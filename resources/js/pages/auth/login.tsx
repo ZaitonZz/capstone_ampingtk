@@ -1,4 +1,4 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
@@ -30,19 +30,15 @@ export default function Login({
 
     /**
      * Handle facial recognition login
-     * Future implementation: Will integrate with biometric APIs
+     * Navigates to the facial recognition page
      */
     const handleFacialRecognitionLogin = async () => {
         setFacialRecognitionLoading(true);
         try {
-            // TODO: Implement facial recognition authentication
-            // 1. Check if browser supports Face API or WebRTC
-            // 2. Request camera access
-            // 3. Capture face data
-            // 4. Send to backend for verification
-            // 5. Redirect based on role
+            // Navigate to facial recognition page
+            window.location.href = '/facial-recognition';
         } catch {
-            setGeneralError('Facial recognition is not available at this time.');
+            setGeneralError('Unable to access facial recognition.');
         } finally {
             setFacialRecognitionLoading(false);
         }
