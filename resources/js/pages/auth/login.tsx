@@ -1,3 +1,11 @@
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Form, Head } from '@inertiajs/react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
@@ -47,12 +55,22 @@ export default function Login({
     const [status, setStatus] = useState<RecognitionStatus>('idle');
     const [isProcessing, setIsProcessing] = useState(false);
     const [faceErrorMessage, setFaceErrorMessage] = useState('');
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+
+    /**
+     * Handle facial recognition login
+     * Toggles to facial recognition view
+     */
+    const handleFacialRecognitionLogin = () => {
+        setIsFaceLogin(true);
+    };
 
     /**
      * Handle Start Camera button click
      * Simulates camera initialization with mock data
      */
     const handleStartCamera = async () => {
+        setIsCameraOpen(true);
         setIsProcessing(true);
         setFaceErrorMessage('');
         setStatus('requesting_camera');
@@ -124,13 +142,14 @@ export default function Login({
     const handleStopCamera = () => {
         setStatus('idle');
         setFaceErrorMessage('');
+        setIsCameraOpen(false);
     };
 
     /**
      * Handle Retry button click
      */
     const handleRetry = () => {
-        setStatus('idle');
+        setStatus('camera_ready');
         setFaceErrorMessage('');
     };
 
@@ -400,100 +419,115 @@ export default function Login({
                                 </Button>
                             </div>
 
-                            {/* Error Message */}
-                            {faceErrorMessage && (
-                                <div className="rounded-lg border border-red-200/50 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
-                                    {faceErrorMessage}
-                                </div>
-                            )}
+                            {/* Camera Dialog */}
+                            <Dialog open={isCameraOpen} onOpenChange={(open) => !open && handleStopCamera()}>
+                                <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>Face Verification</DialogTitle>
+                                        <DialogDescription>
+                                            Position your face in the frame to verify your identity.
+                                        </DialogDescription>
+                                    </DialogHeader>
 
-                            {/* Camera Preview Area - Only show camera when active */}
-                            {isActive ? (
-                                <div className="space-y-4">
-                                    <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative">
-                                        <CameraPreviewPanel status={status} />
-                                    </div>
-
-                                    {/* Status Indicator */}
-                                    <FaceScanStatus status={status} />
-                                </div>
-                            ) : (
-                                <div className="text-center py-10 px-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30">
-                                    <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-900/30 shadow-sm">
-                                        <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
-                                    </div>
-                                    <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
-                                    <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
-                                        Click the button below to activate your camera and verify your identity securely.
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Controls */}
-                            <div className="space-y-3">
-                                {!isActive ? (
-                                    <Button
-                                        onClick={handleStartCamera}
-                                        disabled={isProcessing || isSuccess}
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
-                                        size="lg"
-                                    >
-                                        {isProcessing ? (
-                                            <>
-                                                <Spinner className="mr-2 h-4 w-4" />
-                                                Initializing Camera...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Camera className="mr-2 h-4 w-4" />
-                                                Start Camera
-                                            </>
+                                    <div className="space-y-4 py-2">
+                                        {/* Error Message inside Dialog */}
+                                        {faceErrorMessage && (
+                                            <div className="rounded-md bg-red-50 p-3 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                                                {faceErrorMessage}
+                                            </div>
                                         )}
-                                    </Button>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Button
-                                            onClick={handleScanFace}
-                                            disabled={!isCameraReady || isProcessing || isSuccess}
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                                        >
-                                            {isProcessing ? 'Scanning...' : 'Scan Face'}
-                                        </Button>
+
+                                        <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
+                                            <CameraPreviewPanel status={status} />
+                                        </div>
+                                        <FaceScanStatus status={status} />
+                                    </div>
+
+                                    <DialogFooter className="flex-col sm:flex-row gap-2">
                                         <Button
                                             onClick={handleStopCamera}
                                             variant="outline"
                                             disabled={isProcessing}
+                                            className="w-full sm:w-auto"
                                         >
-                                            Stop Camera
+                                            Cancel
                                         </Button>
-                                    </div>
-                                )}
 
-                                {isSuccess && (
-                                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-2">
-                                        Continue to Dashboard
-                                    </Button>
-                                )}
+                                        {!isSuccess && !isFailed && (
+                                            <Button
+                                                onClick={handleScanFace}
+                                                disabled={!isCameraReady || isProcessing}
+                                                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                                            >
+                                                {isProcessing ? (
+                                                    <>
+                                                        <Spinner className="mr-2 h-4 w-4" />
+                                                        Scanning...
+                                                    </>
+                                                ) : (
+                                                    'Scan Face'
+                                                )}
+                                            </Button>
+                                        )}
 
-                                {isFailed && (
-                                    <Button
-                                        onClick={handleRetry}
-                                        variant="outline"
-                                        className="w-full mt-2"
-                                    >
-                                        <RotateCcw className="mr-2 h-4 w-4" />
-                                        Try Again
-                                    </Button>
-                                )}
+                                        {isFailed && (
+                                            <Button
+                                                onClick={handleRetry}
+                                                className="w-full sm:w-auto"
+                                                variant="secondary"
+                                            >
+                                                Try Again
+                                            </Button>
+                                        )}
+
+                                        {isSuccess && (
+                                            <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+                                                Continue to Dashboard
+                                            </Button>
+                                        )}
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+
+                            {/* Main Sidebar Content (Always visible) */}
+                            <div className="text-center py-10 px-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30">
+                                <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-900/30 shadow-sm">
+                                    <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
+                                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto mb-6">
+                                    Click the button below to open the camera and verify your identity securely.
+                                </p>
+
+                                <Button
+                                    onClick={handleStartCamera}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md"
+                                    size="lg"
+                                >
+                                    <Camera className="mr-2 h-4 w-4" />
+                                    Start Camera
+                                </Button>
                             </div>
 
-                            {/* Instructions - Simplified for sidebar */}
-                            <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded-lg">
-                                <p className="font-medium text-foreground mb-1">Instructions:</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>Position your face within the frame</li>
-                                    <li>Ensure good lighting conditions</li>
-                                    <li>Remove glasses/masks for best results</li>
+                            {/* Instructions */}
+                            <div className="text-xs text-muted-foreground bg-muted/30 p-4 rounded-lg border border-border/50">
+                                <p className="font-medium text-foreground mb-2 flex items-center">
+                                    <Zap className="h-3 w-3 mr-1 text-amber-500" />
+                                    Tips for success:
+                                </p>
+                                <ul className="space-y-1.5 pl-1">
+                                    <li className="flex gap-2">
+                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                        <span>Position your face clearly within the frame</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                        <span>Ensure you are in a well-lit environment</span>
+                                    </li>
+                                    <li className="flex gap-2">
+                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                        <span>Remove accessories like sunglasses or masks</span>
+                                    </li>
                                 </ul>
                             </div>
                         </div>
