@@ -72,19 +72,18 @@ export default function CameraPreviewPanel({ status }: CameraPreviewPanelProps) 
                         <div className="relative h-3/4 w-2/3 max-h-96">
                             {/* Main frame border */}
                             <div
-                                className={`absolute inset-0 rounded-3xl border-2 transition-colors duration-500 ${
-                                    isSuccess
+                                className={`absolute inset-0 rounded-3xl border-2 transition-colors duration-500 ${isSuccess
                                         ? 'border-green-500'
                                         : isFailed
-                                          ? 'border-red-500'
-                                          : 'border-emerald-400'
-                                } ${isScanning ? 'shadow-lg' : ''}`}
+                                            ? 'border-red-500'
+                                            : 'border-emerald-400'
+                                    } ${isScanning ? 'shadow-lg' : ''}`}
                                 style={
                                     isScanning
                                         ? {
-                                              boxShadow:
-                                                  '0 0 20px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.2)',
-                                          }
+                                            boxShadow:
+                                                '0 0 20px rgba(34, 197, 94, 0.5), inset 0 0 20px rgba(34, 197, 94, 0.2)',
+                                        }
                                         : {}
                                 }
                             />
