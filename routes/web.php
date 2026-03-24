@@ -28,6 +28,11 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
+// ── Facial Recognition Login Route ────────────────────────────────────────────
+Route::get('/facial-recognition', function () {
+    return inertia('auth/facial-recognition');
+})->name('facial-recognition');
+
 // ── OTP Verification Routes (Authentication Flow) ─────────────────────────────
 Route::get('/verify-otp', function () {
     if (! auth()->check()) {
