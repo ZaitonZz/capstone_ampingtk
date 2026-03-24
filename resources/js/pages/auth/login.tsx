@@ -57,6 +57,7 @@ export default function Login({
     const [faceErrorMessage, setFaceErrorMessage] = useState('');
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
+    const [recognizedUser, setRecognizedUser] = useState('');
 
     /**
      * Handle facial recognition login
@@ -127,6 +128,7 @@ export default function Login({
 
             if (randomScenario === 'success') {
                 setStatus('success');
+                setRecognizedUser('Dr. Carl');
                 // In production, you would redirect to dashboard here
                 // setTimeout(() => window.location.href = '/dashboard', 2000);
             } else if (randomScenario === 'no_face_detected') {
@@ -457,7 +459,7 @@ export default function Login({
                                         <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
                                             <CameraPreviewPanel status={status} stream={mediaStream} />
                                         </div>
-                                        <FaceScanStatus status={status} />
+                                        <FaceScanStatus status={status} userName={recognizedUser} />
                                     </div>
 
                                     <DialogFooter className="flex-col sm:flex-row gap-2">

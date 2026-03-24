@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import {
     AlertCircle,
     Camera,
@@ -9,6 +8,7 @@ import {
 
 type FaceScanStatusProps = {
     status: string;
+    userName?: string;
 };
 
 const statusConfig: Record<
@@ -76,16 +76,25 @@ const statusConfig: Record<
     },
 };
 
-export default function FaceScanStatus({ status }: FaceScanStatusProps) {
+export default function FaceScanStatus({ status, userName }: FaceScanStatusProps) {
     const config = statusConfig[status] || statusConfig.idle;
 
     return (
-        <div className={`rounded-lg border p-4 ${config.bgColor}`}>
-            <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">{config.icon}</div>
-                <Badge variant={config.variant} className="whitespace-nowrap">
-                    {config.label}
-                </Badge>
+        <div className={`rounded-lg border border-border p-4 ${config.bgColor}`}>
+            <div className={`flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                    <div className="shrink-0 text-foreground">{config.icon}</div>
+                    <div className="flex flex-col">
+                        <span className="font-medium text-sm text-foreground">
+                            {status === 'success' && userName
+                                ? `Welcome back, ${userName}`
+                                : config.label}
+                        </span>
+                        {status === 'success' && userName && (
+                            <span className="text-xs text-muted-foreground">Redirecting to dashboard...</span>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
