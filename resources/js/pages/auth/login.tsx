@@ -56,6 +56,7 @@ export default function Login({
     const [isProcessing, setIsProcessing] = useState(false);
     const [faceErrorMessage, setFaceErrorMessage] = useState('');
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
 
     /**
      * Handle facial recognition login
@@ -67,7 +68,7 @@ export default function Login({
 
     /**
      * Handle Start Camera button click
-     * Simulates camera initialization with mock data
+     * Initializes the camera stream
      */
     const handleStartCamera = async () => {
         setIsCameraOpen(true);
@@ -76,13 +77,21 @@ export default function Login({
         setStatus('requesting_camera');
 
         try {
-            // Simulate camera initialization delay
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: 'user'
+                }
+            });
+
+            setMediaStream(stream);
             setStatus('camera_ready');
-        } catch {
+        } catch (error) {
+            console.error('Camera access error:', error);
             setStatus('permission_denied');
             setFaceErrorMessage(
-                'Unable to access camera. Please check your browser permissions.'
+                'Unable to access camera. Please check your browser permissions and ensure no other app is using the camera.'
             );
         } finally {
             setIsProcessing(false);
@@ -91,7 +100,7 @@ export default function Login({
 
     /**
      * Handle Scan Face button click
-     * Simulates face detection scanning
+     * Simulates face detection scanning (Backend integration point)
      */
     const handleScanFace = async () => {
         if (status !== 'camera_ready') return;
@@ -101,14 +110,17 @@ export default function Login({
         setStatus('scanning');
 
         try {
+            // TODO: Capture frame from video stream and send to backend
+            // For now, we simulate the scanning process
+
             // Simulate scanning delay
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
             // Mock scenarios for demonstration
             const scenarios = [
                 'success',
-                'no_face_detected',
-                'multiple_faces_detected',
+                // 'no_face_detected',
+                // 'multiple_faces_detected',
             ];
             const randomScenario =
                 scenarios[Math.floor(Math.random() * scenarios.length)];
@@ -138,8 +150,13 @@ export default function Login({
 
     /**
      * Handle Stop Camera button click
+     * Stops the camera stream and closes the dialog
      */
     const handleStopCamera = () => {
+        if (mediaStream) {
+            mediaStream.getTracks().forEach(track => track.stop());
+            setMediaStream(null);
+        }
         setStatus('idle');
         setFaceErrorMessage('');
         setIsCameraOpen(false);
@@ -438,7 +455,7 @@ export default function Login({
                                         )}
 
                                         <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
-                                            <CameraPreviewPanel status={status} />
+                                            <CameraPreviewPanel status={status} stream={mediaStream} />
                                         </div>
                                         <FaceScanStatus status={status} />
                                     </div>
