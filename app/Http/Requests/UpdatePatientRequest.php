@@ -19,6 +19,7 @@ class UpdatePatientRequest extends FormRequest
             'middle_name' => ['nullable', 'string', 'max:100'],
             'date_of_birth' => ['sometimes', 'date', 'before:today'],
             'gender' => ['sometimes', 'in:male,female,other'],
+            'profile_photo' => ['nullable', 'image'],
             'civil_status' => ['nullable', 'in:single,married,widowed,separated'],
             'contact_number' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:191'],
