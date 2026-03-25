@@ -109,11 +109,11 @@ export default function Login({
 
             if (data.success) {
                 if (data.requires_otp) {
-                    window.location.href = '/auth/verify-otp';
+                    window.location.href = data.redirect_url || '/auth/verify-otp';
                     return;
                 }
 
-                window.location.href = data.redirect_url || '/dashboard';
+                window.location.href = data.redirect_url || '/auth/verify-otp';
             } else {
                 setGeneralError(data.message || 'An unexpected error occurred. Please try again.');
                 setIsSubmitting(false);
