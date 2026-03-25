@@ -114,6 +114,72 @@ class OtpVerificationController extends Controller
     }
 
     /**
+     * Ensure OTP is generated/sent for authenticated users.
+     * Redirects to verification page.
+     */
+    public function ensureOtp(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return redirect()->route('login');
+        }
+
+        // If OTP cycle already active, redirect to input page
+        if (session('pending_login_token')) {
+            return redirect()->route('auth.verify-otp');
+        }
+
+        // Generate OTP
+        $otp = $this->generateOtp();
+        $pendingLoginToken = Str::uuid()->toString();
+        $otpHash = Hash::make($otp);
+        $ttlSeconds = intval(config('auth_otp.otp.ttl', 300));
+
+        $pendingLoginState = [
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'otp_hash' => $otpHash,
+            'created_at' => now()->toIso8601String(),
+            'expires_at' => now()->addSeconds($ttlSeconds)->toIso8601String(),
+            'attempts' => 0,
+            'max_attempts' => intval(config('auth_otp.otp.max_attempts', 5)),
+            'resend_available_at' => now()->toIso8601String(),
+            'resend_count' => 0,
+            'max_resends' => intval(config('auth_otp.otp.max_resends', 3)),
+            'remember' => auth()->viaRemember(), // Preserve remember status
+        ];
+
+        // Store state
+        $cacheKey = $this->getPendingLoginCacheKey($pendingLoginToken);
+        Cache::put($cacheKey, $pendingLoginState, now()->addSeconds($ttlSeconds));
+        session(['pending_login_token' => $pendingLoginToken]);
+
+        // Send Email
+        try {
+            Mail::send(new OtpMail(
+                userEmail: $user->email,
+                otp: $otp,
+                expiryMinutes: intval(config('auth_otp.otp.ttl', 300) / 60),
+            ));
+            
+            logger("OTP sent to {$user->email} (ensureOtp)");
+        } catch (\Throwable $e) {
+            logger()->error('Failed to send OTP email (ensureOtp)', [
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+
+            Cache::forget($cacheKey);
+            session()->forget('pending_login_token');
+            
+            return redirect()->route('dashboard')->with('error', 'Failed to send OTP email.');
+        }
+
+        return redirect()->route('auth.verify-otp');
+    }
+
+    /**
      * Verify the OTP code submitted by the user.
      */
     public function verify(Request $request): JsonResponse

@@ -109,6 +109,11 @@ Route::post('/logout-otp', function () {
     return redirect()->route('login');
 })->name('logout-otp');
 
+// ── Authenticated User OTP Verification Initialization ────────────────────────
+Route::get('/verify-otp', [OtpVerificationController::class, 'ensureOtp'])
+    ->middleware('auth')
+    ->name('verify-otp');
+
 // ── Authenticated Dashboard Routes ────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Default dashboard (accessible by all authenticated users)
