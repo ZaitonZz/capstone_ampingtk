@@ -37,42 +37,8 @@ Route::post('/auth/email-login-start', [OtpVerificationController::class, 'start
     ->name('auth.email-login-start');
 
 // Step 2: Show OTP verification page (accessible with pending login token)
-Route::get('/auth/verify-otp', function () {
-    $pendingLoginToken = session('pending_login_token');
-
-    if (! $pendingLoginToken) {
-        return redirect()->route('login');
-    }
-
-    // Load pending login state from cache to get expiry info
-    $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
-    $pendingLoginState = \Illuminate\Support\Facades\Cache::get($cacheKey);
-
-    if (! $pendingLoginState) {
-        session()->forget('pending_login_token');
-
-        return redirect()->route('login');
-    }
-
-    $expiresAt = \Carbon\Carbon::parse($pendingLoginState['expires_at']);
-    $expiresIn = max(0, now()->diffInSeconds($expiresAt, false));
-
-    $resendAvailableAt = \Carbon\Carbon::parse($pendingLoginState['resend_available_at']);
-    $resendAvailableIn = max(0, now()->diffInSeconds($resendAvailableAt, false));
-
-    // Mask email for display
-    $email = $pendingLoginState['user_email'];
-    $parts = explode('@', $email);
-    $localPart = $parts[0] ?? '';
-    $domain = $parts[1] ?? '';
-    $maskedEmail = substr($localPart, 0, 1).str_repeat('*', max(1, strlen($localPart) - 1)).'@'.$domain;
-
-    return inertia('auth/otp-verification', [
-        'maskedEmail' => $maskedEmail,
-        'expiresIn' => $expiresIn,
-        'resendAvailableIn' => $resendAvailableIn,
-    ]);
-})->name('auth.verify-otp');
+Route::get('/auth/verify-otp', [OtpVerificationController::class, 'show'])
+    ->name('auth.verify-otp');
 
 // Step 3: Verify OTP code
 Route::post('/auth/verify-otp', [OtpVerificationController::class, 'verify'])

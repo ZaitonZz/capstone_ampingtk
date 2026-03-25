@@ -109,7 +109,7 @@ export default function Login({
 
             if (data.success) {
                 if (data.requires_otp) {
-                    window.location.href = '/auth/verify-otp';
+                    window.location.href = data.redirect_url || '/auth/verify-otp';
                     return;
                 }
 

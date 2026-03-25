@@ -4,6 +4,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     // Use array driver for cache in tests
@@ -58,6 +59,8 @@ describe('Email OTP Authentication', function () {
         });
 
         it('creates pending login state and sends OTP email for valid credentials', function () {
+            config(['auth_otp.enabled' => true]);
+
             $user = User::factory()->create([
                 'password' => Hash::make('correct-password'),
             ]);
@@ -70,9 +73,16 @@ describe('Email OTP Authentication', function () {
             $response->assertOk();
             $response->assertJsonStructure([
                 'success',
+                'requires_otp',
+                'redirect_url',
                 'message',
                 'masked_email',
                 'expires_in',
+            ]);
+            $response->assertJson([
+                'success' => true,
+                'requires_otp' => true,
+                'redirect_url' => route('auth.verify-otp'),
             ]);
 
             // Verify OTP email was sent
@@ -92,6 +102,30 @@ describe('Email OTP Authentication', function () {
             expect($cachedState['user_id'])->toBe($user->id);
             expect($cachedState['user_email'])->toBe($user->email);
             expect($cachedState['attempts'])->toBe(0);
+        });
+
+        it('returns role-based dashboard redirect when OTP is disabled', function () {
+            config(['auth_otp.enabled' => false]);
+
+            $patient = User::factory()->patient()->create([
+                'password' => Hash::make('correct-password'),
+            ]);
+
+            $response = $this->postJson(route('auth.email-login-start'), [
+                'email' => $patient->email,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertOk();
+            $response->assertJson([
+                'success' => true,
+                'requires_otp' => false,
+                'redirect_url' => route('patient.dashboard'),
+            ]);
+
+            $this->assertAuthenticatedAs($patient);
+            expect(session('otp_verified'))->toBeTrue();
+            Mail::assertNothingSent();
         });
 
         it('masks email correctly in response', function () {
@@ -134,6 +168,60 @@ describe('Email OTP Authentication', function () {
             ]);
 
             $response->assertUnprocessable();
+        });
+    });
+
+    describe('OTP Verification Page', function () {
+        it('redirects to login when pending login token is missing', function () {
+            $response = $this->get(route('auth.verify-otp'));
+
+            $response->assertRedirect(route('login'));
+        });
+
+        it('redirects to login when pending login state is missing from cache', function () {
+            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+
+            $response = $this->withSession([
+                'pending_login_token' => $pendingLoginToken,
+            ])->get(route('auth.verify-otp'));
+
+            $response->assertRedirect(route('login'));
+            $response->assertSessionMissing('pending_login_token');
+        });
+
+        it('returns inertia otp verification page with countdown props when pending login is valid', function () {
+            $user = User::factory()->create([
+                'email' => 'jane@example.com',
+            ]);
+
+            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+
+            Cache::put($cacheKey, [
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'otp_hash' => Hash::make('123456'),
+                'created_at' => now()->toIso8601String(),
+                'expires_at' => now()->addSeconds(120)->toIso8601String(),
+                'attempts' => 0,
+                'max_attempts' => 5,
+                'resend_available_at' => now()->addSeconds(45)->toIso8601String(),
+                'resend_count' => 0,
+                'max_resends' => 3,
+                'remember' => false,
+            ], now()->addMinutes(5));
+
+            $response = $this->withSession([
+                'pending_login_token' => $pendingLoginToken,
+            ])->get(route('auth.verify-otp'));
+
+            $response->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('auth/otp-verification')
+                    ->where('maskedEmail', 'j***@example.com')
+                    ->where('expiresIn', fn (int $value) => $value > 0 && $value <= 120)
+                    ->where('resendAvailableIn', fn (int $value) => $value >= 0 && $value <= 45)
+                );
         });
     });
 
