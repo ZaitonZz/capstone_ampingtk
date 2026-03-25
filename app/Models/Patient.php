@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class Patient extends Model
 {
@@ -57,7 +58,19 @@ class Patient extends Model
     public function getProfilePhotoUrlAttribute(): ?string
     {
         if ($this->primaryPhoto?->file_path) {
-            return Storage::disk($this->primaryPhoto->disk ?: 'public')->url($this->primaryPhoto->file_path);
+            $disk = $this->primaryPhoto->disk ?: 'public';
+            $path = $this->primaryPhoto->file_path;
+            $visibility = config("filesystems.disks.{$disk}.visibility");
+
+            if ($visibility === 'public') {
+                return Storage::disk($disk)->url($path);
+            }
+
+            try {
+                return Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(15));
+            } catch (Throwable) {
+                return null;
+            }
         }
 
         return null;
