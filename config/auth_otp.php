@@ -38,7 +38,7 @@ return [
 
     'cache' => [
         // Cache driver to use (default, file, redis, etc)
-        'driver' => env('OTP_CACHE_DRIVER', env('CACHE_DRIVER', 'file')),
+        'driver' => env('OTP_CACHE_DRIVER', env('CACHE_STORE', 'database')),
 
         // Cache key prefix for pending login tokens
         'pending_login_prefix' => 'otp:pending_login:',
