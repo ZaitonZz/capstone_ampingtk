@@ -25,20 +25,7 @@ export default function ViewPatientDialog({
 
     if (!patient) return null;
 
-    let profilePhotoUrl: string | null = null;
-
-    if (patient.profile_photo_url) {
-        profilePhotoUrl = patient.profile_photo_url;
-    } else if (patient.profile_photo_path) {
-        if (
-            patient.profile_photo_path.startsWith('http://') ||
-            patient.profile_photo_path.startsWith('https://')
-        ) {
-            profilePhotoUrl = patient.profile_photo_path;
-        } else {
-            profilePhotoUrl = `/storage/${patient.profile_photo_path.replace(/^\/+/, '')}`;
-        }
-    }
+    const profilePhotoUrl = patient.profile_photo_url ?? null;
 
     const shouldShowProfilePhoto =
         !!profilePhotoUrl && failedPhotoUrl !== profilePhotoUrl;
