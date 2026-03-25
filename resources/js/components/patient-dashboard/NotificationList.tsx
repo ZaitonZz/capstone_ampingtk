@@ -13,9 +13,9 @@ export function NotificationList({ items }: NotificationListProps) {
             icon={BellRing}
         >
             <ul className="space-y-3">
-                {items.map((item) => (
+                {items.map((item, index) => (
                     <li
-                        key={item}
+                        key={index}
                         className="rounded-xl border border-border/80 bg-muted/40 px-3 py-2 text-sm"
                     >
                         {item}
