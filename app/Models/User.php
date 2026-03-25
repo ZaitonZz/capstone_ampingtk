@@ -103,4 +103,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(ConsultationConsent::class);
     }
+
+    /** Doctor photos for ArcFace enrollment */
+    public function doctorPhotos(): HasMany
+    {
+        return $this->hasMany(DoctorPhoto::class);
+    }
+
+    /** Primary doctor photo for verification */
+    public function primaryDoctorPhoto(): HasOne
+    {
+        return $this->hasOne(DoctorPhoto::class)->where('is_primary', true)->latestOfMany();
+    }
 }
