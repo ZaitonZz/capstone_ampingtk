@@ -27,7 +27,6 @@ class Patient extends Model
         'contact_number',
         'email',
         'address',
-        'profile_photo_path',
         'blood_type',
         'emergency_contact_name',
         'emergency_contact_number',
@@ -57,10 +56,6 @@ class Patient extends Model
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
-        if ($this->profile_photo_path) {
-            return Storage::disk('public')->url($this->profile_photo_path);
-        }
-
         if ($this->primaryPhoto?->file_path) {
             return Storage::disk($this->primaryPhoto->disk ?: 'public')->url($this->primaryPhoto->file_path);
         }
