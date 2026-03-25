@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\Patient;
+use App\Models\PatientPhoto;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -84,6 +85,15 @@ it('stores a new patient and sets registered_by to auth user', function () {
         'first_name' => 'Juan',
         'registered_by' => $doctor->id,
     ]);
+
+    $patient = Patient::query()->where('email', 'juan@example.com')->firstOrFail();
+
+    $this->assertDatabaseHas('patient_photos', [
+        'patient_id' => $patient->id,
+        'uploaded_by' => $doctor->id,
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
 });
 
 it('returns 422 when required fields are missing on store', function () {
@@ -124,6 +134,13 @@ it('auto-generates a user account when patient is created with email', function 
     expect($user->role)->toBe('patient');
     expect($user->name)->toBe('John Doe');
     expect($patient->user_id)->toBe($user->id);
+
+    $this->assertDatabaseHas('patient_photos', [
+        'patient_id' => $patient->id,
+        'uploaded_by' => $doctor->id,
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
 });
 
 it('validates unique email when creating patient', function () {
@@ -188,6 +205,41 @@ it('updates a patient record', function () {
         ->assertJsonFragment(['first_name' => 'Updated']);
 
     $this->assertDatabaseHas('patients', ['id' => $patient->id, 'first_name' => 'Updated']);
+});
+
+it('updates patient profile photo and sets it as primary', function () {
+    Storage::fake('public');
+
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
+
+    $oldPhoto = PatientPhoto::factory()->primary()->create([
+        'patient_id' => $patient->id,
+        'uploaded_by' => $doctor->id,
+    ]);
+
+    $this->actingAs($doctor)
+        ->post(route('patients.update', $patient), [
+            '_method' => 'PATCH',
+            'first_name' => 'Updated',
+            'profile_photo' => UploadedFile::fake()->image('updated.jpg'),
+        ], [
+            'Accept' => 'application/json',
+        ])
+        ->assertOk();
+
+    $oldPhoto->refresh();
+    expect($oldPhoto->is_primary)->toBeFalse();
+
+    $newPrimaryPhoto = PatientPhoto::query()
+        ->where('patient_id', $patient->id)
+        ->where('is_primary', true)
+        ->where('id', '!=', $oldPhoto->id)
+        ->first();
+
+    expect($newPrimaryPhoto)->not->toBeNull();
+    expect($newPrimaryPhoto->uploaded_by)->toBe($doctor->id);
+    expect($newPrimaryPhoto->disk)->toBe('public');
 });
 
 it('soft-deletes a patient on destroy', function () {
