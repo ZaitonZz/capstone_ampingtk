@@ -40,6 +40,13 @@ class User extends Authenticatable
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var list<string>
+     */
+    protected $appends = ['avatar'];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -67,6 +74,19 @@ class User extends Authenticatable
     public function isPatient(): bool
     {
         return $this->role === 'patient';
+    }
+
+    public function getAvatarAttribute(): ?string
+    {
+        if ($this->isDoctor()) {
+            $photo = $this->primaryDoctorPhoto()->first();
+
+            if ($photo?->file_path && $photo->disk === 'public') {
+                return "/storage/{$photo->file_path}";
+            }
+        }
+
+        return null;
     }
 
     // Relationships
@@ -102,5 +122,17 @@ class User extends Authenticatable
     public function consultationConsents(): HasMany
     {
         return $this->hasMany(ConsultationConsent::class);
+    }
+
+    /** Doctor photos for ArcFace enrollment */
+    public function doctorPhotos(): HasMany
+    {
+        return $this->hasMany(DoctorPhoto::class);
+    }
+
+    /** Primary doctor photo for verification */
+    public function primaryDoctorPhoto(): HasOne
+    {
+        return $this->hasOne(DoctorPhoto::class)->where('is_primary', true)->latestOfMany();
     }
 }
