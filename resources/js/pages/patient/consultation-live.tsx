@@ -81,7 +81,7 @@ export default function PatientLiveConsultationPage() {
                         ) : (
                             <Camera className="h-4 w-4" />
                         )}
-                        {isCameraOff ? 'Turn Camera On' : 'Toggle Camera'}
+                        {isCameraOff ? 'Turn Camera On' : 'Turn Camera Off'}
                     </Button>
 
                     <Button variant="destructive">
