@@ -2,7 +2,7 @@ import { BellRing } from 'lucide-react';
 import { DashboardCard } from '@/components/patient-dashboard/DashboardCard';
 
 interface NotificationListProps {
-    items: string[];
+    items: Array<{ id: string | number; message: string }>;
 }
 
 export function NotificationList({ items }: NotificationListProps) {
@@ -15,10 +15,10 @@ export function NotificationList({ items }: NotificationListProps) {
             <ul className="space-y-3">
                 {items.map((item) => (
                     <li
-                        key={item}
+                        key={item.id}
                         className="rounded-xl border border-border/80 bg-muted/40 px-3 py-2 text-sm"
                     >
-                        {item}
+                        {item.message}
                     </li>
                 ))}
             </ul>
