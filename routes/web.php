@@ -88,12 +88,14 @@ Route::get('/verify-otp-legacy', function () {
     if (!auth()->check() || !session('otp_verified')) {
         return redirect()->route('login');
     }
-    
+
+    $email = auth()->user()->email;
+    $maskedEmail = preg_replace('/(^.).*(@.*$)/', '$1***$2', $email);
+
     return inertia('auth/otp-verification', [
-        'email' => auth()->user()->email,
-        'phone' => null,
-        'otp_generated_at' => now()->timestamp,
-        'is_fresh_otp' => false,
+        'maskedEmail' => $maskedEmail,
+        'expiresIn' => 0,
+        'resendAvailableIn' => 0,
     ]);
 })->middleware('auth')->name('verify-otp-legacy');
 
