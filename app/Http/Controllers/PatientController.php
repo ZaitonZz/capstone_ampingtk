@@ -140,7 +140,37 @@ class PatientController extends Controller
     {
         $this->authorize('update', $patient);
 
-        $patient->update($request->validated());
+        $validated = $request->validated();
+        $profilePhotoPath = null;
+
+        if ($request->hasFile('profile_photo')) {
+            $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+        }
+
+        try {
+            DB::transaction(function () use ($patient, $validated, $request, $profilePhotoPath): void {
+                unset($validated['profile_photo']);
+
+                $patient->update($validated);
+
+                if ($profilePhotoPath !== null) {
+                    $patient->photos()->where('is_primary', true)->update(['is_primary' => false]);
+
+                    $patient->photos()->create([
+                        'uploaded_by' => $request->user()->id,
+                        'file_path' => $profilePhotoPath,
+                        'disk' => 'public',
+                        'is_primary' => true,
+                    ]);
+                }
+            });
+        } catch (Throwable $exception) {
+            if ($profilePhotoPath !== null) {
+                Storage::disk('public')->delete($profilePhotoPath);
+            }
+
+            throw $exception;
+        }
 
         return response()->json($patient->fresh());
     }
