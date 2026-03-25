@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Consultation;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 
 class PipelinePatientFaceController extends Controller
 {
@@ -18,11 +17,10 @@ class PipelinePatientFaceController extends Controller
         $patient = $consultation->patient;
         $photo = $patient?->primaryPhoto ?? $patient?->photos()->latest('id')->first();
         $usedFallbackPhoto = $photo !== null && ($patient?->primaryPhoto?->id !== $photo->id);
-        $photoUrl = null;
+        $photoPath = null;
 
-        if ($photo !== null) {
-            $disk = Storage::disk($photo->disk);
-            $photoUrl = method_exists($disk, 'url') ? $disk->url($photo->file_path) : null;
+        if ($photo !== null && $photo->disk === 'public') {
+            $photoPath = "/storage/{$photo->file_path}";
         }
 
         return response()->json([
@@ -30,7 +28,7 @@ class PipelinePatientFaceController extends Controller
             'patient_id' => $patient?->id,
             'patient_name' => $patient?->full_name,
             'photo_id' => $photo?->id,
-            'photo_url' => $photoUrl,
+            'photo_path' => $photoPath,
             'face_embedding' => $photo?->face_embedding,
             'used_fallback_photo' => $usedFallbackPhoto,
         ]);
