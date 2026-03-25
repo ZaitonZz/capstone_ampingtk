@@ -18,12 +18,14 @@ class PatientPhoto extends Model
         'disk',
         'is_primary',
         'notes',
+        'face_embedding',
     ];
 
     protected function casts(): array
     {
         return [
             'is_primary' => 'boolean',
+            'face_embedding' => 'array',
         ];
     }
 

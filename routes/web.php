@@ -1,16 +1,18 @@
 <?php
 
-use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\ConsultationSessionController;
+use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
+use App\Http\Controllers\PipelineFaceEmbeddingController;
+use App\Http\Controllers\PipelineFaceMatchResultController;
+use App\Http\Controllers\PipelinePatientFaceController;
 use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
 use Illuminate\Support\Facades\Route;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -22,6 +24,7 @@ Route::get('/', function () {
             default => redirect()->route('dashboard'),
         };
     }
+
     return redirect()->route('login');
 })->name('home');
 
@@ -162,6 +165,9 @@ Route::prefix('internal/pipeline')
     ->group(function () {
         Route::get('rooms', [PipelineRoomsController::class, 'index'])->name('rooms');
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
+        Route::get('consultation/{roomName}/patient-face', [PipelinePatientFaceController::class, 'show'])->name('patient-face.show');
+        Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
+        Route::post('face-match-results', [PipelineFaceMatchResultController::class, 'store'])->name('face-match-results.store');
     });
 
 // ── Agent Testing Endpoints ──────────────────────────────────────────

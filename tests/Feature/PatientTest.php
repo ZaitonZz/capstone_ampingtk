@@ -3,6 +3,8 @@
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 it('redirects guests to login', function () {
     $this->get(route('patients.index'))->assertRedirect(route('login'));
@@ -60,14 +62,20 @@ it('returns a patient with relationships on show', function () {
 });
 
 it('stores a new patient and sets registered_by to auth user', function () {
+    Storage::fake('public');
+
     $doctor = User::factory()->doctor()->create();
 
     $this->actingAs($doctor)
-        ->postJson(route('patients.store'), [
+        ->post(route('patients.store'), [
             'first_name' => 'Juan',
             'last_name' => 'Dela Cruz',
+            'email' => 'juan@example.com',
             'date_of_birth' => '1990-05-15',
             'gender' => 'male',
+            'profile_photo' => UploadedFile::fake()->image('juan.jpg'),
+        ], [
+            'Accept' => 'application/json',
         ])
         ->assertCreated()
         ->assertJsonFragment(['first_name' => 'Juan']);
@@ -84,9 +92,71 @@ it('returns 422 when required fields are missing on store', function () {
     $this->actingAs($doctor)
         ->postJson(route('patients.store'), [])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['first_name', 'last_name', 'date_of_birth', 'gender']);
+        ->assertJsonValidationErrors(['first_name', 'last_name', 'gender', 'email', 'profile_photo']);
 });
 
+it('auto-generates a user account when patient is created with email', function () {
+    Storage::fake('public');
+
+    $doctor = User::factory()->doctor()->create();
+    $email = 'newpatient@example.com';
+
+    $this->actingAs($doctor)
+        ->post(route('patients.store'), [
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'email' => $email,
+            'date_of_birth' => '1995-08-20',
+            'gender' => 'male',
+            'profile_photo' => UploadedFile::fake()->image('john.jpg'),
+        ], [
+            'Accept' => 'application/json',
+        ])
+        ->assertCreated();
+
+    // Verify patient was created
+    $patient = Patient::where('email', $email)->first();
+    expect($patient)->not->toBeNull();
+
+    // Verify user account was auto-generated
+    $user = User::where('email', $email)->first();
+    expect($user)->not->toBeNull();
+    expect($user->role)->toBe('patient');
+    expect($user->name)->toBe('John Doe');
+    expect($patient->user_id)->toBe($user->id);
+});
+
+it('validates unique email when creating patient', function () {
+    $doctor = User::factory()->doctor()->create();
+    $existingUser = User::factory()->create(['email' => 'duplicate@example.com']);
+
+    $this->actingAs($doctor)
+        ->postJson(route('patients.store'), [
+            'first_name' => 'Duplicate',
+            'last_name' => 'Email',
+            'email' => 'duplicate@example.com',
+            'date_of_birth' => '1990-01-01',
+            'gender' => 'female',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['email']);
+});
+
+it('renders create patient page for authenticated medical staff', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $this->actingAs($doctor)
+        ->get(route('patients.create'))
+        ->assertOk();
+});
+
+it('prevents non-medical staff from viewing create patient page', function () {
+    $patient = User::factory()->patient()->create();
+
+    $this->actingAs($patient)
+        ->get(route('patients.create'))
+        ->assertForbidden();
+});
 it('updates a patient record', function () {
     $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
