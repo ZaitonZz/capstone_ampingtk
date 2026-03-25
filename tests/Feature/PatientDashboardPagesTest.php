@@ -57,7 +57,7 @@ it('renders the patient consultation lobby page', function () {
 
     $this->actingAsVerified($patientUser)
         ->get(route('patient.lobby'))
-        ->assertRedirect(route('consultations.lobby.show', $consultation, false));
+        ->assertRedirect(route('consultations.lobby.show', $consultation));
 });
 
 it('renders the patient profile page with face enrollment fields', function () {
