@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\DeepfakeScanLogController;
+use App\Http\Controllers\DoctorPhotoController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PatientNoteController;
@@ -60,4 +61,5 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     // ── Doctor Profile ────────────────────────────────────────────────────────
     Route::get('doctor/profile', [DoctorProfileController::class, 'show'])->name('doctor.profile.show');
     Route::post('doctor/profile', [DoctorProfileController::class, 'upsert'])->name('doctor.profile.upsert');
+    Route::post('doctor/profile/photo', [DoctorPhotoController::class, 'store'])->name('doctor.profile.photo.store');
 });
