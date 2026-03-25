@@ -113,7 +113,7 @@ export default function Login({
                     return;
                 }
 
-                window.location.href = data.redirect_url || '/auth/verify-otp';
+                window.location.href = data.redirect_url || '/dashboard';
             } else {
                 setGeneralError(data.message || 'An unexpected error occurred. Please try again.');
                 setIsSubmitting(false);
