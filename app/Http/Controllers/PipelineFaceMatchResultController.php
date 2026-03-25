@@ -23,7 +23,7 @@ class PipelineFaceMatchResultController extends Controller
 
         if (! $isValidUser) {
             return response()->json([
-                'error' => 'Verification user does not match consultation participant for the specified role.',
+                'message' => 'Verification user does not match consultation participant for the specified role.',
             ], 422);
         }
 
