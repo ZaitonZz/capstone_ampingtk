@@ -51,6 +51,26 @@ class OtpVerificationController extends Controller
             ]);
         }
 
+        if (!$this->isOtpEnabled()) {
+            Auth::login($user, $request->boolean('remember'));
+            $request->session()->regenerate();
+            session(['otp_verified' => true]);
+
+            $redirectUrl = match ($user->role) {
+                'doctor' => route('doctor.dashboard'),
+                'patient' => route('patient.dashboard'),
+                'admin' => route('admin.dashboard'),
+                default => route('dashboard'),
+            };
+
+            return response()->json([
+                'success' => true,
+                'requires_otp' => false,
+                'redirect_url' => $redirectUrl,
+                'message' => 'Login successful.',
+            ]);
+        }
+
         // Generate OTP and pending login token
         $otp = $this->generateOtp();
         $pendingLoginToken = Str::uuid()->toString();
@@ -123,6 +143,12 @@ class OtpVerificationController extends Controller
 
         if (!$user) {
             return redirect()->route('login');
+        }
+
+        if (!$this->isOtpEnabled()) {
+            session(['otp_verified' => true]);
+
+            return redirect()->route('dashboard');
         }
 
         // If OTP cycle already active, redirect to input page
@@ -442,5 +468,10 @@ class OtpVerificationController extends Controller
         $masked = substr($localPart, 0, 1) . str_repeat('*', max(1, strlen($localPart) - 1));
 
         return $masked . '@' . $domain;
+    }
+
+    private function isOtpEnabled(): bool
+    {
+        return (bool) config('auth_otp.enabled', true);
     }
 }

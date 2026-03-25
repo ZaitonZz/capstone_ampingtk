@@ -108,8 +108,12 @@ export default function Login({
             const data = await response.json();
 
             if (data.success) {
-                // Redirect to OTP verification page
-                window.location.href = '/auth/verify-otp';
+                if (data.requires_otp) {
+                    window.location.href = '/auth/verify-otp';
+                    return;
+                }
+
+                window.location.href = data.redirect_url || '/dashboard';
             } else {
                 setGeneralError(data.message || 'An unexpected error occurred. Please try again.');
                 setIsSubmitting(false);
