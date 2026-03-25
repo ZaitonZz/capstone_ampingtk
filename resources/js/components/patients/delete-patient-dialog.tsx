@@ -9,6 +9,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { destroy as destroyPatient } from '@/actions/App/Http/Controllers/PatientController';
 import type { Patient } from '@/types/patient';
 
 type DeletePatientDialogProps = {
@@ -44,7 +45,7 @@ export default function DeletePatientDialog({
                 return;
             }
 
-            const response = await fetch(`/patients/${patient.id}`, {
+            const response = await fetch(destroyPatient.url(patient.id), {
                 method: 'DELETE',
                 headers: {
                     Accept: 'application/json',

@@ -6,9 +6,12 @@ use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
 use App\Models\Patient;
 use App\Models\User;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -55,7 +58,7 @@ class PatientController extends Controller
     {
         $this->authorize('create', Patient::class);
 
-        return Inertia::render('staff/patients/create');
+        return Inertia::render('patients/create');
     }
 
     public function show(Patient $patient): JsonResponse
@@ -77,14 +80,19 @@ class PatientController extends Controller
     {
         $this->authorize('create', Patient::class);
 
-        $validated = $request->validated();
+        $patient = $this->createPatient($request->validated(), $request);
 
-        $profilePhotoPath = null;
-        if ($request->hasFile('profile_photo')) {
-            $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+        // Return JSON for API requests, redirect for browser requests
+        if ($request->expectsJson()) {
+            return response()->json($patient->fresh(), 201);
         }
 
-        // Auto-generate user account if email is provided and no user_id
+        return redirect()->route('patients.index')
+            ->with('success', 'Patient created successfully. User account auto-generated.');
+    }
+
+    protected function createPatient(array $validated, StorePatientRequest $request): Patient
+    {
         $userId = null;
         if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
             $userId = $this->createPatientUser(
@@ -100,22 +108,31 @@ class PatientController extends Controller
             ...$validated,
             'user_id' => $userId,
             'contact_number' => $validated['contact_number'] ?? $phone,
-            'profile_photo_path' => $profilePhotoPath,
+            'profile_photo_path' => null,
             'gender' => $validated['gender'] ?? 'other',
             'registered_by' => $request->user()->id,
         ];
 
         unset($patientData['profile_photo']);
 
-        $patient = Patient::create($patientData);
+        // Create patient in transaction without file
+        $patient = DB::transaction(function () use ($patientData): Patient {
+            return Patient::create($patientData);
+        });
 
-        // Return JSON for API requests, redirect for browser requests
-        if ($request->expectsJson()) {
-            return response()->json($patient->fresh(), 201);
+        // Store file after transaction succeeds to avoid orphaned files
+        if ($request->hasFile('profile_photo')) {
+            try {
+                $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+                $patient->update(['profile_photo_path' => $profilePhotoPath]);
+            } catch (Exception $e) {
+                // Clean up the uploaded file if update fails
+                Storage::disk('public')->delete($profilePhotoPath);
+                throw $e;
+            }
         }
 
-        return redirect()->route('patients.index')
-            ->with('success', 'Patient created successfully. User account auto-generated.');
+        return $patient;
     }
 
     public function update(UpdatePatientRequest $request, Patient $patient): JsonResponse

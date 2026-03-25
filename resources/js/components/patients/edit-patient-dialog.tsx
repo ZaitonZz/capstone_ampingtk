@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { update as updatePatient } from '@/actions/App/Http/Controllers/PatientController';
 import type { Patient } from '@/types/patient';
 
 type EditPatientDialogProps = {
@@ -99,7 +100,7 @@ export default function EditPatientDialog({
                 return;
             }
 
-            const response = await fetch(`/patients/${patient.id}`, {
+            const response = await fetch(updatePatient.url(patient.id), {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
