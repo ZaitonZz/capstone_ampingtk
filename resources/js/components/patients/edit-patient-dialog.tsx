@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { Camera, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,9 +37,18 @@ export default function EditPatientDialog({
     onSuccess,
 }: EditPatientDialogProps) {
     const { success, error } = useToast();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [gender, setGender] = useState('');
+    const [cameraOn, setCameraOn] = useState(false);
+    const [isVideoReady, setIsVideoReady] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [newProfilePhoto, setNewProfilePhoto] = useState<File | null>(null);
+    const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -73,8 +83,165 @@ export default function EditPatientDialog({
                 date_of_birth: formattedDate,
             });
             setGender(patient.gender || '');
+            setNewProfilePhoto(null);
+            setCapturedPhotoUrl(null);
+            setCameraError(null);
+            setCameraOn(false);
         }
     }, [patient]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const startCamera = async () => {
+            if (!navigator.mediaDevices?.getUserMedia) {
+                setCameraError('Webcam is not supported on this browser.');
+                setCameraOn(false);
+                return;
+            }
+
+            try {
+                setCameraError(null);
+                setIsVideoReady(false);
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false,
+                });
+
+                if (cancelled || !cameraOn) {
+                    stream.getTracks().forEach((track) => track.stop());
+                    return;
+                }
+
+                streamRef.current = stream;
+
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (exception) {
+                if (cancelled) {
+                    return;
+                }
+
+                if (exception instanceof DOMException) {
+                    if (exception.name === 'NotAllowedError') {
+                        setCameraError('Camera permission denied. Please allow webcam access.');
+                    } else if (exception.name === 'NotFoundError') {
+                        setCameraError('No camera device found.');
+                    } else {
+                        setCameraError('Camera unavailable.');
+                    }
+                } else {
+                    setCameraError('Camera unavailable.');
+                }
+            }
+        };
+
+        const stopCamera = () => {
+            cancelled = true;
+
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach((track) => track.stop());
+                streamRef.current = null;
+            }
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = null;
+            }
+
+            setIsVideoReady(false);
+        };
+
+        if (cameraOn) {
+            void startCamera();
+        } else {
+            stopCamera();
+        }
+
+        return () => {
+            stopCamera();
+        };
+    }, [cameraOn]);
+
+    useEffect(() => {
+        return () => {
+            if (capturedPhotoUrl) {
+                URL.revokeObjectURL(capturedPhotoUrl);
+            }
+        };
+    }, [capturedPhotoUrl]);
+
+    const handleChoosePhoto = () => {
+        setCameraOn(false);
+        fileInputRef.current?.click();
+    };
+
+    const handlePhotoSelected = (file: File | null) => {
+        if (capturedPhotoUrl) {
+            URL.revokeObjectURL(capturedPhotoUrl);
+        }
+
+        if (!file) {
+            setNewProfilePhoto(null);
+            setCapturedPhotoUrl(null);
+            return;
+        }
+
+        setNewProfilePhoto(file);
+        setCapturedPhotoUrl(URL.createObjectURL(file));
+    };
+
+    const handleRetake = () => {
+        setCameraError(null);
+        handlePhotoSelected(null);
+        setCameraOn(true);
+    };
+
+    const handleRemovePendingPhoto = () => {
+        setCameraOn(false);
+        setCameraError(null);
+        handlePhotoSelected(null);
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const capturePhoto = async () => {
+        if (!videoRef.current || !canvasRef.current) {
+            return;
+        }
+
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+            return;
+        }
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob(resolve, 'image/png');
+        });
+
+        if (!blob) {
+            setCameraError('Failed to capture image. Please try again.');
+            return;
+        }
+
+        const file = new File([blob], `patient-profile-${Date.now()}.png`, {
+            type: 'image/png',
+        });
+
+        handlePhotoSelected(file);
+        setCameraOn(false);
+    };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -100,17 +267,41 @@ export default function EditPatientDialog({
                 return;
             }
 
-            const response = await fetch(updatePatient.url(patient.id), {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify(data),
-                credentials: 'same-origin',
-            });
+            let response: Response;
+
+            if (newProfilePhoto) {
+                const multipartData = new FormData();
+                multipartData.append('_method', 'PATCH');
+                multipartData.append('first_name', data.first_name);
+                multipartData.append('last_name', data.last_name);
+                multipartData.append('middle_name', data.middle_name);
+                multipartData.append('date_of_birth', data.date_of_birth);
+                multipartData.append('gender', data.gender);
+                multipartData.append('profile_photo', newProfilePhoto);
+
+                response = await fetch(updatePatient.url(patient.id), {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: multipartData,
+                    credentials: 'same-origin',
+                });
+            } else {
+                response = await fetch(updatePatient.url(patient.id), {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(data),
+                    credentials: 'same-origin',
+                });
+            }
 
             const responseText = await response.text();
 
@@ -270,6 +461,103 @@ export default function EditPatientDialog({
                                 </SelectContent>
                             </Select>
                             <InputError message={errors.gender} />
+                        </div>
+
+                        <div className="space-y-3 sm:col-span-2">
+                            <Label>Profile Photo</Label>
+
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleChoosePhoto}
+                                >
+                                    <Upload className="h-4 w-4" />
+                                    Update Profile Photo
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleRetake}
+                                >
+                                    <Camera className="h-4 w-4" />
+                                    Retake Profile Photo
+                                </Button>
+                                {newProfilePhoto && (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={handleRemovePendingPhoto}
+                                    >
+                                        Remove New Photo
+                                    </Button>
+                                )}
+                            </div>
+
+                            <Input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0] ?? null;
+                                    handlePhotoSelected(file);
+                                }}
+                            />
+
+                            {cameraOn && (
+                                <div className="space-y-3">
+                                    <video
+                                        ref={videoRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        onLoadedData={() => setIsVideoReady(true)}
+                                        className="h-full min-h-64 w-full rounded-md border border-input bg-black object-cover"
+                                    />
+                                    {!isVideoReady && (
+                                        <p className="text-sm text-muted-foreground">
+                                            Starting camera…
+                                        </p>
+                                    )}
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={() => void capturePhoto()}
+                                            disabled={!isVideoReady}
+                                        >
+                                            Capture Photo
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setCameraOn(false)}
+                                        >
+                                            Close Webcam
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {capturedPhotoUrl && (
+                                <img
+                                    src={capturedPhotoUrl}
+                                    alt="Updated profile preview"
+                                    className="h-40 w-40 rounded-md border border-input object-cover"
+                                />
+                            )}
+
+                            {!capturedPhotoUrl && patient?.profile_photo_url && (
+                                <img
+                                    src={patient.profile_photo_url}
+                                    alt="Current profile"
+                                    className="h-40 w-40 rounded-md border border-input object-cover"
+                                />
+                            )}
+
+                            <canvas ref={canvasRef} className="hidden" />
+                            <InputError message={cameraError ?? undefined} />
+                            <InputError message={errors.profile_photo} />
                         </div>
                     </div>
 
