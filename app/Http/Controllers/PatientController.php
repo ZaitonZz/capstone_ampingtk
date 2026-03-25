@@ -6,10 +6,12 @@ use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
 use App\Models\Patient;
 use App\Models\User;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -91,36 +93,46 @@ class PatientController extends Controller
 
     protected function createPatient(array $validated, StorePatientRequest $request): Patient
     {
-        return DB::transaction(function () use ($validated, $request): Patient {
-            $profilePhotoPath = null;
-            if ($request->hasFile('profile_photo')) {
-                $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
-            }
+        $userId = null;
+        if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
+            $userId = $this->createPatientUser(
+                $validated['first_name'],
+                $validated['last_name'],
+                $validated['email']
+            );
+        }
 
-            $userId = null;
-            if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
-                $userId = $this->createPatientUser(
-                    $validated['first_name'],
-                    $validated['last_name'],
-                    $validated['email']
-                );
-            }
+        $phone = $validated['phone'] ?? null;
 
-            $phone = $validated['phone'] ?? null;
+        $patientData = [
+            ...$validated,
+            'user_id' => $userId,
+            'contact_number' => $validated['contact_number'] ?? $phone,
+            'profile_photo_path' => null,
+            'gender' => $validated['gender'] ?? 'other',
+            'registered_by' => $request->user()->id,
+        ];
 
-            $patientData = [
-                ...$validated,
-                'user_id' => $userId,
-                'contact_number' => $validated['contact_number'] ?? $phone,
-                'profile_photo_path' => $profilePhotoPath,
-                'gender' => $validated['gender'] ?? 'other',
-                'registered_by' => $request->user()->id,
-            ];
+        unset($patientData['profile_photo']);
 
-            unset($patientData['profile_photo']);
-
+        // Create patient in transaction without file
+        $patient = DB::transaction(function () use ($patientData): Patient {
             return Patient::create($patientData);
         });
+
+        // Store file after transaction succeeds to avoid orphaned files
+        if ($request->hasFile('profile_photo')) {
+            try {
+                $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+                $patient->update(['profile_photo_path' => $profilePhotoPath]);
+            } catch (Exception $e) {
+                // Clean up the uploaded file if update fails
+                Storage::disk('public')->delete($profilePhotoPath);
+                throw $e;
+            }
+        }
+
+        return $patient;
     }
 
     public function update(UpdatePatientRequest $request, Patient $patient): JsonResponse
