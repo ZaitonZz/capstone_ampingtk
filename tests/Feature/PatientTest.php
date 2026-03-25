@@ -84,6 +84,15 @@ it('stores a new patient and sets registered_by to auth user', function () {
         'first_name' => 'Juan',
         'registered_by' => $doctor->id,
     ]);
+
+    $patient = Patient::query()->where('email', 'juan@example.com')->firstOrFail();
+
+    $this->assertDatabaseHas('patient_photos', [
+        'patient_id' => $patient->id,
+        'uploaded_by' => $doctor->id,
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
 });
 
 it('returns 422 when required fields are missing on store', function () {
@@ -124,6 +133,13 @@ it('auto-generates a user account when patient is created with email', function 
     expect($user->role)->toBe('patient');
     expect($user->name)->toBe('John Doe');
     expect($patient->user_id)->toBe($user->id);
+
+    $this->assertDatabaseHas('patient_photos', [
+        'patient_id' => $patient->id,
+        'uploaded_by' => $doctor->id,
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
 });
 
 it('validates unique email when creating patient', function () {
