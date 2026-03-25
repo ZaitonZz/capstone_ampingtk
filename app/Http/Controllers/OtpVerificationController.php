@@ -16,6 +16,36 @@ use Illuminate\Validation\ValidationException;
 class OtpVerificationController extends Controller
 {
     /**
+     * Show OTP verification page for pending email/password login.
+     */
+    public function show(): \Illuminate\Http\RedirectResponse|\Inertia\Response
+    {
+        $pendingLoginToken = session('pending_login_token');
+
+        if (!$pendingLoginToken) {
+            return redirect()->route('login');
+        }
+
+        $cacheKey = $this->getPendingLoginCacheKey($pendingLoginToken);
+        $pendingLoginState = Cache::get($cacheKey);
+
+        if (!$pendingLoginState) {
+            session()->forget('pending_login_token');
+
+            return redirect()->route('login');
+        }
+
+        $expiresIn = max(0, now()->diffInSeconds($pendingLoginState['expires_at'], false));
+        $resendAvailableIn = max(0, now()->diffInSeconds($pendingLoginState['resend_available_at'], false));
+
+        return inertia('auth/otp-verification', [
+            'maskedEmail' => $this->maskEmail($pendingLoginState['user_email']),
+            'expiresIn' => $expiresIn,
+            'resendAvailableIn' => $resendAvailableIn,
+        ]);
+    }
+
+    /**
      * Start the email-password login flow.
      * 
      * Validates email and password, then initiates OTP verification.
