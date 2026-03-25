@@ -11,7 +11,7 @@ function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-sec
     $signature = hash_hmac('sha256', $body, $secret);
 
     return [
-        'X-Pipeline-Signature' => 'sha256=' . $signature,
+        'X-Pipeline-Signature' => 'sha256='.$signature,
         'Content-Type' => 'application/json',
     ];
 }
@@ -32,7 +32,7 @@ it('rejects pipeline rooms request with missing signature', function () {
 
 it('rejects pipeline rooms request with wrong secret', function () {
     // getJson sends json_encode([]) = '[]' as the body; sign with the wrong secret
-    $badSig = 'sha256=' . hash_hmac('sha256', '[]', 'wrong-secret');
+    $badSig = 'sha256='.hash_hmac('sha256', '[]', 'wrong-secret');
 
     $this->withHeaders(['X-Pipeline-Signature' => $badSig])
         ->getJson(route('pipeline.rooms'))
@@ -169,6 +169,31 @@ it('returns patient face data with stored embedding when enrolled', function () 
         ->assertOk();
 
     expect($response->json('face_embedding'))->toHaveCount(512);
+});
+
+it('returns latest patient photo when no primary photo exists', function () {
+    $patient = Patient::factory()->create();
+    PatientPhoto::factory()->create([
+        'patient_id' => $patient->id,
+        'is_primary' => false,
+    ]);
+    $latestPhoto = PatientPhoto::factory()->create([
+        'patient_id' => $patient->id,
+        'is_primary' => false,
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'patient_id' => $patient->id,
+        'livekit_room_name' => 'room-patient-fallback-photo',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name]))
+        ->assertOk();
+
+    expect($response->json('photo_id'))->toBe($latestPhoto->id);
+    expect($response->json('used_fallback_photo'))->toBeTrue();
 });
 
 // ── Face embedding enrollment endpoint ───────────────────────────────────────

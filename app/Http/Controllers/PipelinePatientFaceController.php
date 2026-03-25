@@ -16,7 +16,8 @@ class PipelinePatientFaceController extends Controller
             ->firstOrFail();
 
         $patient = $consultation->patient;
-        $photo = $patient?->primaryPhoto;
+        $photo = $patient?->primaryPhoto ?? $patient?->photos()->latest('id')->first();
+        $usedFallbackPhoto = $photo !== null && ($patient?->primaryPhoto?->id !== $photo->id);
         $photoUrl = null;
 
         if ($photo !== null) {
@@ -31,6 +32,7 @@ class PipelinePatientFaceController extends Controller
             'photo_id' => $photo?->id,
             'photo_url' => $photoUrl,
             'face_embedding' => $photo?->face_embedding,
+            'used_fallback_photo' => $usedFallbackPhoto,
         ]);
     }
 }
