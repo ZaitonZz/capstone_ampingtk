@@ -30,49 +30,84 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-// ── OTP Verification Routes (Authentication Flow) ─────────────────────────────
-Route::get('/verify-otp', function () {
-    if (! auth()->check()) {
+// ── Email OTP Authentication Routes ──────────────────────────────────────────
+// Step 1: Start email/password login (validates credentials, sends OTP)
+Route::post('/auth/email-login-start', [OtpVerificationController::class, 'startEmailLogin'])
+    ->name('auth.email-login-start');
+
+// Step 2: Show OTP verification page (accessible with pending login token)
+Route::get('/auth/verify-otp', function () {
+    $pendingLoginToken = session('pending_login_token');
+    
+    if (!$pendingLoginToken) {
+        return redirect()->route('login');
+    }
+    
+    // Load pending login state from cache to get expiry info
+    $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+    $pendingLoginState = \Illuminate\Support\Facades\Cache::get($cacheKey);
+    
+    if (!$pendingLoginState) {
+        session()->forget('pending_login_token');
+        return redirect()->route('login');
+    }
+    
+    $expiresAt = \Carbon\Carbon::parse($pendingLoginState['expires_at']);
+    $expiresIn = max(0, now()->diffInSeconds($expiresAt, false));
+    
+    $resendAvailableAt = \Carbon\Carbon::parse($pendingLoginState['resend_available_at']);
+    $resendAvailableIn = max(0, now()->diffInSeconds($resendAvailableAt, false));
+    
+    // Mask email for display
+    $email = $pendingLoginState['user_email'];
+    $parts = explode('@', $email);
+    $localPart = $parts[0] ?? '';
+    $domain = $parts[1] ?? '';
+    $maskedEmail = substr($localPart, 0, 1) . str_repeat('*', max(1, strlen($localPart) - 1)) . '@' . $domain;
+    
+    return inertia('auth/otp-verification', [
+        'maskedEmail' => $maskedEmail,
+        'expiresIn' => $expiresIn,
+        'resendAvailableIn' => $resendAvailableIn,
+    ]);
+})->name('auth.verify-otp');
+
+// Step 3: Verify OTP code
+Route::post('/auth/verify-otp', [OtpVerificationController::class, 'verify'])
+    ->name('auth.verify-otp-post');
+
+// Step 4: Resend OTP code
+Route::post('/auth/resend-otp', [OtpVerificationController::class, 'resend'])
+    ->name('auth.resend-otp');
+
+// Step 5: Cancel OTP verification (optional back flow)
+Route::post('/auth/cancel-otp', [OtpVerificationController::class, 'cancel'])
+    ->name('auth.cancel-otp');
+
+// ── Legacy OTP Verification Routes (For backward compatibility with require-otp middleware) ───────
+// These routes are used after successful OTP verification
+Route::get('/verify-otp-legacy', function () {
+    if (!auth()->check() || !session('otp_verified')) {
         return redirect()->route('login');
     }
 
-    $isFirstTime = false;
-    // Initialize OTP only if not already set
-    if (! session('otp_code')) {
-        session(['otp_code' => '123456']);
-        session(['otp_generated_at' => now()->timestamp]);
-        logger('OTP test code initialized: 123456');
-        $isFirstTime = true;
-    }
+    $email = auth()->user()->email;
+    $maskedEmail = preg_replace('/(^.).*(@.*$)/', '$1***$2', $email);
 
     return inertia('auth/otp-verification', [
-        'email' => auth()->user()->email,
-        'phone' => null, // For future SMS implementation
-        'otp_generated_at' => session('otp_generated_at'), // Pass timestamp for timer persistence
-        'is_fresh_otp' => $isFirstTime, // Signal to frontend that this is a fresh OTP
+        'maskedEmail' => $maskedEmail,
+        'expiresIn' => 0,
+        'resendAvailableIn' => 0,
     ]);
-})->middleware('auth')->name('verify-otp');
+})->middleware('auth')->name('verify-otp-legacy');
 
-Route::post('/verify-otp', [OtpVerificationController::class, 'verify'])
-    ->middleware('auth')
-    ->name('verify-otp-post');
-
-Route::post('/resend-otp', [OtpVerificationController::class, 'resend'])
-    ->middleware('auth')
-    ->name('resend-otp');
-
-Route::post('/clear-otp', function () {
-    // Clear OTP-related session keys specifically
-    session()->forget(['otp_code', 'otp_generated_at', 'otp_verified']);
-    // Logout user
+Route::post('/logout-otp', function () {
+    session()->forget(['pending_login_token', 'otp_verified']);
     auth()->logout();
-    // Invalidate the session and regenerate CSRF token to prevent session fixation
     session()->invalidate();
     session()->regenerateToken();
-
-    // Redirect to login page
     return redirect()->route('login');
-})->middleware('auth')->name('clear-otp');
+})->name('logout-otp');
 
 // ── Authenticated Dashboard Routes ────────────────────────────────────────────
 Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
