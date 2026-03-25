@@ -400,10 +400,10 @@ describe('Email OTP Authentication', function () {
 
             $response->assertUnprocessable();
             $response->assertJson([
-                'message' => 'The given data was invalid.',
+                'message' => 'Please wait before requesting a new code.',
             ]);
-            // Should include validation errors structure
-            expect($response->json('errors'))->toBeArray();
+            // Should include remaining seconds
+            expect($response->json('resend_available_in'))->toBeGreaterThan(0);
         });
 
         it('generates new OTP after cooldown expires', function () {
