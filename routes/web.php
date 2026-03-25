@@ -150,10 +150,10 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                 ],
                 'upcoming_appointment' => $upcomingAppointment,
                 'recent_consultations' => $recentConsultations,
-                'notifications' => [
+                'notifications' => array_filter([
                     'Your consultation starts in 10 minutes',
-                    'Identity verified successfully',
-                ],
+                    $isIdentityVerified ? 'Identity verified successfully' : null,
+                ]),
             ]);
         })->name('patient.dashboard');
     });
