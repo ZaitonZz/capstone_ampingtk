@@ -295,8 +295,8 @@ Route::prefix('internal/pipeline')
         Route::get('rooms', [PipelineRoomsController::class, 'index'])->name('rooms');
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
         Route::get('consultation/{roomName}/patient-face', [PipelinePatientFaceController::class, 'show'])->name('patient-face.show');
-        Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
         Route::post('face-embeddings/doctor/{doctorPhoto}', [PipelineDoctorFaceEmbeddingController::class, 'store'])->name('face-embeddings-doctor.store');
+        Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
         Route::post('face-match-results', [PipelineFaceMatchResultController::class, 'store'])->name('face-match-results.store');
     });
 
