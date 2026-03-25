@@ -127,6 +127,8 @@ class OtpVerificationController extends Controller
 
         return response()->json([
             'success' => true,
+            'requires_otp' => true,
+            'redirect_url' => route('auth.verify-otp'),
             'message' => 'Verification code sent to your email.',
             'masked_email' => $this->maskEmail($user->email),
             'expires_in' => config('auth_otp.otp.ttl', 300),
