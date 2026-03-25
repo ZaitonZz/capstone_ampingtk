@@ -7,6 +7,7 @@ use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\ConsultationSessionController;
 use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
+use App\Http\Controllers\PipelineDoctorFaceEmbeddingController;
 use App\Http\Controllers\PipelineFaceEmbeddingController;
 use App\Http\Controllers\PipelineFaceMatchResultController;
 use App\Http\Controllers\PipelinePatientFaceController;
@@ -38,33 +39,34 @@ Route::post('/auth/email-login-start', [OtpVerificationController::class, 'start
 // Step 2: Show OTP verification page (accessible with pending login token)
 Route::get('/auth/verify-otp', function () {
     $pendingLoginToken = session('pending_login_token');
-    
-    if (!$pendingLoginToken) {
+
+    if (! $pendingLoginToken) {
         return redirect()->route('login');
     }
-    
+
     // Load pending login state from cache to get expiry info
-    $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+    $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
     $pendingLoginState = \Illuminate\Support\Facades\Cache::get($cacheKey);
-    
-    if (!$pendingLoginState) {
+
+    if (! $pendingLoginState) {
         session()->forget('pending_login_token');
+
         return redirect()->route('login');
     }
-    
+
     $expiresAt = \Carbon\Carbon::parse($pendingLoginState['expires_at']);
     $expiresIn = max(0, now()->diffInSeconds($expiresAt, false));
-    
+
     $resendAvailableAt = \Carbon\Carbon::parse($pendingLoginState['resend_available_at']);
     $resendAvailableIn = max(0, now()->diffInSeconds($resendAvailableAt, false));
-    
+
     // Mask email for display
     $email = $pendingLoginState['user_email'];
     $parts = explode('@', $email);
     $localPart = $parts[0] ?? '';
     $domain = $parts[1] ?? '';
-    $maskedEmail = substr($localPart, 0, 1) . str_repeat('*', max(1, strlen($localPart) - 1)) . '@' . $domain;
-    
+    $maskedEmail = substr($localPart, 0, 1).str_repeat('*', max(1, strlen($localPart) - 1)).'@'.$domain;
+
     return inertia('auth/otp-verification', [
         'maskedEmail' => $maskedEmail,
         'expiresIn' => $expiresIn,
@@ -87,7 +89,7 @@ Route::post('/auth/cancel-otp', [OtpVerificationController::class, 'cancel'])
 // ── Legacy OTP Verification Routes (For backward compatibility with require-otp middleware) ───────
 // These routes are used after successful OTP verification
 Route::get('/verify-otp-legacy', function () {
-    if (!auth()->check() || !session('otp_verified')) {
+    if (! auth()->check() || ! session('otp_verified')) {
         return redirect()->route('login');
     }
 
@@ -106,6 +108,7 @@ Route::post('/logout-otp', function () {
     auth()->logout();
     session()->invalidate();
     session()->regenerateToken();
+
     return redirect()->route('login');
 })->name('logout-otp');
 
@@ -292,6 +295,7 @@ Route::prefix('internal/pipeline')
         Route::get('rooms', [PipelineRoomsController::class, 'index'])->name('rooms');
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
         Route::get('consultation/{roomName}/patient-face', [PipelinePatientFaceController::class, 'show'])->name('patient-face.show');
+        Route::post('face-embeddings/doctor/{doctorPhoto}', [PipelineDoctorFaceEmbeddingController::class, 'store'])->name('face-embeddings-doctor.store');
         Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
         Route::post('face-match-results', [PipelineFaceMatchResultController::class, 'store'])->name('face-match-results.store');
     });

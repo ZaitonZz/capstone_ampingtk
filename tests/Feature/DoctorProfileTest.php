@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\DoctorPhoto;
 use App\Models\DoctorProfile;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 it('redirects guests to login', function () {
     $this->get(route('doctor.profile.show'))->assertRedirect(route('login'));
@@ -78,4 +81,68 @@ it('returns the profile on show after upsert', function () {
         ->getJson(route('doctor.profile.show'))
         ->assertOk()
         ->assertJsonFragment(['specialty' => 'Pediatrics']);
+});
+
+it('allows a doctor to upload a profile photo', function () {
+    Storage::fake('public');
+    $doctor = User::factory()->doctor()->create();
+
+    $this->actingAs($doctor)
+        ->postJson(route('doctor.profile.photo.store'), [
+            'photo' => UploadedFile::fake()->image('doctor.jpg'),
+        ])
+        ->assertCreated()
+        ->assertJsonStructure(['id', 'file_path', 'is_primary', 'avatar_url']);
+
+    $photo = DoctorPhoto::query()->first();
+
+    expect($photo)->not->toBeNull();
+    expect($photo->user_id)->toBe($doctor->id);
+    expect($photo->uploaded_by)->toBe($doctor->id);
+    expect($photo->is_primary)->toBeTrue();
+
+    Storage::disk('public')->assertExists($photo->file_path);
+});
+
+it('marks older doctor photos as non-primary when uploading a new photo', function () {
+    Storage::fake('public');
+    $doctor = User::factory()->doctor()->create();
+
+    $firstResponse = $this->actingAs($doctor)
+        ->postJson(route('doctor.profile.photo.store'), [
+            'photo' => UploadedFile::fake()->image('first.jpg'),
+        ])
+        ->assertCreated();
+
+    $secondResponse = $this->actingAs($doctor)
+        ->postJson(route('doctor.profile.photo.store'), [
+            'photo' => UploadedFile::fake()->image('second.jpg'),
+        ])
+        ->assertCreated();
+
+    $firstId = $firstResponse->json('id');
+    $secondId = $secondResponse->json('id');
+
+    expect(DoctorPhoto::query()->find($firstId)?->is_primary)->toBeFalse();
+    expect(DoctorPhoto::query()->find($secondId)?->is_primary)->toBeTrue();
+});
+
+it('forbids non-doctors from uploading doctor profile photo', function () {
+    Storage::fake('public');
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->postJson(route('doctor.profile.photo.store'), [
+            'photo' => UploadedFile::fake()->image('admin.jpg'),
+        ])
+        ->assertForbidden();
+});
+
+it('returns validation error when doctor profile photo is missing', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $this->actingAs($doctor)
+        ->postJson(route('doctor.profile.photo.store'), [])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['photo']);
 });
