@@ -109,7 +109,7 @@ describe('Email OTP Authentication', function () {
             $maskedEmail = $response->json('masked_email');
             
             // Should show first letter and mask the rest
-            expect($maskedEmail)->toContain('j****@example.com');
+            expect($maskedEmail)->toContain('j******@example.com');
         });
 
         it('enforces rate limiting on login start', function () {

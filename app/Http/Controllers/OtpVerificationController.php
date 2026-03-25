@@ -261,10 +261,11 @@ class OtpVerificationController extends Controller
         // Check resend cooldown (server-side)
         if (now()->isBefore($pendingLoginState['resend_available_at'])) {
             $secondsRemaining = now()->diffInSeconds($pendingLoginState['resend_available_at'], false);
-            throw ValidationException::withMessages([
+            
+            return response()->json([
                 'message' => 'Please wait before requesting a new code.',
                 'resend_available_in' => max(0, $secondsRemaining),
-            ]);
+            ], 422);
         }
 
         // Check if max resends exceeded
