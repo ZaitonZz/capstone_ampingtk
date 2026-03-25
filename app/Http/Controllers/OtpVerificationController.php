@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpMail;
-use Illuminate\Cache\Repository;
-use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
