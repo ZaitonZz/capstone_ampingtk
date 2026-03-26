@@ -13,6 +13,7 @@ import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import LogoPreloader from '@/components/ui/logo-preloader';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import TelemedicineLoginLayout from '@/layouts/auth/telemedicine-login-layout';
@@ -34,6 +35,7 @@ type RecognitionStatus =
     | 'requesting_camera'
     | 'camera_ready'
     | 'scanning'
+    | 'success'
     | 'permission_denied';
 
 export default function Login({
@@ -44,6 +46,7 @@ export default function Login({
     const [generalError, setGeneralError] = useState('');
     const [otpRequired, setOtpRequired] = useState(false);
     const [otpCode, setOtpCode] = useState('');
+    const [isOtpProcessing, setIsOtpProcessing] = useState(false);
 
     // Serial Recognition State
     const [isFaceLogin, setIsFaceLogin] = useState(false);
@@ -126,17 +129,26 @@ export default function Login({
 
     const isCameraReady = status === 'camera_ready';
     const isPermissionDenied = status === 'permission_denied';
+    const isFaceMatched = status === 'success';
+    const showPreloader = isOtpProcessing || isFaceMatched;
 
 
     /**
      * Handle OTP verification
      * Future implementation: Will handle multi-factor authentication
      */
-    const handleOtpSubmit = () => {
+    const handleOtpSubmit = async () => {
         // TODO: Implement OTP verification
         // 1. Validate OTP code
         // 2. Send verification request
         // 3. Complete login if valid
+        setIsOtpProcessing(true);
+
+        try {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+        } finally {
+            setIsOtpProcessing(false);
+        }
     };
 
     return (
@@ -145,6 +157,16 @@ export default function Login({
             subtitle={isFaceLogin ? "Secure facial recognition login" : "Secure access for doctors and patients"}
         >
             <Head title={isFaceLogin ? "Face Login" : "Log in"} />
+
+            {showPreloader && (
+                <LogoPreloader
+                    text={
+                        isOtpProcessing
+                            ? 'Verifying OTP...'
+                            : 'Face matched. Signing you in...'
+                    }
+                />
+            )}
 
             <div className="relative w-full overflow-hidden">
                 <div
@@ -181,9 +203,17 @@ export default function Login({
                             </div>
                             <Button
                                 onClick={handleOtpSubmit}
+                                disabled={isOtpProcessing}
                                 className="h-10 w-full bg-emerald-600 font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                             >
-                                Verify Code
+                                {isOtpProcessing ? (
+                                    <>
+                                        <Spinner className="mr-2 h-4 w-4" />
+                                        Verifying...
+                                    </>
+                                ) : (
+                                    'Verify Code'
+                                )}
                             </Button>
                             <Button
                                 type="button"
