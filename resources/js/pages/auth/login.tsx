@@ -1,3 +1,11 @@
+import { Head } from '@inertiajs/react';
+import { ArrowLeft, Camera, Zap } from 'lucide-react';
+import { useState } from 'react';
+import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
+import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
+import InputError from '@/components/input-error';
+import TextLink from '@/components/text-link';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -6,11 +14,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Head } from '@inertiajs/react';
-import { useState } from 'react';
-import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -18,9 +21,6 @@ import { Spinner } from '@/components/ui/spinner';
 import TelemedicineLoginLayout from '@/layouts/auth/telemedicine-login-layout';
 import { register } from '@/routes';
 import { request } from '@/routes/password';
-import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
-import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
-import { ArrowLeft, Camera, Zap } from 'lucide-react';
 
 type Props = {
     status?: string;

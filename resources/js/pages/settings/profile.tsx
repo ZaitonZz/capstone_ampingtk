@@ -141,6 +141,77 @@ export default function Profile({
                             </>
                         )}
                     </Form>
+
+                    {auth.user.role === 'doctor' && (
+                        <>
+                            <Heading
+                                variant="small"
+                                title="Profile photo"
+                                description="Upload a clear face photo for account identity and verification."
+                            />
+
+                            {auth.user.avatar && (
+                                <img
+                                    src={auth.user.avatar}
+                                    alt="Current profile"
+                                    className="h-20 w-20 rounded-full border object-cover"
+                                />
+                            )}
+
+                            <Form
+                                action="/doctor/profile/photo"
+                                method="post"
+                                encType="multipart/form-data"
+                                options={{
+                                    preserveScroll: true,
+                                }}
+                                className="space-y-4"
+                            >
+                                {({
+                                    processing,
+                                    recentlySuccessful,
+                                    errors,
+                                }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="photo">
+                                                Doctor photo
+                                            </Label>
+                                            <Input
+                                                id="photo"
+                                                name="photo"
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/webp"
+                                                required
+                                            />
+                                            <InputError
+                                                className="mt-2"
+                                                message={errors.photo}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-4">
+                                            <Button disabled={processing}>
+                                                Upload photo
+                                            </Button>
+
+                                            <Transition
+                                                show={recentlySuccessful}
+                                                enter="transition ease-in-out"
+                                                enterFrom="opacity-0"
+                                                leave="transition ease-in-out"
+                                                leaveTo="opacity-0"
+                                            >
+                                                <p className="text-sm text-neutral-600">
+                                                    Uploaded
+                                                </p>
+                                            </Transition>
+                                        </div>
+                                    </>
+                                )}
+                            </Form>
+                        </>
+                    )}
                 </div>
 
                 <DeleteUser />

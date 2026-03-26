@@ -9,8 +9,11 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class PatientController extends Controller
 {
@@ -55,7 +58,7 @@ class PatientController extends Controller
     {
         $this->authorize('create', Patient::class);
 
-        return Inertia::render('staff/patients/create');
+        return Inertia::render('patients/create');
     }
 
     public function show(Patient $patient): JsonResponse
@@ -77,37 +80,7 @@ class PatientController extends Controller
     {
         $this->authorize('create', Patient::class);
 
-        $validated = $request->validated();
-
-        $profilePhotoPath = null;
-        if ($request->hasFile('profile_photo')) {
-            $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
-        }
-
-        // Auto-generate user account if email is provided and no user_id
-        $userId = null;
-        if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
-            $userId = $this->createPatientUser(
-                $validated['first_name'],
-                $validated['last_name'],
-                $validated['email']
-            );
-        }
-
-        $phone = $validated['phone'] ?? null;
-
-        $patientData = [
-            ...$validated,
-            'user_id' => $userId,
-            'contact_number' => $validated['contact_number'] ?? $phone,
-            'profile_photo_path' => $profilePhotoPath,
-            'gender' => $validated['gender'] ?? 'other',
-            'registered_by' => $request->user()->id,
-        ];
-
-        unset($patientData['profile_photo']);
-
-        $patient = Patient::create($patientData);
+        $patient = $this->createPatient($request->validated(), $request);
 
         // Return JSON for API requests, redirect for browser requests
         if ($request->expectsJson()) {
@@ -118,11 +91,86 @@ class PatientController extends Controller
             ->with('success', 'Patient created successfully. User account auto-generated.');
     }
 
+    protected function createPatient(array $validated, StorePatientRequest $request): Patient
+    {
+        $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+        $phone = $validated['phone'] ?? null;
+
+        try {
+            return DB::transaction(function () use ($validated, $request, $profilePhotoPath, $phone): Patient {
+                $userId = null;
+
+                if (($validated['email'] ?? null) && ! ($validated['user_id'] ?? null)) {
+                    $userId = $this->createPatientUser(
+                        $validated['first_name'],
+                        $validated['last_name'],
+                        $validated['email']
+                    );
+                }
+
+                $patientData = [
+                    ...$validated,
+                    'user_id' => $userId,
+                    'contact_number' => $validated['contact_number'] ?? $phone,
+                    'gender' => $validated['gender'] ?? 'other',
+                    'registered_by' => $request->user()->id,
+                ];
+
+                unset($patientData['profile_photo']);
+
+                $patient = Patient::create($patientData);
+
+                $patient->photos()->create([
+                    'uploaded_by' => $request->user()->id,
+                    'file_path' => $profilePhotoPath,
+                    'disk' => 'public',
+                    'is_primary' => true,
+                ]);
+
+                return $patient;
+            });
+        } catch (Throwable $exception) {
+            Storage::disk('public')->delete($profilePhotoPath);
+
+            throw $exception;
+        }
+    }
+
     public function update(UpdatePatientRequest $request, Patient $patient): JsonResponse
     {
         $this->authorize('update', $patient);
 
-        $patient->update($request->validated());
+        $validated = $request->validated();
+        $profilePhotoPath = null;
+
+        if ($request->hasFile('profile_photo')) {
+            $profilePhotoPath = $request->file('profile_photo')->store('patients', 'public');
+        }
+
+        try {
+            DB::transaction(function () use ($patient, $validated, $request, $profilePhotoPath): void {
+                unset($validated['profile_photo']);
+
+                $patient->update($validated);
+
+                if ($profilePhotoPath !== null) {
+                    $patient->photos()->where('is_primary', true)->update(['is_primary' => false]);
+
+                    $patient->photos()->create([
+                        'uploaded_by' => $request->user()->id,
+                        'file_path' => $profilePhotoPath,
+                        'disk' => 'public',
+                        'is_primary' => true,
+                    ]);
+                }
+            });
+        } catch (Throwable $exception) {
+            if ($profilePhotoPath !== null) {
+                Storage::disk('public')->delete($profilePhotoPath);
+            }
+
+            throw $exception;
+        }
 
         return response()->json($patient->fresh());
     }

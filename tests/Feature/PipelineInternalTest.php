@@ -3,15 +3,17 @@
 use App\Models\Consultation;
 use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeScanLog;
+use App\Models\DoctorPhoto;
 use App\Models\Patient;
 use App\Models\PatientPhoto;
+use App\Models\User;
 
 function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-secret'): array
 {
     $signature = hash_hmac('sha256', $body, $secret);
 
     return [
-        'X-Pipeline-Signature' => 'sha256=' . $signature,
+        'X-Pipeline-Signature' => 'sha256='.$signature,
         'Content-Type' => 'application/json',
     ];
 }
@@ -32,7 +34,7 @@ it('rejects pipeline rooms request with missing signature', function () {
 
 it('rejects pipeline rooms request with wrong secret', function () {
     // getJson sends json_encode([]) = '[]' as the body; sign with the wrong secret
-    $badSig = 'sha256=' . hash_hmac('sha256', '[]', 'wrong-secret');
+    $badSig = 'sha256='.hash_hmac('sha256', '[]', 'wrong-secret');
 
     $this->withHeaders(['X-Pipeline-Signature' => $badSig])
         ->getJson(route('pipeline.rooms'))
@@ -103,6 +105,32 @@ it('stores a scan result posted by the pipeline', function () {
     )->toBeTrue();
 });
 
+it('stores an inconclusive scan result posted by the pipeline', function () {
+    $consultation = Consultation::factory()->create();
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'result' => 'inconclusive',
+        'confidence_score' => 0.51,
+        'frame_number' => 11,
+        'model_version' => 'efficientnet_v2_s',
+        'flagged' => false,
+    ];
+
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated()
+        ->assertJsonStructure(['id', 'consultation_id']);
+
+    expect(
+        DeepfakeScanLog::where('consultation_id', $consultation->id)
+            ->where('result', 'inconclusive')
+            ->exists()
+    )->toBeTrue();
+});
+
 it('rejects scan result with invalid data', function () {
     $data = [
         'consultation_id' => 9999999,
@@ -131,7 +159,7 @@ it('returns 404 for unknown room name', function () {
 });
 
 it('returns patient face data with null embedding when not yet enrolled', function () {
-    $patient = Patient::factory()->create();
+    $patient = Patient::factory()->withUserAccount()->create();
     $photo = PatientPhoto::factory()->primary()->create(['patient_id' => $patient->id]);
 
     $consultation = Consultation::factory()->teleconsultation()->create([
@@ -141,11 +169,12 @@ it('returns patient face data with null embedding when not yet enrolled', functi
     ]);
 
     $response = $this->withHeaders(pipelineSignedHeaders('[]'))
-        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name]))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'patient']))
         ->assertOk();
 
     expect($response->json('consultation_id'))->toBe($consultation->id);
-    expect($response->json('patient_id'))->toBe($patient->id);
+    expect($response->json('subject_user_id'))->toBe($patient->user_id);
+    expect($response->json('subject_role'))->toBe('patient');
     expect($response->json('photo_id'))->toBe($photo->id);
     expect($response->json('face_embedding'))->toBeNull();
 });
@@ -165,10 +194,118 @@ it('returns patient face data with stored embedding when enrolled', function () 
     ]);
 
     $response = $this->withHeaders(pipelineSignedHeaders('[]'))
-        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name]))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'patient']))
         ->assertOk();
 
     expect($response->json('face_embedding'))->toHaveCount(512);
+});
+
+it('returns latest patient photo when no primary photo exists', function () {
+    $patient = Patient::factory()->create();
+    PatientPhoto::factory()->create([
+        'patient_id' => $patient->id,
+        'is_primary' => false,
+    ]);
+    $latestPhoto = PatientPhoto::factory()->create([
+        'patient_id' => $patient->id,
+        'is_primary' => false,
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'patient_id' => $patient->id,
+        'livekit_room_name' => 'room-patient-fallback-photo',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'patient']))
+        ->assertOk();
+
+    expect($response->json('photo_id'))->toBe($latestPhoto->id);
+    expect($response->json('used_fallback_photo'))->toBeTrue();
+});
+
+it('returns doctor face data with null embedding when not yet enrolled', function () {
+    $doctor = User::factory()->doctor()->create();
+    $photo = DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-no-embedding.jpg',
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'room-doctor-no-embedding',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'doctor']))
+        ->assertOk();
+
+    expect($response->json('consultation_id'))->toBe($consultation->id);
+    expect($response->json('subject_user_id'))->toBe($doctor->id);
+    expect($response->json('subject_role'))->toBe('doctor');
+    expect($response->json('photo_id'))->toBe($photo->id);
+    expect($response->json('face_embedding'))->toBeNull();
+});
+
+it('returns doctor face data with stored embedding when enrolled', function () {
+    $embedding = array_fill(0, 512, 0.01);
+    $doctor = User::factory()->doctor()->create();
+    DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-with-embedding.jpg',
+        'disk' => 'public',
+        'is_primary' => true,
+        'face_embedding' => $embedding,
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'room-doctor-with-embedding',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'doctor']))
+        ->assertOk();
+
+    expect($response->json('face_embedding'))->toHaveCount(512);
+});
+
+it('returns latest doctor photo when no primary doctor photo exists', function () {
+    $doctor = User::factory()->doctor()->create();
+    DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-fallback-1.jpg',
+        'disk' => 'public',
+        'is_primary' => false,
+    ]);
+    $latestPhoto = DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-fallback-2.jpg',
+        'disk' => 'public',
+        'is_primary' => false,
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'room-doctor-fallback-photo',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.patient-face.show', ['roomName' => $consultation->livekit_room_name, 'role' => 'doctor']))
+        ->assertOk();
+
+    expect($response->json('photo_id'))->toBe($latestPhoto->id);
+    expect($response->json('used_fallback_photo'))->toBeTrue();
 });
 
 // ── Face embedding enrollment endpoint ───────────────────────────────────────
@@ -204,6 +341,58 @@ it('stores a 512-d ArcFace embedding on a patient photo', function () {
     expect($photo->fresh()->face_embedding)->toHaveCount(512);
 });
 
+it('rejects doctor face embedding without signature', function () {
+    $doctor = User::factory()->doctor()->create();
+    $photo = DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-enroll.jpg',
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
+
+    $this->postJson(route('pipeline.face-embeddings-doctor.store', $photo), ['embedding' => []])
+        ->assertUnauthorized();
+});
+
+it('rejects doctor face embedding with wrong size array', function () {
+    $doctor = User::factory()->doctor()->create();
+    $photo = DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-enroll-invalid.jpg',
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
+    $data = ['embedding' => array_fill(0, 128, 0.5)];
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.face-embeddings-doctor.store', $photo), $data)
+        ->assertUnprocessable();
+});
+
+it('stores a 512-d ArcFace embedding on a doctor photo', function () {
+    $doctor = User::factory()->doctor()->create();
+    $photo = DoctorPhoto::query()->create([
+        'user_id' => $doctor->id,
+        'uploaded_by' => $doctor->id,
+        'file_path' => 'doctor-photos/doctor-enroll-success.jpg',
+        'disk' => 'public',
+        'is_primary' => true,
+    ]);
+    $embedding = array_fill(0, 512, 0.02);
+    $data = ['embedding' => $embedding];
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.face-embeddings-doctor.store', $photo), $data)
+        ->assertOk()
+        ->assertJson(['photo_id' => $photo->id, 'enrolled' => true]);
+
+    expect($photo->fresh()->face_embedding)->toHaveCount(512);
+});
+
 // ── Face match result endpoint ────────────────────────────────────────────────
 
 it('rejects face match result without signature', function () {
@@ -231,8 +420,12 @@ it('rejects face match result with non-existent consultation', function () {
 
 it('records a successful face match log', function () {
     $consultation = Consultation::factory()->create();
+    $consultation->patient->update(['user_id' => User::factory()->patient()->create()->id]);
+
     $data = [
         'consultation_id' => $consultation->id,
+        'user_id' => $consultation->patient->user_id,
+        'verified_role' => 'patient',
         'matched' => true,
         'face_match_score' => 0.87,
     ];
@@ -252,12 +445,18 @@ it('records a successful face match log', function () {
     expect($log->matched)->toBeTrue();
     expect((float) $log->face_match_score)->toBe(0.87);
     expect($log->flagged)->toBeFalse();
+    expect($log->user_id)->toBe($consultation->patient->user_id);
+    expect($log->verified_role)->toBe('patient');
 });
 
 it('records a failed face match log', function () {
     $consultation = Consultation::factory()->create();
+    $consultation->patient->update(['user_id' => User::factory()->patient()->create()->id]);
+
     $data = [
         'consultation_id' => $consultation->id,
+        'user_id' => $consultation->patient->user_id,
+        'verified_role' => 'patient',
         'matched' => false,
         'face_match_score' => 0.21,
         'flagged' => true,
@@ -278,18 +477,25 @@ it('records a failed face match log', function () {
     expect($log->matched)->toBeFalse();
     expect((float) $log->face_match_score)->toBe(0.21);
     expect($log->flagged)->toBeTrue();
+    expect($log->user_id)->toBe($consultation->patient->user_id);
+    expect($log->verified_role)->toBe('patient');
 });
 
 it('stores multiple face verification records for one consultation', function () {
     $consultation = Consultation::factory()->create();
+    $consultation->patient->update(['user_id' => User::factory()->patient()->create()->id]);
 
     $first = [
         'consultation_id' => $consultation->id,
+        'user_id' => $consultation->patient->user_id,
+        'verified_role' => 'patient',
         'matched' => true,
         'face_match_score' => 0.81,
     ];
     $second = [
         'consultation_id' => $consultation->id,
+        'user_id' => $consultation->patient->user_id,
+        'verified_role' => 'patient',
         'matched' => false,
         'face_match_score' => 0.24,
         'flagged' => true,

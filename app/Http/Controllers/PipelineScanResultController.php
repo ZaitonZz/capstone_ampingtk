@@ -12,7 +12,7 @@ class PipelineScanResultController extends Controller
     {
         $validated = $request->validate([
             'consultation_id' => ['required', 'integer', 'exists:consultations,id'],
-            'result' => ['required', 'string', 'in:real,fake,unknown'],
+            'result' => ['required', 'string', 'in:real,fake,inconclusive'],
             'confidence_score' => ['required', 'numeric', 'min:0', 'max:1'],
             'frame_path' => ['nullable', 'string', 'max:500'],
             'frame_number' => ['nullable', 'integer', 'min:0'],

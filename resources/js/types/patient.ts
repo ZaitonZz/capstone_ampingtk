@@ -2,7 +2,6 @@ export type Patient = {
     id: number;
     first_name: string;
     last_name: string;
-    profile_photo_path?: string | null;
     profile_photo_url?: string | null;
     middle_name?: string;
     date_of_birth: string;

@@ -4,7 +4,10 @@ import {
     FolderGit2,
     ContactRound,
     LayoutGrid,
+    CalendarDays,
     ClipboardList,
+    Stethoscope,
+    Pill,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -20,7 +23,10 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as consultations } from '@/routes/consultations';
+import { dashboard as doctorDashboard } from '@/routes/doctor';
+import { dashboard as patientDashboard } from '@/routes/patient';
 import { index as patientConsultations } from '@/routes/patient/consultations';
 import { index as patientsList } from '@/routes/patients';
 import type { NavItem } from '@/types';
@@ -42,11 +48,18 @@ export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
     const isMedicalStaff = user.role === 'doctor' || user.role === 'admin';
+        const dashboardHref = isPatient
+                ? patientDashboard()
+                : user.role === 'doctor'
+                    ? doctorDashboard()
+                    : user.role === 'admin'
+                        ? adminDashboard()
+                        : dashboard();
 
     const mainNavItems: NavItem[] = [
         {
             title: 'Dashboard',
-            href: dashboard(),
+            href: dashboardHref,
             icon: LayoutGrid,
         },
     ];
@@ -66,9 +79,24 @@ export function AppSidebar() {
 
     if (isPatient) {
         mainNavItems.push({
-            title: 'My Consultations',
+            title: 'Appointments',
             href: patientConsultations(),
-            icon: ContactRound,
+            icon: CalendarDays,
+        });
+        mainNavItems.push({
+            title: 'Consultation Lobby',
+            href: '/patient/lobby',
+            icon: Stethoscope,
+        });
+        mainNavItems.push({
+            title: 'Medical Records',
+            href: '/patient/medical-records',
+            icon: ClipboardList,
+        });
+        mainNavItems.push({
+            title: 'Prescriptions',
+            href: '/patient/prescriptions',
+            icon: Pill,
         });
     }
 
@@ -78,7 +106,7 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
+                            <Link href={dashboardHref} prefetch>
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>
