@@ -16,62 +16,52 @@ const statusConfig: Record<
     {
         icon: React.ReactNode;
         label: string;
-        variant: 'default' | 'secondary' | 'destructive' | 'outline';
         bgColor: string;
     }
 > = {
     idle: {
         icon: <Camera className="h-4 w-4" />,
         label: 'Ready to scan',
-        variant: 'secondary',
         bgColor: 'bg-gray-50 dark:bg-gray-900/30',
     },
     requesting_camera: {
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
         label: 'Requesting camera access',
-        variant: 'default',
         bgColor: 'bg-blue-50 dark:bg-blue-900/10',
     },
     camera_ready: {
         icon: <Camera className="h-4 w-4" />,
         label: 'Camera ready',
-        variant: 'default',
         bgColor: 'bg-emerald-50 dark:bg-emerald-900/10',
     },
     scanning: {
         icon: <Loader2 className="h-4 w-4 animate-spin" />,
         label: 'Scanning face',
-        variant: 'default',
         bgColor: 'bg-blue-50 dark:bg-blue-900/10',
     },
     success: {
         icon: <CheckCircle className="h-4 w-4" />,
         label: 'Face recognized',
-        variant: 'default',
         bgColor: 'bg-green-50 dark:bg-green-900/10',
     },
     failed: {
         icon: <XCircle className="h-4 w-4" />,
         label: 'Recognition failed',
-        variant: 'destructive',
         bgColor: 'bg-red-50 dark:bg-red-900/10',
     },
     no_face_detected: {
         icon: <AlertCircle className="h-4 w-4" />,
         label: 'No face detected',
-        variant: 'destructive',
         bgColor: 'bg-red-50 dark:bg-red-900/10',
     },
     multiple_faces_detected: {
         icon: <AlertCircle className="h-4 w-4" />,
         label: 'Multiple faces detected',
-        variant: 'destructive',
         bgColor: 'bg-red-50 dark:bg-red-900/10',
     },
     permission_denied: {
         icon: <XCircle className="h-4 w-4" />,
         label: 'Camera permission denied',
-        variant: 'destructive',
         bgColor: 'bg-red-50 dark:bg-red-900/10',
     },
 };
