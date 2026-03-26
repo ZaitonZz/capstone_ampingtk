@@ -23,6 +23,7 @@ Route::get('/', function () {
         return match (auth()->user()->role) {
             'doctor' => redirect()->route('doctor.dashboard'),
             'patient' => redirect()->route('patient.dashboard'),
+            'medicalstaff' => redirect()->route('medicalstaff.dashboard'),
             'admin' => redirect()->route('admin.dashboard'),
             default => redirect()->route('dashboard'),
         };
@@ -173,6 +174,13 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
             return inertia('dashboard');
         })->name('admin.dashboard');
     });
+
+    // Medical staff-specific dashboard
+    Route::get('medicalstaff/dashboard', function () {
+        abort_unless(auth()->user()?->isMedicalStaff(), 403, 'Access restricted to medical staff accounts.');
+
+        return inertia('medicalstaff/dashboard');
+    })->name('medicalstaff.dashboard');
 });
 
 Route::middleware(['auth'])->group(function () {
