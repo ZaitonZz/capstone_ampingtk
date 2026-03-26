@@ -19,6 +19,13 @@ class UserSeeder extends Seeder
             'password' => Hash::make('password'),
         ]);
 
+        // ── Medical Staff (non-doctor EMR account) ──────────────────────────
+        User::factory()->medicalStaff()->create([
+            'name' => 'Medical Staff User',
+            'email' => 'medicalstaff@clinic.test',
+            'password' => Hash::make('password'),
+        ]);
+
         // ── Doctors (with profiles) ───────────────────────────────────────────
         $doctorData = [
             [
