@@ -369,8 +369,8 @@ export default function Login({
                         : 'pointer-events-none absolute inset-0 translate-x-full opacity-0'
                         }`}
                 >
-                    <div className="space-y-6 px-1">
-                        <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <div className="space-y-4 px-1">
+                        <div className="flex items-center justify-between border-b border-border pb-1">
                             <h3 className="text-lg font-semibold text-foreground">Face Login</h3>
                             <Button
                                 variant="ghost"
@@ -441,18 +441,18 @@ export default function Login({
                         </Dialog>
 
                         {/* Main Sidebar Content (Always visible) */}
-                        <div className="text-center py-10 px-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30">
-                            <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-900/30 shadow-sm">
-                                <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                        <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 px-4 py-6 text-center dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 shadow-sm dark:bg-emerald-900/30">
+                                <Camera className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                             </div>
-                            <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
-                            <p className="mx-auto mb-6 max-w-50 text-xs text-muted-foreground">
+                            <h3 className="mb-1 text-base font-semibold text-foreground">Face Authentication</h3>
+                            <p className="mx-auto mb-4 max-w-50 text-xs text-muted-foreground">
                                 Click the button below to open the camera and verify your identity securely.
                             </p>
 
                             <Button
                                 onClick={handleStartCamera}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md"
+                                className="w-full bg-emerald-600 font-medium text-white shadow-md hover:bg-emerald-700"
                                 size="lg"
                             >
                                 <Camera className="mr-2 h-4 w-4" />
@@ -461,12 +461,12 @@ export default function Login({
                         </div>
 
                         {/* Instructions */}
-                        <div className="text-xs text-muted-foreground bg-muted/30 p-4 rounded-lg border border-border/50">
-                            <p className="font-medium text-foreground mb-2 flex items-center">
+                        <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground">
+                            <p className="mb-2 flex items-center font-medium text-foreground">
                                 <Zap className="h-3 w-3 mr-1 text-amber-500" />
                                 Tips for success:
                             </p>
-                            <ul className="space-y-1.5 pl-1">
+                            <ul className="space-y-1 pl-1">
                                 <li className="flex gap-2">
                                     <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
                                     <span>Position your face clearly within the frame</span>
