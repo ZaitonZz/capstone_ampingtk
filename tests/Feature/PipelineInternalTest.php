@@ -105,6 +105,32 @@ it('stores a scan result posted by the pipeline', function () {
     )->toBeTrue();
 });
 
+it('stores an inconclusive scan result posted by the pipeline', function () {
+    $consultation = Consultation::factory()->create();
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'result' => 'inconclusive',
+        'confidence_score' => 0.51,
+        'frame_number' => 11,
+        'model_version' => 'efficientnet_v2_s',
+        'flagged' => false,
+    ];
+
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated()
+        ->assertJsonStructure(['id', 'consultation_id']);
+
+    expect(
+        DeepfakeScanLog::where('consultation_id', $consultation->id)
+            ->where('result', 'inconclusive')
+            ->exists()
+    )->toBeTrue();
+});
+
 it('rejects scan result with invalid data', function () {
     $data = [
         'consultation_id' => 9999999,
