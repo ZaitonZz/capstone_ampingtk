@@ -32,6 +32,7 @@ export default function CameraPreviewPanel({ status, stream }: CameraPreviewPane
                     playsInline
                     muted
                     className="h-full w-full object-cover"
+                    style={{ transform: 'scaleX(-1)' }}
                 />
             )}
 
