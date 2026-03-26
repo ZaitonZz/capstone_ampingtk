@@ -13,12 +13,12 @@ class ConsultationPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isDoctor() || $user->isAdmin();
+        return $user->isClinicalStaff();
     }
 
     public function view(User $user, Consultation $consultation): bool
     {
-        if ($user->isAdmin() || $consultation->doctor_id === $user->id) {
+        if ($user->isAdmin() || $user->isMedicalStaff() || $consultation->doctor_id === $user->id) {
             return true;
         }
 
@@ -27,16 +27,16 @@ class ConsultationPolicy
 
     public function create(User $user): bool
     {
-        return $user->isDoctor() || $user->isAdmin();
+        return $user->isClinicalStaff();
     }
 
     public function update(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin() || $consultation->doctor_id === $user->id;
+        return $user->isAdmin() || $user->isMedicalStaff() || $consultation->doctor_id === $user->id;
     }
 
     public function delete(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin() || $consultation->doctor_id === $user->id;
+        return $user->isAdmin() || $user->isMedicalStaff() || $consultation->doctor_id === $user->id;
     }
 }
