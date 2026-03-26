@@ -124,11 +124,8 @@ export default function Login({
         setIsCameraOpen(false);
     };
 
-    const isIdle = status === 'idle';
     const isCameraReady = status === 'camera_ready';
-    const isScanning = status === 'scanning';
     const isPermissionDenied = status === 'permission_denied';
-    const isActive = isCameraReady || isScanning;
 
 
     /**
@@ -149,342 +146,344 @@ export default function Login({
         >
             <Head title={isFaceLogin ? "Face Login" : "Log in"} />
 
-            <div className="relative overflow-hidden w-full">
+            <div className="relative w-full overflow-hidden">
                 <div
-                    className={`flex w-[200%] transition-transform duration-500 ease-in-out ${isFaceLogin ? '-translate-x-1/2' : 'translate-x-0'
+                    className={`w-full transform transition-all duration-500 ease-in-out ${isFaceLogin
+                        ? 'pointer-events-none absolute inset-0 -translate-x-full opacity-0'
+                        : 'relative translate-x-0 opacity-100'
                         }`}
                 >
-                    {/* Left Section: Email Login */}
-                    <div className="w-1/2 pr-1">
-                        {/* General Authentication Error */}
-                        {generalError && (
-                            <div className="mb-4 rounded-lg border border-red-200/50 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
-                                {generalError}
-                            </div>
-                        )}
+                    {/* General Authentication Error */}
+                    {generalError && (
+                        <div className="mb-4 rounded-lg border border-red-200/50 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-400">
+                            {generalError}
+                        </div>
+                    )}
 
-                        {otpRequired ? (
-                            // OTP Verification Step (Future Feature)
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium">
-                                        Enter verification code
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        A verification code has been sent to your registered email.
-                                    </p>
-                                    <Input
-                                        type="text"
-                                        placeholder="000000"
-                                        value={otpCode}
-                                        onChange={(e) => setOtpCode(e.target.value)}
-                                        className="h-10 font-mono text-center text-lg"
-                                        maxLength={6}
-                                    />
-                                </div>
-                                <Button
-                                    onClick={handleOtpSubmit}
-                                    className="h-10 w-full bg-emerald-600 font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                                >
-                                    Verify Code
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setOtpRequired(false);
-                                        setOtpCode('');
-                                    }}
-                                    className="h-10 w-full"
-                                >
-                                    Back to Login
-                                </Button>
+                    {otpRequired ? (
+                        // OTP Verification Step (Future Feature)
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-sm font-medium">
+                                    Enter verification code
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    A verification code has been sent to your registered email.
+                                </p>
+                                <Input
+                                    type="text"
+                                    placeholder="000000"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value)}
+                                    className="h-10 font-mono text-center text-lg"
+                                    maxLength={6}
+                                />
                             </div>
-                        ) : (
-                            <Form
-                                {...store.form()}
-                                resetOnSuccess={['password']}
-                                className="flex flex-col gap-6"
+                            <Button
+                                onClick={handleOtpSubmit}
+                                className="h-10 w-full bg-emerald-600 font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
                             >
-                                {({ processing, errors }) => (
-                                    <>
-                                        {/* Email Field */}
-                                        <div className="space-y-2">
-                                            <Label htmlFor="email" className="text-sm font-medium">
-                                                Email address
-                                            </Label>
-                                            <Input
-                                                id="email"
-                                                type="email"
-                                                name="email"
-                                                required
-                                                autoFocus
-                                                disabled={processing}
-                                                autoComplete="email"
-                                                placeholder="your.email@example.com"
-                                                className="h-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
-                                                aria-invalid={!!errors.email}
-                                            />
-                                            <InputError message={errors.email} />
-                                        </div>
-
-                                        {/* Password Field */}
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="password" className="text-sm font-medium">
-                                                    Password
-                                                </Label>
-                                                {canResetPassword && (
-                                                    <TextLink
-                                                        href={request()}
-                                                        className="text-xs font-medium text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
-                                                    >
-                                                        Forgot password?
-                                                    </TextLink>
-                                                )}
-                                            </div>
-                                            <div className="relative">
-                                                <Input
-                                                    id="password"
-                                                    type={showPassword ? 'text' : 'password'}
-                                                    name="password"
-                                                    required
-                                                    disabled={processing}
-                                                    autoComplete="current-password"
-                                                    placeholder="••••••••"
-                                                    className="h-10 pr-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
-                                                    aria-invalid={!!errors.password}
-                                                />
-                                                {/* Show/Hide Password Toggle */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    disabled={processing}
-                                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                                                    aria-label={
-                                                        showPassword
-                                                            ? 'Hide password'
-                                                            : 'Show password'
-                                                    }
-                                                >
-                                                    {showPassword ? (
-                                                        <svg
-                                                            className="h-4 w-4"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
-                                                            />
-                                                        </svg>
-                                                    ) : (
-                                                        <svg
-                                                            className="h-4 w-4"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                                            />
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                                            />
-                                                        </svg>
-                                                    )}
-                                                </button>
-                                            </div>
-                                            <InputError message={errors.password} />
-                                        </div>
-
-                                        {/* Primary Sign In Button */}
-                                        <Button
-                                            type="submit"
+                                Verify Code
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    setOtpRequired(false);
+                                    setOtpCode('');
+                                }}
+                                className="h-10 w-full"
+                            >
+                                Back to Login
+                            </Button>
+                        </div>
+                    ) : (
+                        <Form
+                            {...store.form()}
+                            resetOnSuccess={['password']}
+                            className="flex flex-col gap-6"
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    {/* Email Field */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email" className="text-sm font-medium">
+                                            Email address
+                                        </Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            name="email"
+                                            required
+                                            autoFocus
                                             disabled={processing}
-                                            className="h-10 w-full bg-emerald-600 font-semibold text-white transition-all duration-200 hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                                            data-test="login-button"
-                                        >
-                                            {processing ? (
-                                                <>
-                                                    <Spinner />
-                                                    <span>Signing in...</span>
-                                                </>
-                                            ) : (
-                                                'Sign In'
-                                            )}
-                                        </Button>
-
-                                        {/* Divider */}
-                                        <div className="relative">
-                                            <Separator className="bg-border" />
-                                            <div className="relative flex justify-center -top-3">
-                                                <span className="bg-card px-2 text-xs font-medium text-muted-foreground">
-                                                    Or continue with
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Facial Recognition Button */}
-                                        <Button
-                                            type="button"
-                                            disabled={processing}
-                                            onClick={() => setIsFaceLogin(true)}
-                                            className="h-10 w-full border-emerald-200 bg-emerald-50 font-medium text-emerald-700 transition-all duration-200 hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/30 dark:bg-emerald-900/10 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                                            variant="outline"
-                                        >
-                                            <Camera className="mr-2 h-4 w-4" />
-                                            <span>Login with Facial Recognition</span>
-                                        </Button>
-
-                                        {/* Sign Up Link */}
-                                        {canRegister && (
-                                            <div className="border-t border-gray-200 pt-4 text-center text-sm dark:border-gray-800">
-                                                <span className="text-muted-foreground">
-                                                    Don't have an account?{' '}
-                                                    <TextLink
-                                                        href={register()}
-                                                        className="font-semibold text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
-                                                    >
-                                                        Create one now
-                                                    </TextLink>
-                                                </span>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                            </Form>
-                        )}
-                    </div>
-
-                    {/* Right Section: Facial Recognition */}
-                    <div className="w-1/2 ">
-                        <div className="space-y-6 px-1">
-                            <div className="flex items-center justify-between pb-2 border-b border-border">
-                                <h3 className="text-lg font-semibold text-foreground">Face Login</h3>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        setIsFaceLogin(false);
-                                        handleStopCamera();
-                                    }}
-                                    className="h-8 text-muted-foreground hover:text-foreground"
-                                >
-                                    <ArrowLeft className="mr-2 h-3.5 w-3.5" />
-                                    Back
-                                </Button>
-                            </div>
-
-                            {/* Camera Dialog */}
-                            <Dialog open={isCameraOpen} onOpenChange={(open) => !open && handleStopCamera()}>
-                                <DialogContent className="sm:max-w-md">
-                                    <DialogHeader>
-                                        <DialogTitle>Face Verification</DialogTitle>
-                                        <DialogDescription>
-                                            Position your face in the frame to verify your identity.
-                                        </DialogDescription>
-                                    </DialogHeader>
-
-                                    <div className="space-y-4 py-2">
-                                        {/* Error Message inside Dialog */}
-                                        {faceErrorMessage && (
-                                            <div className="rounded-md bg-red-50 p-3 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                                                {faceErrorMessage}
-                                            </div>
-                                        )}
-
-                                        <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
-                                            <CameraPreviewPanel status={status} stream={mediaStream} />
-                                        </div>
-                                        <FaceScanStatus status={status} />
+                                            autoComplete="email"
+                                            placeholder="your.email@example.com"
+                                            className="h-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
+                                            aria-invalid={!!errors.email}
+                                        />
+                                        <InputError message={errors.email} />
                                     </div>
 
-                                    <DialogFooter className="flex-col sm:flex-row gap-2">
-                                        <Button
-                                            onClick={handleStopCamera}
-                                            variant="outline"
-                                            disabled={isProcessing}
-                                            className="w-full sm:w-auto"
-                                        >
-                                            Cancel
-                                        </Button>
-
-                                        {!isPermissionDenied && (
-                                            <Button
-                                                onClick={handleScanFace}
-                                                disabled={!isCameraReady || isProcessing}
-                                                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    {/* Password Field */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="password" className="text-sm font-medium">
+                                                Password
+                                            </Label>
+                                            {canResetPassword && (
+                                                <TextLink
+                                                    href={request()}
+                                                    className="text-xs font-medium text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
+                                                >
+                                                    Forgot password?
+                                                </TextLink>
+                                            )}
+                                        </div>
+                                        <div className="relative">
+                                            <Input
+                                                id="password"
+                                                type={showPassword ? 'text' : 'password'}
+                                                name="password"
+                                                required
+                                                disabled={processing}
+                                                autoComplete="current-password"
+                                                placeholder="••••••••"
+                                                className="h-10 pr-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
+                                                aria-invalid={!!errors.password}
+                                            />
+                                            {/* Show/Hide Password Toggle */}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                disabled={processing}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                                aria-label={
+                                                    showPassword
+                                                        ? 'Hide password'
+                                                        : 'Show password'
+                                                }
                                             >
-                                                {isProcessing ? (
-                                                    <>
-                                                        <Spinner className="mr-2 h-4 w-4" />
-                                                        Scanning...
-                                                    </>
+                                                {showPassword ? (
+                                                    <svg
+                                                        className="h-4 w-4"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
+                                                        />
+                                                    </svg>
                                                 ) : (
-                                                    'Scan Face'
+                                                    <svg
+                                                        className="h-4 w-4"
+                                                        fill="none"
+                                                        viewBox="0 0 24 24"
+                                                        stroke="currentColor"
+                                                    >
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                                        />
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                                        />
+                                                    </svg>
                                                 )}
-                                            </Button>
+                                            </button>
+                                        </div>
+                                        <InputError message={errors.password} />
+                                    </div>
+
+                                    {/* Primary Sign In Button */}
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="h-10 w-full bg-emerald-600 font-semibold text-white transition-all duration-200 hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                                        data-test="login-button"
+                                    >
+                                        {processing ? (
+                                            <>
+                                                <Spinner />
+                                                <span>Signing in...</span>
+                                            </>
+                                        ) : (
+                                            'Sign In'
                                         )}
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
+                                    </Button>
 
-                            {/* Main Sidebar Content (Always visible) */}
-                            <div className="text-center py-10 px-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30">
-                                <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-900/30 shadow-sm">
-                                    <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+                                    {/* Divider */}
+                                    <div className="relative">
+                                        <Separator className="bg-border" />
+                                        <div className="relative flex justify-center -top-3">
+                                            <span className="bg-card px-2 text-xs font-medium text-muted-foreground">
+                                                Or continue with
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Facial Recognition Button */}
+                                    <Button
+                                        type="button"
+                                        disabled={processing}
+                                        onClick={() => setIsFaceLogin(true)}
+                                        className="h-10 w-full border-emerald-200 bg-emerald-50 font-medium text-emerald-700 transition-all duration-200 hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/30 dark:bg-emerald-900/10 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                        variant="outline"
+                                    >
+                                        <Camera className="mr-2 h-4 w-4" />
+                                        <span>Login with Facial Recognition</span>
+                                    </Button>
+
+                                    {/* Sign Up Link */}
+                                    {canRegister && (
+                                        <div className="border-t border-gray-200 pt-4 text-center text-sm dark:border-gray-800">
+                                            <span className="text-muted-foreground">
+                                                Don't have an account?{' '}
+                                                <TextLink
+                                                    href={register()}
+                                                    className="font-semibold text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
+                                                >
+                                                    Create one now
+                                                </TextLink>
+                                            </span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </Form>
+                    )}
+                </div>
+
+                <div
+                    className={`w-full transform transition-all duration-500 ease-in-out ${isFaceLogin
+                        ? 'relative translate-x-0 opacity-100'
+                        : 'pointer-events-none absolute inset-0 translate-x-full opacity-0'
+                        }`}
+                >
+                    <div className="space-y-6 px-1">
+                        <div className="flex items-center justify-between pb-2 border-b border-border">
+                            <h3 className="text-lg font-semibold text-foreground">Face Login</h3>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setIsFaceLogin(false);
+                                    handleStopCamera();
+                                }}
+                                className="h-8 text-muted-foreground hover:text-foreground"
+                            >
+                                <ArrowLeft className="mr-2 h-3.5 w-3.5" />
+                                Back
+                            </Button>
+                        </div>
+
+                        {/* Camera Dialog */}
+                        <Dialog open={isCameraOpen} onOpenChange={(open) => !open && handleStopCamera()}>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Face Verification</DialogTitle>
+                                    <DialogDescription>
+                                        Position your face in the frame to verify your identity.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-4 py-2">
+                                    {/* Error Message inside Dialog */}
+                                    {faceErrorMessage && (
+                                        <div className="rounded-md bg-red-50 p-3 text-xs text-red-600 dark:bg-red-900/20 dark:text-red-400">
+                                            {faceErrorMessage}
+                                        </div>
+                                    )}
+
+                                    <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
+                                        <CameraPreviewPanel status={status} stream={mediaStream} />
+                                    </div>
+                                    <FaceScanStatus status={status} />
                                 </div>
-                                <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
-                                <p className="mx-auto mb-6 max-w-50 text-xs text-muted-foreground">
-                                    Click the button below to open the camera and verify your identity securely.
-                                </p>
 
-                                <Button
-                                    onClick={handleStartCamera}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md"
-                                    size="lg"
-                                >
-                                    <Camera className="mr-2 h-4 w-4" />
-                                    Start Camera
-                                </Button>
-                            </div>
+                                <DialogFooter className="flex-col sm:flex-row gap-2">
+                                    <Button
+                                        onClick={handleStopCamera}
+                                        variant="outline"
+                                        disabled={isProcessing}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        Cancel
+                                    </Button>
 
-                            {/* Instructions */}
-                            <div className="text-xs text-muted-foreground bg-muted/30 p-4 rounded-lg border border-border/50">
-                                <p className="font-medium text-foreground mb-2 flex items-center">
-                                    <Zap className="h-3 w-3 mr-1 text-amber-500" />
-                                    Tips for success:
-                                </p>
-                                <ul className="space-y-1.5 pl-1">
-                                    <li className="flex gap-2">
-                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
-                                        <span>Position your face clearly within the frame</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
-                                        <span>Ensure you are in a well-lit environment</span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
-                                        <span>Remove accessories like sunglasses or masks</span>
-                                    </li>
-                                </ul>
+                                    {!isPermissionDenied && (
+                                        <Button
+                                            onClick={handleScanFace}
+                                            disabled={!isCameraReady || isProcessing}
+                                            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        >
+                                            {isProcessing ? (
+                                                <>
+                                                    <Spinner className="mr-2 h-4 w-4" />
+                                                    Scanning...
+                                                </>
+                                            ) : (
+                                                'Scan Face'
+                                            )}
+                                        </Button>
+                                    )}
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* Main Sidebar Content (Always visible) */}
+                        <div className="text-center py-10 px-4 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-900/30">
+                            <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-emerald-900/30 shadow-sm">
+                                <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
                             </div>
+                            <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
+                            <p className="mx-auto mb-6 max-w-50 text-xs text-muted-foreground">
+                                Click the button below to open the camera and verify your identity securely.
+                            </p>
+
+                            <Button
+                                onClick={handleStartCamera}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-md"
+                                size="lg"
+                            >
+                                <Camera className="mr-2 h-4 w-4" />
+                                Start Camera
+                            </Button>
+                        </div>
+
+                        {/* Instructions */}
+                        <div className="text-xs text-muted-foreground bg-muted/30 p-4 rounded-lg border border-border/50">
+                            <p className="font-medium text-foreground mb-2 flex items-center">
+                                <Zap className="h-3 w-3 mr-1 text-amber-500" />
+                                Tips for success:
+                            </p>
+                            <ul className="space-y-1.5 pl-1">
+                                <li className="flex gap-2">
+                                    <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                    <span>Position your face clearly within the frame</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                    <span>Ensure you are in a well-lit environment</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="block h-1.5 w-1.5 mt-1 rounded-full bg-muted-foreground/40" />
+                                    <span>Remove accessories like sunglasses or masks</span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
-
-                </div> {/* End Slide Container */}
-            </div> {/* End Overflow Hide */}
+                </div>
+            </div>
         </TelemedicineLoginLayout>
     );
 }

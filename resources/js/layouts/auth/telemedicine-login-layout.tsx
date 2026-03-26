@@ -14,9 +14,9 @@ export default function TelemedicineLoginLayout({
     children,
 }: TelemedicineLoginLayoutProps) {
     return (
-        <div className="flex min-h-screen bg-background">
+        <div className="flex h-screen overflow-hidden bg-background">
             {/* Left Side - Hero Image with Gradient Overlay (Desktop Only) */}
-            <div className="hidden lg:flex lg:flex-[11] items-center justify-center bg-gradient-to-br from-emerald-600 to-emerald-800 relative overflow-hidden">
+            <div className="relative hidden items-center justify-center overflow-hidden bg-linear-to-br from-emerald-600 to-emerald-800 lg:flex lg:flex-11">
                 {/* Background Image */}
                 <img
                     src="/images/amping_tk1.png"
@@ -25,7 +25,7 @@ export default function TelemedicineLoginLayout({
                 />
 
                 {/* Green Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/80 via-emerald-700/75 to-emerald-900/80" />
+                <div className="absolute inset-0 bg-linear-to-br from-emerald-600/80 via-emerald-700/75 to-emerald-900/80" />
 
                 {/* Content */}
                 <div className="relative z-10 space-y-8 px-12 text-center">
@@ -71,8 +71,8 @@ export default function TelemedicineLoginLayout({
             </div>
 
             {/* Right Side - Login Form Panel */}
-            <div className="flex w-full lg:flex-[9] items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-                <div className="w-full max-w-sm space-y-6">
+            <div className="flex h-full w-full items-center justify-center overflow-hidden px-4 py-4 sm:px-6 lg:flex-9 lg:px-8">
+                <div className="flex h-full w-full max-w-sm flex-col justify-center space-y-6 overflow-hidden">
                     {/* Mobile Logo (Visible only on small screens) */}
                     <div className="flex justify-center lg:hidden">
                         <AppLogoIcon className="h-16 w-auto" />
