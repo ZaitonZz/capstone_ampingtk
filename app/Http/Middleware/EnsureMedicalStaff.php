@@ -9,13 +9,13 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureMedicalStaff
 {
     /**
-     * Only doctors and admins may access the EMR API.
+     * Only clinical staff accounts may access the EMR API.
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (! $user || (! $user->isDoctor() && ! $user->isAdmin())) {
+        if (! $user || ! $user->isClinicalStaff()) {
             abort(403, 'Access restricted to medical staff.');
         }
 
