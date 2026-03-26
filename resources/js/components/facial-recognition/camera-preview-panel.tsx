@@ -15,9 +15,8 @@ export default function CameraPreviewPanel({ status, stream }: CameraPreviewPane
     }, [stream]);
 
     const isScanning = status === 'scanning';
-    // const isSuccess = status === 'success'; 
+    // const isSuccess = status === 'success';
     // const isFailed = status === 'failed' || status === 'no_face_detected' || status === 'multiple_faces_detected';
-    const isActive = status === 'camera_ready' || isScanning;
 
     // Determine if we should show the video feed
     const showVideo = !!stream;
