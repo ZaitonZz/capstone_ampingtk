@@ -47,14 +47,19 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
-    const isMedicalStaff = user.role === 'doctor' || user.role === 'admin';
-        const dashboardHref = isPatient
-                ? patientDashboard()
-                : user.role === 'doctor'
-                    ? doctorDashboard()
-                    : user.role === 'admin'
-                        ? adminDashboard()
-                        : dashboard();
+    const isMedicalStaff =
+        user.role === 'doctor' ||
+        user.role === 'admin' ||
+        user.role === 'medicalstaff';
+    const dashboardHref = isPatient
+        ? patientDashboard()
+        : user.role === 'doctor'
+          ? doctorDashboard()
+          : user.role === 'admin'
+            ? adminDashboard()
+            : user.role === 'medicalstaff'
+              ? '/medicalstaff/dashboard'
+              : dashboard();
 
     const mainNavItems: NavItem[] = [
         {
