@@ -45,6 +45,14 @@ it('doctor sees only their own consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
+it('medical staff can access consultations index', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.index'))
+        ->assertOk();
+});
+
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 it('approves a pending consultation and transitions it to scheduled', function () {
