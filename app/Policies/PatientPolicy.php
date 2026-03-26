@@ -13,7 +13,7 @@ class PatientPolicy
      */
     private function isMedicalStaff(User $user): bool
     {
-        return $user->isDoctor() || $user->isAdmin();
+        return $user->isClinicalStaff();
     }
 
     public function viewAny(User $user): bool
