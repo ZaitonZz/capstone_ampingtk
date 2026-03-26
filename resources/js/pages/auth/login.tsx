@@ -21,8 +21,7 @@ import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
 import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
-import RecognitionInstructions from '@/components/facial-recognition/recognition-instructions';
-import { ArrowLeft, Camera, RotateCcw, Zap } from 'lucide-react';
+import { ArrowLeft, Camera, Zap } from 'lucide-react';
 
 type Props = {
     status?: string;
@@ -35,10 +34,6 @@ type RecognitionStatus =
     | 'requesting_camera'
     | 'camera_ready'
     | 'scanning'
-    | 'success'
-    | 'failed'
-    | 'no_face_detected'
-    | 'multiple_faces_detected'
     | 'permission_denied';
 
 export default function Login({
@@ -57,15 +52,6 @@ export default function Login({
     const [faceErrorMessage, setFaceErrorMessage] = useState('');
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
-    const [recognizedUser, setRecognizedUser] = useState('');
-
-    /**
-     * Handle facial recognition login
-     * Toggles to facial recognition view
-     */
-    const handleFacialRecognitionLogin = () => {
-        setIsFaceLogin(true);
-    };
 
     /**
      * Handle Start Camera button click
@@ -101,7 +87,7 @@ export default function Login({
 
     /**
      * Handle Scan Face button click
-     * Simulates face detection scanning (Backend integration point)
+     * UI-only placeholder until model integration is available
      */
     const handleScanFace = async () => {
         if (status !== 'camera_ready') return;
@@ -111,40 +97,14 @@ export default function Login({
         setStatus('scanning');
 
         try {
-            // TODO: Capture frame from video stream and send to backend
-            // For now, we simulate the scanning process
-
-            // Simulate scanning delay
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
-            // Mock scenarios for demonstration
-            const scenarios = [
-                'success',
-                // 'no_face_detected',
-                // 'multiple_faces_detected',
-            ];
-            const randomScenario =
-                scenarios[Math.floor(Math.random() * scenarios.length)];
-
-            if (randomScenario === 'success') {
-                setStatus('success');
-                setRecognizedUser('Dr. Carl');
-                // In production, you would redirect to dashboard here
-                // setTimeout(() => window.location.href = '/dashboard', 2000);
-            } else if (randomScenario === 'no_face_detected') {
-                setStatus('no_face_detected');
-                setFaceErrorMessage(
-                    'No face detected. Please position your face in the frame and try again.'
-                );
-            } else {
-                setStatus('multiple_faces_detected');
-                setFaceErrorMessage(
-                    'Multiple faces detected. Please ensure only one face is visible.'
-                );
-            }
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            setStatus('camera_ready');
+            setFaceErrorMessage(
+                'Facial recognition model is not integrated yet. UI is ready for backend/model hookup.'
+            );
         } catch {
-            setStatus('failed');
-            setFaceErrorMessage('Facial recognition failed. Please try again.');
+            setStatus('camera_ready');
+            setFaceErrorMessage('Unable to continue scan. Please try again.');
         } finally {
             setIsProcessing(false);
         }
@@ -164,23 +124,10 @@ export default function Login({
         setIsCameraOpen(false);
     };
 
-    /**
-     * Handle Retry button click
-     */
-    const handleRetry = () => {
-        setStatus('camera_ready');
-        setFaceErrorMessage('');
-    };
-
     const isIdle = status === 'idle';
     const isCameraReady = status === 'camera_ready';
     const isScanning = status === 'scanning';
-    const isSuccess = status === 'success';
-    const isFailed =
-        status === 'failed' ||
-        status === 'no_face_detected' ||
-        status === 'multiple_faces_detected' ||
-        status === 'permission_denied';
+    const isPermissionDenied = status === 'permission_denied';
     const isActive = isCameraReady || isScanning;
 
 
@@ -459,7 +406,7 @@ export default function Login({
                                         <div className="rounded-lg overflow-hidden border border-border bg-black/5 aspect-video relative shadow-inner">
                                             <CameraPreviewPanel status={status} stream={mediaStream} />
                                         </div>
-                                        <FaceScanStatus status={status} userName={recognizedUser} />
+                                        <FaceScanStatus status={status} />
                                     </div>
 
                                     <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -472,7 +419,7 @@ export default function Login({
                                             Cancel
                                         </Button>
 
-                                        {!isSuccess && !isFailed && (
+                                        {!isPermissionDenied && (
                                             <Button
                                                 onClick={handleScanFace}
                                                 disabled={!isCameraReady || isProcessing}
@@ -488,22 +435,6 @@ export default function Login({
                                                 )}
                                             </Button>
                                         )}
-
-                                        {isFailed && (
-                                            <Button
-                                                onClick={handleRetry}
-                                                className="w-full sm:w-auto"
-                                                variant="secondary"
-                                            >
-                                                Try Again
-                                            </Button>
-                                        )}
-
-                                        {isSuccess && (
-                                            <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
-                                                Continue to Dashboard
-                                            </Button>
-                                        )}
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
@@ -514,7 +445,7 @@ export default function Login({
                                     <Camera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
                                 </div>
                                 <h3 className="text-base font-semibold text-foreground mb-1">Face Authentication</h3>
-                                <p className="text-xs text-muted-foreground max-w-[200px] mx-auto mb-6">
+                                <p className="mx-auto mb-6 max-w-50 text-xs text-muted-foreground">
                                     Click the button below to open the camera and verify your identity securely.
                                 </p>
 
