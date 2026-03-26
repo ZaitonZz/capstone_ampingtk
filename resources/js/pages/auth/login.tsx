@@ -6,19 +6,17 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Form, Head } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import LogoPreloader from '@/components/ui/logo-preloader';
 import { Separator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import TelemedicineLoginLayout from '@/layouts/auth/telemedicine-login-layout';
 import { register } from '@/routes';
-import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
 import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
@@ -44,9 +42,11 @@ export default function Login({
 }: Props) {
     const [showPassword, setShowPassword] = useState(false);
     const [generalError, setGeneralError] = useState('');
-    const [otpRequired, setOtpRequired] = useState(false);
-    const [otpCode, setOtpCode] = useState('');
-    const [isOtpProcessing, setIsOtpProcessing] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
     // Serial Recognition State
     const [isFaceLogin, setIsFaceLogin] = useState(false);
@@ -129,25 +129,76 @@ export default function Login({
 
     const isCameraReady = status === 'camera_ready';
     const isPermissionDenied = status === 'permission_denied';
-    const isFaceMatched = status === 'success';
-    const showPreloader = isOtpProcessing || isFaceMatched;
-
 
     /**
-     * Handle OTP verification
-     * Future implementation: Will handle multi-factor authentication
+     * Handle email/password login start.
+     * Submits to email-login-start endpoint to validate credentials and receive OTP.
      */
-    const handleOtpSubmit = async () => {
-        // TODO: Implement OTP verification
-        // 1. Validate OTP code
-        // 2. Send verification request
-        // 3. Complete login if valid
-        setIsOtpProcessing(true);
+    const handleEmailLoginStart = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+
+        setEmailError('');
+        setPasswordError('');
+        setGeneralError('');
+
+        if (!email || !password) {
+            if (!email) setEmailError('Email is required');
+            if (!password) setPasswordError('Password is required');
+            return;
+        }
+
+        setIsSubmitting(true);
 
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-        } finally {
-            setIsOtpProcessing(false);
+            const response = await fetch('/auth/email-login-start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN':
+                        (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                },
+                body: JSON.stringify({
+                    email: email.trim(),
+                    password,
+                    remember: false,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                if (data.errors) {
+                    if (data.errors.email) {
+                        setEmailError(Array.isArray(data.errors.email) ? data.errors.email[0] : data.errors.email);
+                    }
+                    if (data.errors.password) {
+                        setPasswordError(Array.isArray(data.errors.password) ? data.errors.password[0] : data.errors.password);
+                    }
+                } else {
+                    setGeneralError(data.message || 'Login failed. Please try again.');
+                }
+
+                setIsSubmitting(false);
+                return;
+            }
+
+            if (data.success) {
+                if (data.requires_otp) {
+                    window.location.href = data.redirect_url || '/auth/verify-otp';
+                    return;
+                }
+
+                window.location.href = data.redirect_url || '/dashboard';
+                return;
+            }
+
+            setGeneralError(data.message || 'An unexpected error occurred. Please try again.');
+            setIsSubmitting(false);
+        } catch (error) {
+            console.error('Login error:', error);
+            setGeneralError('An error occurred during login. Please try again.');
+            setIsSubmitting(false);
         }
     };
 
@@ -157,16 +208,6 @@ export default function Login({
             subtitle={isFaceLogin ? "Secure facial recognition login" : "Secure access for doctors and patients"}
         >
             <Head title={isFaceLogin ? "Face Login" : "Log in"} />
-
-            {showPreloader && (
-                <LogoPreloader
-                    text={
-                        isOtpProcessing
-                            ? 'Verifying OTP...'
-                            : 'Face matched. Signing you in...'
-                    }
-                />
-            )}
 
             <div className="relative w-full overflow-hidden">
                 <div
@@ -182,215 +223,175 @@ export default function Login({
                         </div>
                     )}
 
-                    {otpRequired ? (
-                        // OTP Verification Step (Future Feature)
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-sm font-medium">
-                                    Enter verification code
-                                </Label>
-                                <p className="text-xs text-muted-foreground">
-                                    A verification code has been sent to your registered email.
-                                </p>
-                                <Input
-                                    type="text"
-                                    placeholder="000000"
-                                    value={otpCode}
-                                    onChange={(e) => setOtpCode(e.target.value)}
-                                    className="h-10 font-mono text-center text-lg"
-                                    maxLength={6}
-                                />
-                            </div>
-                            <Button
-                                onClick={handleOtpSubmit}
-                                disabled={isOtpProcessing}
-                                className="h-10 w-full bg-emerald-600 font-medium text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                            >
-                                {isOtpProcessing ? (
-                                    <>
-                                        <Spinner className="mr-2 h-4 w-4" />
-                                        Verifying...
-                                    </>
-                                ) : (
-                                    'Verify Code'
-                                )}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                    setOtpRequired(false);
-                                    setOtpCode('');
+                    <form
+                        onSubmit={handleEmailLoginStart}
+                        className="flex flex-col gap-6"
+                    >
+                        {/* Email Field */}
+                        <div className="space-y-2">
+                            <Label htmlFor="email" className="text-sm font-medium">
+                                Email address
+                            </Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                name="email"
+                                required
+                                autoFocus
+                                disabled={isSubmitting}
+                                autoComplete="email"
+                                placeholder="your.email@example.com"
+                                value={email}
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    setEmailError('');
+                                    setGeneralError('');
                                 }}
-                                className="h-10 w-full"
-                            >
-                                Back to Login
-                            </Button>
+                                className="h-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
+                                aria-invalid={!!emailError}
+                            />
+                            <InputError message={emailError} />
                         </div>
-                    ) : (
-                        <Form
-                            {...store.form()}
-                            resetOnSuccess={['password']}
-                            className="flex flex-col gap-6"
-                        >
-                            {({ processing, errors }) => (
-                                <>
-                                    {/* Email Field */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email" className="text-sm font-medium">
-                                            Email address
-                                        </Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            name="email"
-                                            required
-                                            autoFocus
-                                            disabled={processing}
-                                            autoComplete="email"
-                                            placeholder="your.email@example.com"
-                                            className="h-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
-                                            aria-invalid={!!errors.email}
-                                        />
-                                        <InputError message={errors.email} />
-                                    </div>
 
-                                    {/* Password Field */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <Label htmlFor="password" className="text-sm font-medium">
-                                                Password
-                                            </Label>
-                                            {canResetPassword && (
-                                                <TextLink
-                                                    href={request()}
-                                                    className="text-xs font-medium text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
-                                                >
-                                                    Forgot password?
-                                                </TextLink>
-                                            )}
-                                        </div>
-                                        <div className="relative">
-                                            <Input
-                                                id="password"
-                                                type={showPassword ? 'text' : 'password'}
-                                                name="password"
-                                                required
-                                                disabled={processing}
-                                                autoComplete="current-password"
-                                                placeholder="••••••••"
-                                                className="h-10 pr-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
-                                                aria-invalid={!!errors.password}
+                        {/* Password Field */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="password" className="text-sm font-medium">
+                                    Password
+                                </Label>
+                                {canResetPassword && (
+                                    <TextLink
+                                        href={request()}
+                                        className="text-xs font-medium text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
+                                    >
+                                        Forgot password?
+                                    </TextLink>
+                                )}
+                            </div>
+                            <div className="relative">
+                                <Input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    name="password"
+                                    required
+                                    disabled={isSubmitting}
+                                    autoComplete="current-password"
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => {
+                                        setPassword(e.target.value);
+                                        setPasswordError('');
+                                        setGeneralError('');
+                                    }}
+                                    className="h-10 pr-10 border-gray-300 transition-colors duration-200 focus:border-emerald-500 focus:ring-emerald-500"
+                                    aria-invalid={!!passwordError}
+                                />
+                                {/* Show/Hide Password Toggle */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    disabled={isSubmitting}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                    aria-label={
+                                        showPassword
+                                            ? 'Hide password'
+                                            : 'Show password'
+                                    }
+                                >
+                                    {showPassword ? (
+                                        <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
                                             />
-                                            {/* Show/Hide Password Toggle */}
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                disabled={processing}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                                                aria-label={
-                                                    showPassword
-                                                        ? 'Hide password'
-                                                        : 'Show password'
-                                                }
-                                            >
-                                                {showPassword ? (
-                                                    <svg
-                                                        className="h-4 w-4"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-4.803m5.596-3.856a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0z"
-                                                        />
-                                                    </svg>
-                                                ) : (
-                                                    <svg
-                                                        className="h-4 w-4"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                                        />
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            strokeWidth={2}
-                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                                        />
-                                                    </svg>
-                                                )}
-                                            </button>
-                                        </div>
-                                        <InputError message={errors.password} />
-                                    </div>
-
-                                    {/* Primary Sign In Button */}
-                                    <Button
-                                        type="submit"
-                                        disabled={processing}
-                                        className="h-10 w-full bg-emerald-600 font-semibold text-white transition-all duration-200 hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                                        data-test="login-button"
-                                    >
-                                        {processing ? (
-                                            <>
-                                                <Spinner />
-                                                <span>Signing in...</span>
-                                            </>
-                                        ) : (
-                                            'Sign In'
-                                        )}
-                                    </Button>
-
-                                    {/* Divider */}
-                                    <div className="relative">
-                                        <Separator className="bg-border" />
-                                        <div className="relative flex justify-center -top-3">
-                                            <span className="bg-card px-2 text-xs font-medium text-muted-foreground">
-                                                Or continue with
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Facial Recognition Button */}
-                                    <Button
-                                        type="button"
-                                        disabled={processing}
-                                        onClick={() => setIsFaceLogin(true)}
-                                        className="h-10 w-full border-emerald-200 bg-emerald-50 font-medium text-emerald-700 transition-all duration-200 hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/30 dark:bg-emerald-900/10 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                                        variant="outline"
-                                    >
-                                        <Camera className="mr-2 h-4 w-4" />
-                                        <span>Login with Facial Recognition</span>
-                                    </Button>
-
-                                    {/* Sign Up Link */}
-                                    {canRegister && (
-                                        <div className="border-t border-gray-200 pt-4 text-center text-sm dark:border-gray-800">
-                                            <span className="text-muted-foreground">
-                                                Don't have an account?{' '}
-                                                <TextLink
-                                                    href={register()}
-                                                    className="font-semibold text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
-                                                >
-                                                    Create one now
-                                                </TextLink>
-                                            </span>
-                                        </div>
+                                        </svg>
+                                    ) : (
+                                        <svg
+                                            className="h-4 w-4"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                            />
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                            />
+                                        </svg>
                                     )}
+                                </button>
+                            </div>
+                            <InputError message={passwordError} />
+                        </div>
+
+                        {/* Primary Sign In Button */}
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="h-10 w-full bg-emerald-600 font-semibold text-white transition-all duration-200 hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+                            data-test="login-button"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Spinner />
+                                    <span>Signing in...</span>
                                 </>
+                            ) : (
+                                'Sign In'
                             )}
-                        </Form>
-                    )}
+                        </Button>
+
+                        {/* Divider */}
+                        <div className="relative">
+                            <Separator className="bg-border" />
+                            <div className="relative flex justify-center -top-3">
+                                <span className="bg-card px-2 text-xs font-medium text-muted-foreground">
+                                    Or continue with
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Facial Recognition Button */}
+                        <Button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => setIsFaceLogin(true)}
+                            className="h-10 w-full border-emerald-200 bg-emerald-50 font-medium text-emerald-700 transition-all duration-200 hover:bg-emerald-100 hover:border-emerald-300 dark:border-emerald-900/30 dark:bg-emerald-900/10 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                            variant="outline"
+                        >
+                            <Camera className="mr-2 h-4 w-4" />
+                            <span>Login with Facial Recognition</span>
+                        </Button>
+
+                        {/* Sign Up Link */}
+                        {canRegister && (
+                            <div className="border-t border-gray-200 pt-4 text-center text-sm dark:border-gray-800">
+                                <span className="text-muted-foreground">
+                                    Don't have an account?{' '}
+                                    <TextLink
+                                        href={register()}
+                                        className="font-semibold text-emerald-600 no-underline hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400"
+                                    >
+                                        Create one now
+                                    </TextLink>
+                                </span>
+                            </div>
+                        )}
+                    </form>
                 </div>
 
                 <div
