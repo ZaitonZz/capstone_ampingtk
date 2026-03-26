@@ -76,6 +76,16 @@ class User extends Authenticatable
         return $this->role === 'patient';
     }
 
+    public function isMedicalStaff(): bool
+    {
+        return $this->role === 'medicalstaff';
+    }
+
+    public function isClinicalStaff(): bool
+    {
+        return $this->isDoctor() || $this->isAdmin() || $this->isMedicalStaff();
+    }
+
     public function getAvatarAttribute(): ?string
     {
         if ($this->isDoctor()) {
