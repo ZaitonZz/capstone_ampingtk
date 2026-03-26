@@ -21,7 +21,10 @@ class ConsultationController extends Controller
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
-            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when(
+                ! $request->user()->isAdmin() && ! $request->user()->isMedicalStaff(),
+                fn ($q) => $q->where('doctor_id', $request->user()->id)
+            )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
@@ -126,7 +129,10 @@ class ConsultationController extends Controller
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
-            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when(
+                ! $request->user()->isAdmin() && ! $request->user()->isMedicalStaff(),
+                fn ($q) => $q->where('doctor_id', $request->user()->id)
+            )
             ->whereNotNull('scheduled_at')
             ->get()
             ->map(fn (Consultation $c) => [
