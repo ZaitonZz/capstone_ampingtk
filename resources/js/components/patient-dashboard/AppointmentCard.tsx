@@ -1,8 +1,8 @@
 import { Link } from '@inertiajs/react';
 import { CalendarDays, Stethoscope, Video } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { DashboardCard } from '@/components/patient-dashboard/DashboardCard';
 import { StatusBadge } from '@/components/patient-dashboard/StatusBadge';
+import { Button } from '@/components/ui/button';
 
 type AppointmentStatus = 'confirmed' | 'pending';
 
