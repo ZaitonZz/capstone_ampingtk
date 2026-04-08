@@ -12,6 +12,9 @@ class DeepfakeScanLog extends Model
 
     protected $fillable = [
         'consultation_id',
+        'microcheck_id',
+        'user_id',
+        'verified_role',
         'result',
         'confidence_score',
         'frame_path',
@@ -37,6 +40,16 @@ class DeepfakeScanLog extends Model
     public function consultation(): BelongsTo
     {
         return $this->belongsTo(Consultation::class);
+    }
+
+    public function microcheck(): BelongsTo
+    {
+        return $this->belongsTo(ConsultationMicrocheck::class);
+    }
+
+    public function detectedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function reviewer(): BelongsTo
