@@ -48,6 +48,9 @@ return [
 
     'pipeline' => [
         'secret' => env('PIPELINE_SECRET'),
+        'microcheck_min_interval_seconds' => (int) env('PIPELINE_MICROCHECK_MIN_INTERVAL_SECONDS', 5),
+        'microcheck_max_interval_seconds' => (int) env('PIPELINE_MICROCHECK_MAX_INTERVAL_SECONDS', 20),
+        'microcheck_expiry_seconds' => (int) env('PIPELINE_MICROCHECK_EXPIRY_SECONDS', 45),
     ],
 
 ];

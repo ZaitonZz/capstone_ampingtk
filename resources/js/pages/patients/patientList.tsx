@@ -2,12 +2,13 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Search, Filter } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
+import * as PatientController from '@/actions/App/Http/Controllers/PatientController';
+import { show as patientShow } from '@/actions/App/Http/Controllers/PatientController';
 import DeletePatientDialog from '@/components/patients/delete-patient-dialog';
 import EditPatientDialog from '@/components/patients/edit-patient-dialog';
 import Pagination from '@/components/patients/pagination';
 import PatientTable from '@/components/patients/patient-table';
 import ViewPatientDialog from '@/components/patients/view-patient-dialog';
-import * as PatientController from '@/actions/App/Http/Controllers/PatientController';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -18,7 +19,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { show as patientShow } from '@/actions/App/Http/Controllers/PatientController';
 import { index as patientsList } from '@/routes/patients';
 import type { BreadcrumbItem } from '@/types';
 import type { Patient, PaginatedData } from '@/types/patient';

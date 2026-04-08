@@ -1,5 +1,6 @@
 import { Camera, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { update as updatePatient } from '@/actions/App/Http/Controllers/PatientController';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +21,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { update as updatePatient } from '@/actions/App/Http/Controllers/PatientController';
 import type { Patient } from '@/types/patient';
 
 type EditPatientDialogProps = {

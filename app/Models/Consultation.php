@@ -101,6 +101,16 @@ class Consultation extends Model
         return $this->hasMany(ConsultationFaceVerificationLog::class);
     }
 
+    public function microchecks(): HasMany
+    {
+        return $this->hasMany(ConsultationMicrocheck::class);
+    }
+
+    public function latestMicrocheck(): HasOne
+    {
+        return $this->hasOne(ConsultationMicrocheck::class)->latestOfMany('scheduled_at');
+    }
+
     public function consents(): HasMany
     {
         return $this->hasMany(ConsultationConsent::class);

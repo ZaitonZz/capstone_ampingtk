@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\ConsultationFaceVerificationLog;
+use App\Models\ConsultationMicrocheck;
 use App\Models\DeepfakeScanLog;
 use App\Models\DoctorPhoto;
 use App\Models\Patient;
@@ -23,6 +24,9 @@ beforeEach(function () {
     config()->set('services.livekit.api_secret', 'test-api-secret');
     config()->set('services.livekit.ws_url', 'wss://livekit.test');
     config()->set('services.pipeline.secret', 'pipeline-test-secret');
+    config()->set('services.pipeline.microcheck_min_interval_seconds', 1);
+    config()->set('services.pipeline.microcheck_max_interval_seconds', 1);
+    config()->set('services.pipeline.microcheck_expiry_seconds', 45);
 });
 
 // ── Pipeline rooms endpoint ────────────────────────────────────────────────────
@@ -80,9 +84,20 @@ it('rejects scan result without signature', function () {
 
 it('stores a scan result posted by the pipeline', function () {
     $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(4),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
 
     $data = [
         'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
         'result' => 'fake',
         'confidence_score' => 0.97,
         'frame_number' => 42,
@@ -96,20 +111,35 @@ it('stores a scan result posted by the pipeline', function () {
     $this->withHeaders(pipelineSignedHeaders($body))
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertCreated()
-        ->assertJsonStructure(['id', 'consultation_id']);
+        ->assertJsonStructure(['id', 'consultation_id', 'microcheck_id', 'latency_ms', 'user_id', 'verified_role']);
 
     expect(
         DeepfakeScanLog::where('consultation_id', $consultation->id)
+            ->where('microcheck_id', $microcheck->id)
+            ->where('user_id', $patientUser->id)
+            ->where('verified_role', 'patient')
             ->where('result', 'fake')
             ->exists()
     )->toBeTrue();
+
+    expect($microcheck->fresh()->status)->toBe('completed');
+    expect($microcheck->fresh()->latency_ms)->not->toBeNull();
 });
 
 it('stores an inconclusive scan result posted by the pipeline', function () {
     $consultation = Consultation::factory()->create();
 
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(3),
+        'claimed_at' => now()->subSeconds(1),
+    ]);
+
     $data = [
         'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $consultation->doctor_id,
+        'verified_role' => 'doctor',
         'result' => 'inconclusive',
         'confidence_score' => 0.51,
         'frame_number' => 11,
@@ -122,10 +152,13 @@ it('stores an inconclusive scan result posted by the pipeline', function () {
     $this->withHeaders(pipelineSignedHeaders($body))
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertCreated()
-        ->assertJsonStructure(['id', 'consultation_id']);
+        ->assertJsonStructure(['id', 'consultation_id', 'microcheck_id', 'latency_ms', 'user_id', 'verified_role']);
 
     expect(
         DeepfakeScanLog::where('consultation_id', $consultation->id)
+            ->where('microcheck_id', $microcheck->id)
+            ->where('user_id', $consultation->doctor_id)
+            ->where('verified_role', 'doctor')
             ->where('result', 'inconclusive')
             ->exists()
     )->toBeTrue();
@@ -134,6 +167,9 @@ it('stores an inconclusive scan result posted by the pipeline', function () {
 it('rejects scan result with invalid data', function () {
     $data = [
         'consultation_id' => 9999999,
+        'microcheck_id' => 9999999,
+        'user_id' => 9999999,
+        'verified_role' => 'patient',
         'result' => 'maybe',
         'confidence_score' => 2.5,
     ];
@@ -143,6 +179,200 @@ it('rejects scan result with invalid data', function () {
     $this->withHeaders(pipelineSignedHeaders($body))
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertUnprocessable();
+});
+
+it('rejects scan result when microcheck has not been claimed', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->create([
+        'consultation_id' => $consultation->id,
+        'status' => 'pending',
+        'scheduled_at' => now()->subSeconds(5),
+        'claimed_at' => null,
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'real',
+        'confidence_score' => 0.92,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertUnprocessable()
+        ->assertJson([
+            'message' => 'Microcheck must be claimed before scan result submission.',
+        ]);
+
+    expect(DeepfakeScanLog::where('microcheck_id', $microcheck->id)->exists())->toBeFalse();
+    expect($microcheck->fresh()->status)->toBe('pending');
+});
+
+it('rejects scan result when microcheck is scheduled in the future', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->addSeconds(10),
+        'claimed_at' => now()->subSecond(),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'real',
+        'confidence_score' => 0.88,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertUnprocessable()
+        ->assertJson([
+            'message' => 'Microcheck is not yet due for scan result submission.',
+        ]);
+
+    expect(DeepfakeScanLog::where('microcheck_id', $microcheck->id)->exists())->toBeFalse();
+    expect($microcheck->fresh()->status)->toBe('claimed');
+});
+
+it('expires overdue pending checks before scheduling next microcheck after scan result', function () {
+    $consultation = Consultation::factory()->teleconsultation()->ongoing()->create([
+        'livekit_room_name' => 'consultation-expiry-room',
+        'livekit_room_status' => 'room_ready',
+    ]);
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $overduePending = ConsultationMicrocheck::factory()->create([
+        'consultation_id' => $consultation->id,
+        'status' => 'pending',
+        'scheduled_at' => now()->subMinutes(2),
+    ]);
+
+    $claimedDue = ConsultationMicrocheck::factory()->claimed()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(5),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $claimedDue->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'real',
+        'confidence_score' => 0.93,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated();
+
+    expect($overduePending->fresh()->status)->toBe('expired');
+    expect($claimedDue->fresh()->status)->toBe('completed');
+    expect(
+        ConsultationMicrocheck::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('status', 'pending')
+            ->count()
+    )->toBe(1);
+    expect(
+        ConsultationMicrocheck::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('status', 'pending')
+            ->first()
+            ?->id
+    )->not->toBe($overduePending->id);
+});
+
+it('claims a due microcheck for an identified participant', function () {
+    $consultation = Consultation::factory()->teleconsultation()->ongoing()->create([
+        'livekit_room_name' => 'consultation-claim-room',
+        'livekit_room_status' => 'room_ready',
+    ]);
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->create([
+        'consultation_id' => $consultation->id,
+        'status' => 'pending',
+        'scheduled_at' => now()->subSecond(),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+    ];
+
+    $response = $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.microchecks.claim'), $data)
+        ->assertOk()
+        ->assertJson(['claimed' => true]);
+
+    expect($response->json('microcheck.id'))->toBe($microcheck->id);
+    expect($microcheck->fresh()->status)->toBe('claimed');
+});
+
+it('returns already_claimed state when claim is retried for an active claimed microcheck', function () {
+    $consultation = Consultation::factory()->teleconsultation()->ongoing()->create([
+        'livekit_room_name' => 'consultation-already-claimed-room',
+        'livekit_room_status' => 'room_ready',
+    ]);
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(3),
+        'claimed_at' => now()->subSecond(),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+    ];
+
+    $response = $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.microchecks.claim'), $data)
+        ->assertOk()
+        ->assertJson([
+            'claimed' => false,
+            'reason' => 'already_claimed',
+        ]);
+
+    expect($response->json('microcheck.id'))->toBe($microcheck->id);
+    expect($response->json('microcheck.status'))->toBe('claimed');
+    expect($response->json('next_scheduled_at'))->toBe($microcheck->scheduled_at?->toIso8601String());
+});
+
+it('returns identity_required when microcheck claim has no role metadata', function () {
+    $consultation = Consultation::factory()->teleconsultation()->ongoing()->create([
+        'livekit_room_name' => 'consultation-identity-room',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.microchecks.claim'), $data)
+        ->assertOk()
+        ->assertJson([
+            'claimed' => false,
+            'reason' => 'identity_required',
+        ]);
 });
 
 // ── Patient face endpoint ─────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Separator } from '@/components/ui/separator';
-import type { ReactNode } from 'react';
 
 type TelemedicineLoginLayoutProps = {
     title: string;
