@@ -14,6 +14,9 @@ class StoreDeepfakeScanLogRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'microcheck_id' => ['nullable', 'integer', 'exists:consultation_microchecks,id'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'verified_role' => ['nullable', 'string', 'in:patient,doctor'],
             'result' => ['required', 'in:real,fake,inconclusive'],
             'confidence_score' => ['nullable', 'numeric', 'between:0,1'],
             'frame_path' => ['nullable', 'string', 'max:500'],
