@@ -42,10 +42,17 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         match ($eventType) {
-            'participant_joined', 'participant_left' => $consultation->forceFill([
+            'participant_joined' => $consultation->forceFill([
+                'status' => in_array($consultation->status, ['pending', 'scheduled'], true) ? 'ongoing' : $consultation->status,
+                'started_at' => $consultation->started_at ?? now(),
+                'livekit_last_activity_at' => now(),
+            ])->save(),
+            'participant_left' => $consultation->forceFill([
                 'livekit_last_activity_at' => now(),
             ])->save(),
             'room_finished' => $consultation->forceFill([
+                'status' => $consultation->status === 'ongoing' ? 'completed' : $consultation->status,
+                'ended_at' => $consultation->ended_at ?? now(),
                 'livekit_room_status' => 'ended',
                 'livekit_ended_at' => now(),
                 'livekit_last_activity_at' => now(),

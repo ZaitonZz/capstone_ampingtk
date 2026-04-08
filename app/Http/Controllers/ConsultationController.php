@@ -20,7 +20,13 @@ class ConsultationController extends Controller
         $this->authorize('viewAny', Consultation::class);
 
         $consultations = Consultation::query()
-            ->with(['patient', 'doctor'])
+            ->with(['patient', 'doctor', 'latestMicrocheck'])
+            ->withMin([
+                'microchecks as next_microcheck_due_at' => fn ($q) => $q->where('status', 'pending'),
+            ], 'scheduled_at')
+            ->withAvg([
+                'microchecks as avg_microcheck_latency_ms' => fn ($q) => $q->where('status', 'completed'),
+            ], 'latency_ms')
             ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -81,7 +87,8 @@ class ConsultationController extends Controller
             'note',
             'vitalSigns',
             'prescriptions',
-            'deepfakeScanLogs',
+            'deepfakeScanLogs' => fn ($q) => $q->with('detectedUser:id,name')->latest('scanned_at')->limit(50),
+            'microchecks' => fn ($q) => $q->latest('scheduled_at')->limit(50),
         ]);
 
         return Inertia::render('consultations/show', [
