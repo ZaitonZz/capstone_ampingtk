@@ -27,7 +27,7 @@ class PipelineScanResultController extends Controller
             'frame_number' => ['nullable', 'integer', 'min:0'],
             'model_version' => ['nullable', 'string', 'max:100'],
             'flagged' => ['sometimes', 'boolean'],
-            'scanned_at' => ['nullable', 'date'],
+            'scanned_at' => ['nullable', 'date', 'before_or_equal:now'],
         ]);
 
         $consultation = Consultation::query()
@@ -56,15 +56,21 @@ class PipelineScanResultController extends Controller
             ], 422);
         }
 
-        if (! in_array($microcheck->status, ['pending', 'claimed'], true)) {
+        if ($microcheck->status !== 'claimed') {
             return response()->json([
-                'message' => 'Microcheck is no longer claimable for scan result submission.',
+                'message' => 'Microcheck must be claimed before scan result submission.',
             ], 422);
         }
 
         $completedAt = isset($validated['scanned_at'])
             ? Carbon::parse($validated['scanned_at'])
             : now();
+
+        if ($microcheck->scheduled_at === null || $microcheck->scheduled_at->greaterThan($completedAt)) {
+            return response()->json([
+                'message' => 'Microcheck is not yet due for scan result submission.',
+            ], 422);
+        }
 
         $completedMicrocheck = $this->microcheckService->completeCheck($microcheck, $completedAt);
         $flagged = $validated['flagged'] ?? ($validated['result'] === 'fake');
