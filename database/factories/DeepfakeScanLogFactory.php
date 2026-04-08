@@ -14,6 +14,9 @@ class DeepfakeScanLogFactory extends Factory
     {
         return [
             'consultation_id' => Consultation::factory(),
+            'microcheck_id' => null,
+            'user_id' => null,
+            'verified_role' => null,
             'result' => fake()->randomElement(['real', 'fake', 'inconclusive']),
             'confidence_score' => fake()->randomFloat(4, 0.0, 1.0),
             'frame_path' => fake()->optional(0.7)->filePath(),
