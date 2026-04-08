@@ -59,9 +59,24 @@ class PipelineMicrocheckController extends Controller
         $microcheck = $this->microcheckService->claimDueCheck($consultation, $referenceTime);
 
         if ($microcheck === null) {
+            $activeCheck = $this->microcheckService->activeCheck($consultation);
+            $reason = match (true) {
+                $activeCheck === null => 'no_active_microcheck',
+                $activeCheck->status === 'claimed' => 'already_claimed',
+                default => 'not_due',
+            };
+
             return response()->json([
                 'claimed' => false,
-                'microcheck' => null,
+                'reason' => $reason,
+                'microcheck' => $activeCheck === null ? null : [
+                    'id' => $activeCheck->id,
+                    'consultation_id' => $activeCheck->consultation_id,
+                    'status' => $activeCheck->status,
+                    'scheduled_at' => $activeCheck->scheduled_at?->toIso8601String(),
+                    'claimed_at' => $activeCheck->claimed_at?->toIso8601String(),
+                    'expires_at' => $activeCheck->expires_at?->toIso8601String(),
+                ],
                 'next_scheduled_at' => $this->microcheckService->nextPendingScheduledAt($consultation)?->toIso8601String(),
             ]);
         }
