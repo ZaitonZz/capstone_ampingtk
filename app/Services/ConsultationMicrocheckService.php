@@ -35,11 +35,13 @@ class ConsultationMicrocheckService
 
         return DB::transaction(function () use ($consultation, $referenceTime): ConsultationMicrocheck {
             Consultation::query()->whereKey($consultation->id)->lockForUpdate()->firstOrFail();
+            $this->expirePendingChecks($consultation, $referenceTime);
 
             $activeCheck = ConsultationMicrocheck::query()
                 ->where('consultation_id', $consultation->id)
                 ->whereIn('status', ['pending', 'claimed'])
                 ->orderBy('scheduled_at')
+                ->lockForUpdate()
                 ->first();
 
             if ($activeCheck !== null) {
@@ -122,11 +124,20 @@ class ConsultationMicrocheckService
     {
         $nextPending = ConsultationMicrocheck::query()
             ->where('consultation_id', $consultation->id)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'claimed'])
             ->orderBy('scheduled_at')
             ->first();
 
         return $nextPending?->scheduled_at;
+    }
+
+    public function activeCheck(Consultation $consultation): ?ConsultationMicrocheck
+    {
+        return ConsultationMicrocheck::query()
+            ->where('consultation_id', $consultation->id)
+            ->whereIn('status', ['pending', 'claimed'])
+            ->orderBy('scheduled_at')
+            ->first();
     }
 
     private function createPendingCheck(Consultation $consultation, CarbonInterface $referenceTime): ConsultationMicrocheck
