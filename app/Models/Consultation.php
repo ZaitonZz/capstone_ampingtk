@@ -96,6 +96,11 @@ class Consultation extends Model
         return $this->hasMany(DeepfakeScanLog::class);
     }
 
+    public function deepfakeEscalations(): HasMany
+    {
+        return $this->hasMany(DeepfakeEscalation::class);
+    }
+
     public function faceVerificationLogs(): HasMany
     {
         return $this->hasMany(ConsultationFaceVerificationLog::class);

@@ -12,6 +12,8 @@ class ConsultationMicrocheck extends Model
 
     protected $fillable = [
         'consultation_id',
+        'cycle_key',
+        'target_role',
         'status',
         'scheduled_at',
         'claimed_at',
