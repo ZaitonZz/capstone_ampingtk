@@ -47,22 +47,43 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+function toDatetimeLocal(iso: string | null): string {
+    if (!iso) {
+        return '';
+    }
+
+    const date = new Date(iso);
+
+    return (
+        [
+            date.getFullYear(),
+            String(date.getMonth() + 1).padStart(2, '0'),
+            String(date.getDate()).padStart(2, '0'),
+        ].join('-') +
+        'T' +
+        [
+            String(date.getHours()).padStart(2, '0'),
+            String(date.getMinutes()).padStart(2, '0'),
+        ].join(':')
+    );
+}
+
 export default function MedicalStaffDashboardPage() {
     const { metrics, pending_consultations, recent_registrations } =
         usePage<PageProps>().props;
 
     function approveConsultation(consultationId: number) {
-        router.patch(ConsultationController.approve.url(consultationId), {}, {
-            preserveScroll: true,
-        });
+        router.patch(
+            ConsultationController.approve.url(consultationId),
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
     }
 
     function rescheduleConsultation(consultation: PendingConsultation) {
-        const suggestedDate = consultation.scheduled_at
-            ? new Date(consultation.scheduled_at)
-                  .toISOString()
-                  .slice(0, 16)
-            : '';
+        const suggestedDate = toDatetimeLocal(consultation.scheduled_at);
 
         const input = window.prompt(
             'Enter new schedule (YYYY-MM-DDTHH:mm)',
@@ -104,7 +125,8 @@ export default function MedicalStaffDashboardPage() {
                         Medical Staff Dashboard
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Registration, scheduling, and care coordination workspace.
+                        Registration, scheduling, and care coordination
+                        workspace.
                     </p>
                 </section>
 
@@ -147,10 +169,18 @@ export default function MedicalStaffDashboardPage() {
                             Register new patients and maintain demographics.
                         </p>
                         <Button asChild className="mt-4 w-full">
-                            <Link href="/staff/patients/create">Register Patient</Link>
+                            <Link href="/staff/patients/create">
+                                Register Patient
+                            </Link>
                         </Button>
-                        <Button asChild variant="outline" className="mt-2 w-full">
-                            <Link href="/staff/patients">Open Patient List</Link>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="mt-2 w-full"
+                        >
+                            <Link href="/staff/patients">
+                                Open Patient List
+                            </Link>
                         </Button>
                     </div>
 
@@ -160,13 +190,22 @@ export default function MedicalStaffDashboardPage() {
                             Consultation Desk
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Manage scheduling and pending consultation approvals.
+                            Manage scheduling and pending consultation
+                            approvals.
                         </p>
                         <Button asChild className="mt-4 w-full">
-                            <Link href="/consultations">Open Consultations</Link>
+                            <Link href="/consultations">
+                                Open Consultations
+                            </Link>
                         </Button>
-                        <Button asChild variant="outline" className="mt-2 w-full">
-                            <Link href="/consultations/calendar">Open Calendar</Link>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="mt-2 w-full"
+                        >
+                            <Link href="/consultations/calendar">
+                                Open Calendar
+                            </Link>
                         </Button>
                     </div>
 
@@ -176,9 +215,14 @@ export default function MedicalStaffDashboardPage() {
                             Care Coordination
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Monitor today's load and prioritize pending operations.
+                            Monitor today's load and prioritize pending
+                            operations.
                         </p>
-                        <Button asChild variant="outline" className="mt-4 w-full">
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="mt-4 w-full"
+                        >
                             <Link href={ConsultationController.calendar.url()}>
                                 View Workload Calendar
                             </Link>
@@ -254,7 +298,11 @@ export default function MedicalStaffDashboardPage() {
                                         >
                                             Cancel
                                         </Button>
-                                        <Button size="sm" variant="outline" asChild>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            asChild
+                                        >
                                             <Link
                                                 href={ConsultationController.show.url(
                                                     consultation.id,
@@ -283,8 +331,13 @@ export default function MedicalStaffDashboardPage() {
                             )}
 
                             {recent_registrations.map((patient) => (
-                                <div key={patient.id} className="rounded-xl border p-3">
-                                    <p className="text-sm font-medium">{patient.name}</p>
+                                <div
+                                    key={patient.id}
+                                    className="rounded-xl border p-3"
+                                >
+                                    <p className="text-sm font-medium">
+                                        {patient.name}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">
                                         Registered:{' '}
                                         {patient.registered_at
