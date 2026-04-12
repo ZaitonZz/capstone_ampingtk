@@ -83,11 +83,11 @@ export default function PrivacyPolicy() {
                                 </div>
                             </div>
 
-                            <div className="relative min-h-104 overflow-hidden bg-emerald-950">
+                            <div className="relative min-h-[26rem] overflow-hidden bg-emerald-950">
                                 <img
                                     src="/images/Data_privacy_1.png"
                                     alt="Data privacy illustration"
-                                    className="absolute inset-0 h-full w-full object-cover object-center opacity-82"
+                                    className="absolute inset-0 h-full w-full object-cover object-center opacity-[0.82]"
                                 />
                                 <div className="absolute inset-0 bg-linear-to-t from-emerald-950 via-emerald-950/60 to-transparent" />
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_36%)]" />
