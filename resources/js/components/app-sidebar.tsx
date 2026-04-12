@@ -8,6 +8,7 @@ import {
     ClipboardList,
     Stethoscope,
     Pill,
+    ShieldAlert,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
 import { dashboard as patientDashboard } from '@/routes/patient';
@@ -51,6 +53,7 @@ export function AppSidebar() {
         user.role === 'doctor' ||
         user.role === 'admin' ||
         user.role === 'medicalstaff';
+    const isAdmin = user.role === 'admin';
     const dashboardHref = isPatient
         ? patientDashboard()
         : user.role === 'doctor'
@@ -102,6 +105,14 @@ export function AppSidebar() {
             title: 'Prescriptions',
             href: '/patient/prescriptions',
             icon: Pill,
+        });
+    }
+
+    if (isAdmin) {
+        mainNavItems.push({
+            title: 'Deepfake Alerts',
+            href: adminDeepfakeAlerts(),
+            icon: ShieldAlert,
         });
     }
 

@@ -1,13 +1,45 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+    AlertTriangle,
+    Edit,
+    Trash2,
+    CheckCircle,
+    ShieldCheck,
+    Video,
+} from 'lucide-react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation, ConsultationStatus } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationDeepfakeEscalation,
+    ConsultationStatus,
+} from '@/types/consultation';
+
+const CANCELLATION_REASON_PRESETS = [
+    'Identity verification failed after 5 straight fake checks',
+    'High deepfake confidence persisted across consecutive scans',
+    'Patient identity could not be safely validated',
+    'Potential impersonation risk remains unresolved',
+    'Other',
+] as const;
+
+type CancellationReasonPreset = (typeof CANCELLATION_REASON_PRESETS)[number];
 
 const MICROCHECK_VARIANT: Record<
     'pending' | 'claimed' | 'completed' | 'expired',
@@ -58,6 +90,20 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default function ConsultationShow({ consultation }: Props) {
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
+    const escalationTimeline = consultation.deepfake_escalations ?? [];
+    const openDoctorDecisions = escalationTimeline.filter(
+        (escalation) =>
+            escalation.type === 'doctor_decision' &&
+            escalation.status === 'open',
+    );
+    const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+    const [pendingEscalationId, setPendingEscalationId] = useState<number | null>(
+        null,
+    );
+    const [selectedReasonPreset, setSelectedReasonPreset] =
+        useState<CancellationReasonPreset>(CANCELLATION_REASON_PRESETS[0]);
+    const [customCancellationReason, setCustomCancellationReason] =
+        useState('');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -75,6 +121,72 @@ export default function ConsultationShow({ consultation }: Props) {
 
     function handleApprove() {
         router.patch(ConsultationController.approve.url(consultation.id));
+    }
+
+    function handleDeepfakeDecision(escalationId: number) {
+        router.patch(
+            ConsultationController.decideDeepfakeEscalation.url(
+                consultation.id,
+            ),
+            {
+                escalation_id: escalationId,
+                decision: 'continue',
+            },
+            {
+                preserveScroll: true,
+            },
+        );
+    }
+
+    function openCancelDecisionDialog(escalationId: number) {
+        setPendingEscalationId(escalationId);
+        setSelectedReasonPreset(CANCELLATION_REASON_PRESETS[0]);
+        setCustomCancellationReason('');
+        setIsCancelDialogOpen(true);
+    }
+
+    function closeCancelDecisionDialog() {
+        setIsCancelDialogOpen(false);
+        setPendingEscalationId(null);
+        setCustomCancellationReason('');
+    }
+
+    const resolvedCancellationReason = useMemo(() => {
+        if (selectedReasonPreset === 'Other') {
+            return customCancellationReason.trim();
+        }
+
+        return selectedReasonPreset;
+    }, [customCancellationReason, selectedReasonPreset]);
+
+    const canSubmitCancellationDecision =
+        pendingEscalationId !== null && resolvedCancellationReason.length > 0;
+
+    function submitCancelDecision() {
+        if (pendingEscalationId === null || !canSubmitCancellationDecision) {
+            return;
+        }
+
+        router.patch(
+            ConsultationController.decideDeepfakeEscalation.url(
+                consultation.id,
+            ),
+            {
+                escalation_id: pendingEscalationId,
+                decision: 'cancel',
+                cancellation_reason: resolvedCancellationReason,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    closeCancelDecisionDialog();
+                },
+            },
+        );
+    }
+
+    function formatEscalationType(type: ConsultationDeepfakeEscalation['type']) {
+        return type === 'admin_alert' ? 'Admin Alert' : 'Doctor Decision';
     }
 
     return (
@@ -152,6 +264,47 @@ export default function ConsultationShow({ consultation }: Props) {
                         </Button>
                     </div>
                 </div>
+
+                {openDoctorDecisions.length > 0 && (
+                    <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+                        <div className="mb-3 flex items-start gap-3">
+                            <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
+                            <div>
+                                <p className="text-sm font-semibold text-destructive">
+                                    Patient has reached 5 straight fake scans
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    Decide whether this consultation should
+                                    continue or be cancelled.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() =>
+                                    handleDeepfakeDecision(
+                                        openDoctorDecisions[0].id,
+                                    )
+                                }
+                            >
+                                Continue Consultation
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() =>
+                                    openCancelDecisionDialog(
+                                        openDoctorDecisions[0].id,
+                                    )
+                                }
+                            >
+                                Cancel Consultation
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
@@ -272,6 +425,9 @@ export default function ConsultationShow({ consultation }: Props) {
                                             Status
                                         </th>
                                         <th className="px-2 py-2 font-medium">
+                                            Role
+                                        </th>
+                                        <th className="px-2 py-2 font-medium">
                                             Scheduled
                                         </th>
                                         <th className="px-2 py-2 font-medium">
@@ -298,6 +454,9 @@ export default function ConsultationShow({ consultation }: Props) {
                                                         .toUpperCase() +
                                                         check.status.slice(1)}
                                                 </Badge>
+                                            </td>
+                                            <td className="px-2 py-2 text-muted-foreground">
+                                                {check.target_role ?? '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {new Date(
@@ -403,7 +562,156 @@ export default function ConsultationShow({ consultation }: Props) {
                         </div>
                     )}
                 </div>
+
+                <div className="mt-4 rounded-xl border p-4">
+                    <h2 className="mb-3 text-base font-semibold">
+                        Escalation Timeline
+                    </h2>
+
+                    {escalationTimeline.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No escalation events recorded yet.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {escalationTimeline.map((escalation) => (
+                                <div
+                                    key={escalation.id}
+                                    className="rounded-lg border p-3"
+                                >
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant="outline">
+                                            {formatEscalationType(
+                                                escalation.type,
+                                            )}
+                                        </Badge>
+                                        <Badge
+                                            variant={
+                                                escalation.status === 'open'
+                                                    ? 'destructive'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {escalation.status}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                            {new Date(
+                                                escalation.created_at,
+                                            ).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
+                                        <span>
+                                            Triggered by {escalation.triggered_role}{' '}
+                                            ({escalation.streak_count} straight
+                                            fake){' '}
+                                            {escalation.triggered_by?.name
+                                                ? `- ${escalation.triggered_by.name}`
+                                                : ''}
+                                        </span>
+                                        {escalation.decision && (
+                                            <span>
+                                                Decision: {escalation.decision}
+                                                {escalation.resolver?.name
+                                                    ? ` by ${escalation.resolver.name}`
+                                                    : ''}
+                                                {escalation.resolved_at
+                                                    ? ` at ${new Date(escalation.resolved_at).toLocaleString()}`
+                                                    : ''}
+                                            </span>
+                                        )}
+                                        {escalation.notes && (
+                                            <span>
+                                                Notes: {escalation.notes}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
+
+            <Dialog
+                open={isCancelDialogOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeCancelDecisionDialog();
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Confirm Consultation Cancellation
+                        </DialogTitle>
+                        <DialogDescription>
+                            Select a reason for cancelling this consultation
+                            after the deepfake escalation.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                        <Label>Cancellation Reason</Label>
+                        <div className="flex flex-wrap gap-2">
+                            {CANCELLATION_REASON_PRESETS.map((reason) => (
+                                <Button
+                                    key={reason}
+                                    type="button"
+                                    variant={
+                                        selectedReasonPreset === reason
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    size="sm"
+                                    onClick={() =>
+                                        setSelectedReasonPreset(reason)
+                                    }
+                                >
+                                    {reason}
+                                </Button>
+                            ))}
+                        </div>
+
+                        {selectedReasonPreset === 'Other' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="custom-cancel-reason">
+                                    Custom Reason
+                                </Label>
+                                <Input
+                                    id="custom-cancel-reason"
+                                    value={customCancellationReason}
+                                    onChange={(event) =>
+                                        setCustomCancellationReason(
+                                            event.target.value,
+                                        )
+                                    }
+                                    placeholder="Enter cancellation reason"
+                                />
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={closeCancelDecisionDialog}
+                        >
+                            Back
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={!canSubmitCancellationDecision}
+                            onClick={submitCancelDecision}
+                        >
+                            Confirm Cancellation
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
