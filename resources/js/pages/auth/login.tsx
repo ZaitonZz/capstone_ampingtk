@@ -3,6 +3,7 @@ import { ArrowLeft, Camera, Zap } from 'lucide-react';
 import { useState } from 'react';
 import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
 import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
+import DataPrivacyNoticeDialog from '@/components/data-privacy-notice-dialog';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
@@ -208,6 +209,8 @@ export default function Login({
             subtitle={isFaceLogin ? "Secure facial recognition login" : "Secure access for doctors and patients"}
         >
             <Head title={isFaceLogin ? "Face Login" : "Log in"} />
+
+            <DataPrivacyNoticeDialog />
 
             <div className="relative w-full overflow-hidden">
                 <div
