@@ -32,6 +32,8 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
+Route::inertia('privacy-policy', 'privacy-policy')->name('privacy-policy');
+
 // ── Email OTP Authentication Routes ──────────────────────────────────────────
 // Step 1: Start email/password login (validates credentials, sends OTP)
 Route::post('/auth/email-login-start', [OtpVerificationController::class, 'startEmailLogin'])
