@@ -15,6 +15,7 @@ use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
 use App\Models\Consultation;
 use App\Models\DeepfakeScanLog;
+use App\Models\Patient;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -179,7 +180,42 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     Route::get('medicalstaff/dashboard', function () {
         abort_unless(auth()->user()?->isMedicalStaff(), 403, 'Access restricted to medical staff accounts.');
 
-        return inertia('medicalstaff/dashboard');
+        $pendingConsultations = Consultation::query()
+            ->with(['patient:id,first_name,last_name', 'doctor:id,name'])
+            ->where('status', 'pending')
+            ->orderBy('scheduled_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (Consultation $consultation) => [
+                'id' => $consultation->id,
+                'patient_name' => $consultation->patient?->full_name ?? 'Unknown Patient',
+                'doctor_name' => $consultation->doctor?->name ?? 'Unassigned',
+                'type' => $consultation->type,
+                'scheduled_at' => $consultation->scheduled_at?->toIso8601String(),
+                'reschedule_url' => route('consultations.reschedule', $consultation),
+                'cancel_url' => route('consultations.cancel', $consultation),
+            ]);
+
+        $recentRegistrations = Patient::query()
+            ->latest('created_at')
+            ->limit(5)
+            ->get(['id', 'first_name', 'last_name', 'created_at', 'user_id'])
+            ->map(fn (Patient $patient) => [
+                'id' => $patient->id,
+                'name' => $patient->full_name,
+                'registered_at' => $patient->created_at?->toIso8601String(),
+                'has_account' => $patient->user_id !== null,
+            ]);
+
+        return inertia('medicalstaff/dashboard', [
+            'metrics' => [
+                'pending_consultations' => Consultation::query()->where('status', 'pending')->count(),
+                'todays_consultations' => Consultation::query()->whereDate('scheduled_at', today())->count(),
+                'patients_without_account' => Patient::query()->whereNull('user_id')->count(),
+            ],
+            'pending_consultations' => $pendingConsultations,
+            'recent_registrations' => $recentRegistrations,
+        ]);
     })->name('medicalstaff.dashboard');
 });
 
