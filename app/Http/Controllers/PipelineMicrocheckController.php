@@ -56,10 +56,17 @@ class PipelineMicrocheckController extends Controller
             ], 422);
         }
 
-        $microcheck = $this->microcheckService->claimDueCheck($consultation, $referenceTime);
+        $microcheck = $this->microcheckService->claimDueCheck(
+            $consultation,
+            $validated['verified_role'],
+            $referenceTime,
+        );
 
         if ($microcheck === null) {
-            $activeCheck = $this->microcheckService->activeCheck($consultation);
+            $activeCheck = $this->microcheckService->activeCheckForRole(
+                $consultation,
+                $validated['verified_role'],
+            );
             $reason = match (true) {
                 $activeCheck === null => 'no_active_microcheck',
                 $activeCheck->status === 'claimed' => 'already_claimed',
@@ -72,6 +79,8 @@ class PipelineMicrocheckController extends Controller
                 'microcheck' => $activeCheck === null ? null : [
                     'id' => $activeCheck->id,
                     'consultation_id' => $activeCheck->consultation_id,
+                    'cycle_key' => $activeCheck->cycle_key,
+                    'target_role' => $activeCheck->target_role,
                     'status' => $activeCheck->status,
                     'scheduled_at' => $activeCheck->scheduled_at?->toIso8601String(),
                     'claimed_at' => $activeCheck->claimed_at?->toIso8601String(),
@@ -86,6 +95,8 @@ class PipelineMicrocheckController extends Controller
             'microcheck' => [
                 'id' => $microcheck->id,
                 'consultation_id' => $microcheck->consultation_id,
+                'cycle_key' => $microcheck->cycle_key,
+                'target_role' => $microcheck->target_role,
                 'status' => $microcheck->status,
                 'scheduled_at' => $microcheck->scheduled_at?->toIso8601String(),
                 'claimed_at' => $microcheck->claimed_at?->toIso8601String(),

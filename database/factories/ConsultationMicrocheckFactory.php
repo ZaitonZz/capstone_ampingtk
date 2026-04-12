@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Consultation;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ConsultationMicrocheck>
@@ -19,6 +20,8 @@ class ConsultationMicrocheckFactory extends Factory
     {
         return [
             'consultation_id' => Consultation::factory(),
+            'cycle_key' => null,
+            'target_role' => null,
             'status' => 'pending',
             'scheduled_at' => now()->subSeconds(5),
             'claimed_at' => null,
@@ -43,6 +46,22 @@ class ConsultationMicrocheckFactory extends Factory
             'claimed_at' => now()->subSeconds(4),
             'completed_at' => now()->subSecond(),
             'latency_ms' => 2500,
+        ]);
+    }
+
+    public function forPatientRole(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'target_role' => 'patient',
+            'cycle_key' => $attributes['cycle_key'] ?? (string) Str::uuid(),
+        ]);
+    }
+
+    public function forDoctorRole(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'target_role' => 'doctor',
+            'cycle_key' => $attributes['cycle_key'] ?? (string) Str::uuid(),
         ]);
     }
 }

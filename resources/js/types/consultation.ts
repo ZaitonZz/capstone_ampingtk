@@ -27,6 +27,8 @@ export type MicrocheckStatus = 'pending' | 'claimed' | 'completed' | 'expired';
 export interface ConsultationMicrocheck {
     id: number;
     consultation_id: number;
+    cycle_key: string | null;
+    target_role: 'patient' | 'doctor' | null;
     status: MicrocheckStatus;
     scheduled_at: string;
     claimed_at: string | null;
@@ -54,6 +56,30 @@ export interface DeepfakeScanLog {
         id: number;
         name: string;
     } | null;
+}
+
+export interface ConsultationDeepfakeEscalation {
+    id: number;
+    consultation_id: number;
+    triggered_by_user_id: number | null;
+    triggered_role: 'patient' | 'doctor';
+    type: 'admin_alert' | 'doctor_decision';
+    streak_count: number;
+    status: 'open' | 'resolved';
+    decision: 'continue' | 'cancel' | null;
+    resolved_by: number | null;
+    resolved_at: string | null;
+    notes: string | null;
+    triggered_by?: {
+        id: number;
+        name: string;
+    } | null;
+    resolver?: {
+        id: number;
+        name: string;
+    } | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface Consultation {
@@ -84,6 +110,7 @@ export interface Consultation {
     doctor?: DoctorSummary;
     microchecks?: ConsultationMicrocheck[];
     deepfake_scan_logs?: DeepfakeScanLog[];
+    deepfake_escalations?: ConsultationDeepfakeEscalation[];
     created_at: string;
     updated_at: string;
 }

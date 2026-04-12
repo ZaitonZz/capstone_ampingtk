@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminDeepfakeAlertController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
@@ -177,6 +178,11 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
         Route::get('admin/dashboard', function () {
             return inertia('dashboard');
         })->name('admin.dashboard');
+
+        Route::get('admin/alerts/deepfake', [AdminDeepfakeAlertController::class, 'index'])
+            ->name('admin.deepfake-alerts.index');
+        Route::patch('admin/alerts/deepfake/{escalation}/resolve', [AdminDeepfakeAlertController::class, 'resolve'])
+            ->name('admin.deepfake-alerts.resolve');
     });
 
     // Medical staff-specific dashboard

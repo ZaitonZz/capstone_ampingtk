@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\DeepfakeEscalation;
 use App\Models\Patient;
 use App\Models\User;
 
@@ -85,6 +86,75 @@ it('cannot approve a consultation that is not pending', function () {
     $this->actingAs($doctor)
         ->patch(route('consultations.approve', $consultation))
         ->assertStatus(422);
+});
+
+it('doctor can continue consultation after patient deepfake escalation decision', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+    ]);
+
+    $escalation = DeepfakeEscalation::factory()->patientDecision()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $consultation->patient?->user_id,
+    ]);
+
+    $this->actingAs($doctor)
+        ->patch(route('consultations.deepfake-decision', $consultation), [
+            'escalation_id' => $escalation->id,
+            'decision' => 'continue',
+        ])
+        ->assertRedirect();
+
+    expect($consultation->fresh()->status)->toBe('scheduled');
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
+    expect($escalation->fresh()->decision)->toBe('continue');
+});
+
+it('doctor can cancel consultation after patient deepfake escalation decision', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+    ]);
+
+    $escalation = DeepfakeEscalation::factory()->patientDecision()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $consultation->patient?->user_id,
+    ]);
+
+    $this->actingAs($doctor)
+        ->patch(route('consultations.deepfake-decision', $consultation), [
+            'escalation_id' => $escalation->id,
+            'decision' => 'cancel',
+            'cancellation_reason' => 'Identity verification failed 5 times.',
+        ])
+        ->assertRedirect();
+
+    expect($consultation->fresh()->status)->toBe('cancelled');
+    expect($consultation->fresh()->cancellation_reason)->toBe('Identity verification failed 5 times.');
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
+    expect($escalation->fresh()->decision)->toBe('cancel');
+});
+
+it('admin can view the deepfake alerts page', function () {
+    $admin = User::factory()->admin()->create();
+    $consultation = Consultation::factory()->create();
+
+    DeepfakeEscalation::factory()->doctorAlert()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $consultation->doctor_id,
+    ]);
+
+    $this->actingAsVerified($admin)
+        ->get(route('admin.deepfake-alerts.index'))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('admin/deepfake-alerts')
+                ->has('alerts.data', 1)
+        );
 });
 
 // ── Patient access control ────────────────────────────────────────────────────

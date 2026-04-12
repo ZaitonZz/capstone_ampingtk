@@ -3,11 +3,13 @@
 use App\Models\Consultation;
 use App\Models\ConsultationFaceVerificationLog;
 use App\Models\ConsultationMicrocheck;
+use App\Models\DeepfakeEscalation;
 use App\Models\DeepfakeScanLog;
 use App\Models\DoctorPhoto;
 use App\Models\Patient;
 use App\Models\PatientPhoto;
 use App\Models\User;
+use App\Services\DeepfakeEscalationService;
 
 function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-secret'): array
 {
@@ -87,7 +89,7 @@ it('stores a scan result posted by the pipeline', function () {
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'scheduled_at' => now()->subSeconds(4),
         'claimed_at' => now()->subSeconds(2),
@@ -129,7 +131,7 @@ it('stores a scan result posted by the pipeline', function () {
 it('stores an inconclusive scan result posted by the pipeline', function () {
     $consultation = Consultation::factory()->create();
 
-    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forDoctorRole()->create([
         'consultation_id' => $consultation->id,
         'scheduled_at' => now()->subSeconds(3),
         'claimed_at' => now()->subSeconds(1),
@@ -186,7 +188,7 @@ it('rejects scan result when microcheck has not been claimed', function () {
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $microcheck = ConsultationMicrocheck::factory()->create([
+    $microcheck = ConsultationMicrocheck::factory()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'status' => 'pending',
         'scheduled_at' => now()->subSeconds(5),
@@ -218,7 +220,7 @@ it('rejects scan result when microcheck is scheduled in the future', function ()
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'scheduled_at' => now()->addSeconds(10),
         'claimed_at' => now()->subSecond(),
@@ -252,13 +254,13 @@ it('expires overdue pending checks before scheduling next microcheck after scan 
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $overduePending = ConsultationMicrocheck::factory()->create([
+    $overduePending = ConsultationMicrocheck::factory()->forDoctorRole()->create([
         'consultation_id' => $consultation->id,
         'status' => 'pending',
         'scheduled_at' => now()->subMinutes(2),
     ]);
 
-    $claimedDue = ConsultationMicrocheck::factory()->claimed()->create([
+    $claimedDue = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'scheduled_at' => now()->subSeconds(5),
         'claimed_at' => now()->subSeconds(2),
@@ -284,14 +286,7 @@ it('expires overdue pending checks before scheduling next microcheck after scan 
             ->where('consultation_id', $consultation->id)
             ->where('status', 'pending')
             ->count()
-    )->toBe(1);
-    expect(
-        ConsultationMicrocheck::query()
-            ->where('consultation_id', $consultation->id)
-            ->where('status', 'pending')
-            ->first()
-            ?->id
-    )->not->toBe($overduePending->id);
+    )->toBe(2);
 });
 
 it('claims a due microcheck for an identified participant', function () {
@@ -302,7 +297,7 @@ it('claims a due microcheck for an identified participant', function () {
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $microcheck = ConsultationMicrocheck::factory()->create([
+    $microcheck = ConsultationMicrocheck::factory()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'status' => 'pending',
         'scheduled_at' => now()->subSecond(),
@@ -331,7 +326,7 @@ it('returns already_claimed state when claim is retried for an active claimed mi
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
 
-    $microcheck = ConsultationMicrocheck::factory()->claimed()->create([
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
         'consultation_id' => $consultation->id,
         'scheduled_at' => now()->subSeconds(3),
         'claimed_at' => now()->subSecond(),
@@ -373,6 +368,235 @@ it('returns identity_required when microcheck claim has no role metadata', funct
             'claimed' => false,
             'reason' => 'identity_required',
         ]);
+});
+
+it('creates paired pending microchecks for patient and doctor when a new cycle is initialized', function () {
+    $consultation = Consultation::factory()->teleconsultation()->ongoing()->create([
+        'livekit_room_name' => 'consultation-paired-cycle-room',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.microchecks.claim'), $data)
+        ->assertOk()
+        ->assertJson([
+            'claimed' => false,
+            'reason' => 'identity_required',
+        ]);
+
+    $pendingChecks = ConsultationMicrocheck::query()
+        ->where('consultation_id', $consultation->id)
+        ->where('status', 'pending')
+        ->orderBy('id')
+        ->get();
+
+    expect($pendingChecks)->toHaveCount(2);
+    expect($pendingChecks->pluck('target_role')->sort()->values()->all())->toBe(['doctor', 'patient']);
+    expect($pendingChecks->pluck('cycle_key')->filter()->unique()->count())->toBe(1);
+});
+
+it('rejects scan result when submitted role does not match microcheck target role', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forDoctorRole()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(4),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'real',
+        'confidence_score' => 0.87,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertUnprocessable()
+        ->assertJson([
+            'message' => 'Microcheck role does not match the submitted verification role.',
+        ]);
+
+    expect(DeepfakeScanLog::where('microcheck_id', $microcheck->id)->exists())->toBeFalse();
+    expect($microcheck->fresh()->status)->toBe('claimed');
+});
+
+it('creates an admin escalation when doctor reaches 5 straight fake scans', function () {
+    $consultation = Consultation::factory()->create();
+
+    foreach (range(1, 4) as $offset) {
+        DeepfakeScanLog::factory()->fake()->create([
+            'consultation_id' => $consultation->id,
+            'user_id' => $consultation->doctor_id,
+            'verified_role' => 'doctor',
+            'scanned_at' => now()->subSeconds(20 + $offset),
+        ]);
+    }
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forDoctorRole()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(4),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $consultation->doctor_id,
+        'verified_role' => 'doctor',
+        'result' => 'fake',
+        'confidence_score' => 0.94,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated();
+
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_ADMIN_ALERT)
+            ->where('triggered_role', 'doctor')
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
+
+it('creates a doctor decision escalation when patient reaches 5 straight fake scans', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    foreach (range(1, 4) as $offset) {
+        DeepfakeScanLog::factory()->fake()->create([
+            'consultation_id' => $consultation->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'scanned_at' => now()->subSeconds(20 + $offset),
+        ]);
+    }
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(4),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'fake',
+        'confidence_score' => 0.95,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated();
+
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('triggered_role', 'patient')
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
+
+it('does not create duplicate open doctor decision escalations for the same triggering log', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    foreach (range(1, 4) as $offset) {
+        DeepfakeScanLog::factory()->fake()->create([
+            'consultation_id' => $consultation->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'scanned_at' => now()->subSeconds(20 + $offset),
+        ]);
+    }
+
+    $triggerLog = DeepfakeScanLog::factory()->fake()->create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'scanned_at' => now(),
+    ]);
+
+    $service = app(DeepfakeEscalationService::class);
+
+    $service->handleNewScanLog($triggerLog);
+    $service->handleNewScanLog($triggerLog);
+
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('triggered_role', 'patient')
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
+
+it('does not escalate when a non-fake result breaks the fake streak', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    foreach (range(1, 4) as $offset) {
+        DeepfakeScanLog::factory()->fake()->create([
+            'consultation_id' => $consultation->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'scanned_at' => now()->subSeconds(60 + $offset),
+        ]);
+    }
+
+    DeepfakeScanLog::factory()->real()->create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'scanned_at' => now()->subSeconds(10),
+    ]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
+        'consultation_id' => $consultation->id,
+        'scheduled_at' => now()->subSeconds(4),
+        'claimed_at' => now()->subSeconds(2),
+    ]);
+
+    $data = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'result' => 'fake',
+        'confidence_score' => 0.96,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
+        ->postJson(route('pipeline.scan-results.store'), $data)
+        ->assertCreated();
+
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('triggered_role', 'patient')
+            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->exists()
+    )->toBeFalse();
 });
 
 // ── Patient face endpoint ─────────────────────────────────────────────────────
