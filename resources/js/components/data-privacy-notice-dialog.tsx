@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { ExternalLink, ShieldCheck } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -10,26 +10,10 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-const DATA_PRIVACY_NOTICE_STORAGE_KEY = 'ampingtk:data-privacy-notice-acknowledged';
-
 export default function DataPrivacyNoticeDialog() {
-    const [open, setOpen] = useState(false);
-
-    useEffect(() => {
-        try {
-            setOpen(window.localStorage.getItem(DATA_PRIVACY_NOTICE_STORAGE_KEY) !== 'true');
-        } catch {
-            setOpen(true);
-        }
-    }, []);
+    const [open, setOpen] = useState(true);
 
     const acknowledgeNotice = () => {
-        try {
-            window.localStorage.setItem(DATA_PRIVACY_NOTICE_STORAGE_KEY, 'true');
-        } catch {
-            // Ignore storage failures and still close the dialog.
-        }
-
         setOpen(false);
     };
 
@@ -53,7 +37,7 @@ export default function DataPrivacyNoticeDialog() {
                             alt="AMPING_TK data privacy notice"
                             className="h-full w-full object-contain opacity-90 p-4"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-emerald-950 via-emerald-950/30 to-transparent" />
+                        <div className="absolute inset-0 bg-linear-to-t from-emerald-950 via-emerald-950/30 to-transparent" />
 
                         <div className="absolute inset-x-0 bottom-4 left-0 right-0 flex justify-center">
                             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wide text-white backdrop-blur-sm">
