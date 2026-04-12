@@ -33,22 +33,25 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     // 'calendar' and 'approve' being swallowed by the {consultation} wildcard.
     Route::get('consultations/calendar', [ConsultationController::class, 'calendar'])->name('consultations.calendar');
     Route::patch('consultations/{consultation}/approve', [ConsultationController::class, 'approve'])->name('consultations.approve');
+    Route::patch('consultations/{consultation}/reschedule', [ConsultationController::class, 'reschedule'])->name('consultations.reschedule');
+    Route::patch('consultations/{consultation}/cancel', [ConsultationController::class, 'cancel'])->name('consultations.cancel');
     Route::resource('consultations', ConsultationController::class);
 
     Route::prefix('consultations/{consultation}')->name('consultations.')->group(function () {
+        Route::middleware('doctor.or.admin')->group(function () {
+            // SOAP Notes (one per consultation, upsert via store)
+            Route::get('note', [PatientNoteController::class, 'show'])->name('note.show');
+            Route::post('note', [PatientNoteController::class, 'store'])->name('note.store');
+            Route::patch('note', [PatientNoteController::class, 'update'])->name('note.update');
 
-        // SOAP Notes (one per consultation, upsert via store)
-        Route::get('note', [PatientNoteController::class, 'show'])->name('note.show');
-        Route::post('note', [PatientNoteController::class, 'store'])->name('note.store');
-        Route::patch('note', [PatientNoteController::class, 'update'])->name('note.update');
+            // Vital Signs (one set per consultation, upsert via store)
+            Route::get('vitals', [VitalSignController::class, 'show'])->name('vitals.show');
+            Route::post('vitals', [VitalSignController::class, 'store'])->name('vitals.store');
 
-        // Vital Signs (one set per consultation, upsert via store)
-        Route::get('vitals', [VitalSignController::class, 'show'])->name('vitals.show');
-        Route::post('vitals', [VitalSignController::class, 'store'])->name('vitals.store');
-
-        // Prescriptions (many per consultation)
-        Route::apiResource('prescriptions', PrescriptionController::class)
-            ->only(['index', 'store', 'update', 'destroy']);
+            // Prescriptions (many per consultation)
+            Route::apiResource('prescriptions', PrescriptionController::class)
+                ->only(['index', 'store', 'update', 'destroy']);
+        });
 
         // Deepfake Scan Logs
         Route::get('deepfake-scans', [DeepfakeScanLogController::class, 'index'])->name('deepfake-scans.index');
@@ -57,8 +60,10 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
         Route::patch('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'update'])->name('deepfake-scans.update');
     });
 
-    // ── Doctor Profile ────────────────────────────────────────────────────────
-    Route::get('doctor/profile', [DoctorProfileController::class, 'show'])->name('doctor.profile.show');
-    Route::post('doctor/profile', [DoctorProfileController::class, 'upsert'])->name('doctor.profile.upsert');
-    Route::post('doctor/profile/photo', [DoctorPhotoController::class, 'store'])->name('doctor.profile.photo.store');
+    // ── Doctor Profile (Doctor/Admin only) ───────────────────────────────────
+    Route::middleware('doctor.or.admin')->group(function () {
+        Route::get('doctor/profile', [DoctorProfileController::class, 'show'])->name('doctor.profile.show');
+        Route::post('doctor/profile', [DoctorProfileController::class, 'upsert'])->name('doctor.profile.upsert');
+        Route::post('doctor/profile/photo', [DoctorPhotoController::class, 'store'])->name('doctor.profile.photo.store');
+    });
 });
