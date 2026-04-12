@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Consultation;
 use App\Models\DeepfakeEscalation;
 use App\Models\DeepfakeScanLog;
+use Illuminate\Support\Facades\DB;
 
 class DeepfakeEscalationService
 {
@@ -27,27 +29,38 @@ class DeepfakeEscalationService
             ? DeepfakeEscalation::TYPE_ADMIN_ALERT
             : DeepfakeEscalation::TYPE_DOCTOR_DECISION;
 
-        $alreadyOpen = DeepfakeEscalation::query()
-            ->where('consultation_id', $log->consultation_id)
-            ->where('type', $type)
-            ->where('status', DeepfakeEscalation::STATUS_OPEN)
-            ->exists();
+        DB::transaction(function () use ($log, $type): void {
+            $lockedConsultation = Consultation::query()
+                ->whereKey($log->consultation_id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($alreadyOpen) {
-            return;
-        }
+            if ($lockedConsultation === null) {
+                return;
+            }
 
-        DeepfakeEscalation::query()->create([
-            'consultation_id' => $log->consultation_id,
-            'triggered_by_user_id' => $log->user_id,
-            'triggered_role' => $log->verified_role,
-            'type' => $type,
-            'streak_count' => self::STREAK_THRESHOLD,
-            'status' => DeepfakeEscalation::STATUS_OPEN,
-            'notes' => $log->verified_role === 'doctor'
-                ? 'Doctor reached 5 straight fake scans.'
-                : 'Patient reached 5 straight fake scans; doctor decision is required.',
-        ]);
+            $alreadyOpen = DeepfakeEscalation::query()
+                ->where('consultation_id', $log->consultation_id)
+                ->where('type', $type)
+                ->where('status', DeepfakeEscalation::STATUS_OPEN)
+                ->exists();
+
+            if ($alreadyOpen) {
+                return;
+            }
+
+            DeepfakeEscalation::query()->create([
+                'consultation_id' => $log->consultation_id,
+                'triggered_by_user_id' => $log->user_id,
+                'triggered_role' => $log->verified_role,
+                'type' => $type,
+                'streak_count' => self::STREAK_THRESHOLD,
+                'status' => DeepfakeEscalation::STATUS_OPEN,
+                'notes' => $log->verified_role === 'doctor'
+                    ? 'Doctor reached 5 straight fake scans.'
+                    : 'Patient reached 5 straight fake scans; doctor decision is required.',
+            ]);
+        }, attempts: 5);
     }
 
     private function hasReachedStreakThreshold(DeepfakeScanLog $log, int $threshold): bool

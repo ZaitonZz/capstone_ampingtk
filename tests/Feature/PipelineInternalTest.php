@@ -9,6 +9,7 @@ use App\Models\DoctorPhoto;
 use App\Models\Patient;
 use App\Models\PatientPhoto;
 use App\Models\User;
+use App\Services\DeepfakeEscalationService;
 
 function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-secret'): array
 {
@@ -502,6 +503,42 @@ it('creates a doctor decision escalation when patient reaches 5 straight fake sc
     $this->withHeaders(pipelineSignedHeaders(json_encode($data)))
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertCreated();
+
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('triggered_role', 'patient')
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
+
+it('does not create duplicate open doctor decision escalations for the same triggering log', function () {
+    $consultation = Consultation::factory()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    foreach (range(1, 4) as $offset) {
+        DeepfakeScanLog::factory()->fake()->create([
+            'consultation_id' => $consultation->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'scanned_at' => now()->subSeconds(20 + $offset),
+        ]);
+    }
+
+    $triggerLog = DeepfakeScanLog::factory()->fake()->create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'scanned_at' => now(),
+    ]);
+
+    $service = app(DeepfakeEscalationService::class);
+
+    $service->handleNewScanLog($triggerLog);
+    $service->handleNewScanLog($triggerLog);
 
     expect(
         DeepfakeEscalation::query()
