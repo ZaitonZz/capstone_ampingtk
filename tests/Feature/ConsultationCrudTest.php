@@ -47,10 +47,16 @@ it('doctor sees only their own consultations on the calendar', function () {
 
 it('medical staff can access consultations index', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctorA = User::factory()->doctor()->create();
+    $doctorB = User::factory()->doctor()->create();
+
+    Consultation::factory()->create(['doctor_id' => $doctorA->id]);
+    Consultation::factory()->create(['doctor_id' => $doctorB->id]);
 
     $this->actingAs($medicalStaff)
         ->get(route('consultations.index'))
-        ->assertOk();
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 2));
 });
 
 // ── Approve ───────────────────────────────────────────────────────────────────

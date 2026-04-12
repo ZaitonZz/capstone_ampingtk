@@ -29,7 +29,10 @@ class ConsultationController extends Controller
             ->withAvg([
                 'microchecks as avg_microcheck_latency_ms' => fn ($q) => $q->where('status', 'completed'),
             ], 'latency_ms')
-            ->when(! $request->user()->isAdmin(), fn ($q) => $q->where('doctor_id', $request->user()->id))
+            ->when(
+                ! $request->user()->isAdmin() && ! $request->user()->isMedicalStaff(),
+                fn ($q) => $q->where('doctor_id', $request->user()->id)
+            )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
