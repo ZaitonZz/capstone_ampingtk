@@ -12,6 +12,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        DB::table('users')->where('role', 'medicalstaff')->update(['role' => 'doctor']);
+
         DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'doctor', 'patient') NOT NULL DEFAULT 'doctor'");
     }
 };
