@@ -16,7 +16,7 @@ class EnsureMedicalStaff
         $user = $request->user();
 
         if (! $user || ! $user->isClinicalStaff()) {
-            abort(403, 'Access restricted to medical staff.');
+            abort(403, 'Access restricted to clinical staff.');
         }
 
         return $next($request);
