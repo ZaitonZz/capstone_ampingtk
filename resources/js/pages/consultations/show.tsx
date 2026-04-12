@@ -96,6 +96,10 @@ export default function ConsultationShow({ consultation }: Props) {
             escalation.type === 'doctor_decision' &&
             escalation.status === 'open',
     );
+    const activeDoctorDecision = openDoctorDecisions[0] ?? null;
+    const activeDoctorDecisionStreakLabel = activeDoctorDecision
+        ? `${activeDoctorDecision.streak_count} straight fake scan${activeDoctorDecision.streak_count === 1 ? '' : 's'}`
+        : null;
     const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
     const [pendingEscalationId, setPendingEscalationId] = useState<number | null>(
         null,
@@ -265,18 +269,24 @@ export default function ConsultationShow({ consultation }: Props) {
                     </div>
                 </div>
 
-                {openDoctorDecisions.length > 0 && (
+                {activeDoctorDecision !== null && (
                     <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
                         <div className="mb-3 flex items-start gap-3">
                             <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
                             <div>
                                 <p className="text-sm font-semibold text-destructive">
-                                    Patient has reached 5 straight fake scans
+                                    Patient has reached{' '}
+                                    {activeDoctorDecisionStreakLabel}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                     Decide whether this consultation should
                                     continue or be cancelled.
                                 </p>
+                                {activeDoctorDecision.notes && (
+                                    <p className="text-sm text-muted-foreground">
+                                        {activeDoctorDecision.notes}
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -285,7 +295,7 @@ export default function ConsultationShow({ consultation }: Props) {
                                 variant="outline"
                                 onClick={() =>
                                     handleDeepfakeDecision(
-                                        openDoctorDecisions[0].id,
+                                        activeDoctorDecision.id,
                                     )
                                 }
                             >
@@ -296,7 +306,7 @@ export default function ConsultationShow({ consultation }: Props) {
                                 variant="destructive"
                                 onClick={() =>
                                     openCancelDecisionDialog(
-                                        openDoctorDecisions[0].id,
+                                        activeDoctorDecision.id,
                                     )
                                 }
                             >
