@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\Consultation;
 use App\Models\ConsultationMicrocheck;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ConsultationMicrocheckService
 {
@@ -16,7 +18,7 @@ class ConsultationMicrocheckService
 
         return ConsultationMicrocheck::query()
             ->where('consultation_id', $consultation->id)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'claimed'])
             ->where('scheduled_at', '<=', $expiryCutoff)
             ->update([
                 'status' => 'expired',
@@ -37,10 +39,7 @@ class ConsultationMicrocheckService
             Consultation::query()->whereKey($consultation->id)->lockForUpdate()->firstOrFail();
             $this->expirePendingChecks($consultation, $referenceTime);
 
-            $activeCheck = ConsultationMicrocheck::query()
-                ->where('consultation_id', $consultation->id)
-                ->whereIn('status', ['pending', 'claimed'])
-                ->orderBy('scheduled_at')
+            $activeCheck = $this->activeCheckQuery($consultation)
                 ->lockForUpdate()
                 ->first();
 
@@ -48,31 +47,43 @@ class ConsultationMicrocheckService
                 return $activeCheck;
             }
 
-            return $this->createPendingCheck($consultation, $referenceTime);
+            [$patientCheck] = $this->createPendingPair($consultation, $referenceTime);
+
+            return $patientCheck;
         });
     }
 
-    public function claimDueCheck(Consultation $consultation, ?CarbonInterface $referenceTime = null): ?ConsultationMicrocheck
-    {
+    public function claimDueCheck(
+        Consultation $consultation,
+        string $verifiedRole,
+        ?CarbonInterface $referenceTime = null
+    ): ?ConsultationMicrocheck {
         $referenceTime ??= now();
 
         if (! $this->isEligibleConsultation($consultation)) {
             return null;
         }
 
-        return DB::transaction(function () use ($consultation, $referenceTime): ?ConsultationMicrocheck {
+        if (! in_array($verifiedRole, ['patient', 'doctor'], true)) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($consultation, $verifiedRole, $referenceTime): ?ConsultationMicrocheck {
             Consultation::query()->whereKey($consultation->id)->lockForUpdate()->firstOrFail();
             $this->expirePendingChecks($consultation, $referenceTime);
 
-            $activeCheck = ConsultationMicrocheck::query()
-                ->where('consultation_id', $consultation->id)
-                ->whereIn('status', ['pending', 'claimed'])
-                ->orderBy('scheduled_at')
+            $activeCheck = $this->activeCheckQueryForRole($consultation, $verifiedRole)
                 ->lockForUpdate()
                 ->first();
 
             if ($activeCheck === null) {
-                $this->createPendingCheck($consultation, $referenceTime);
+                $anyActiveCheck = $this->activeCheckQuery($consultation)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($anyActiveCheck === null) {
+                    $this->createPendingPair($consultation, $referenceTime);
+                }
 
                 return null;
             }
@@ -122,34 +133,64 @@ class ConsultationMicrocheckService
 
     public function nextPendingScheduledAt(Consultation $consultation): ?CarbonInterface
     {
-        $nextPending = ConsultationMicrocheck::query()
-            ->where('consultation_id', $consultation->id)
-            ->whereIn('status', ['pending', 'claimed'])
-            ->orderBy('scheduled_at')
-            ->first();
+        $nextPending = $this->activeCheckQuery($consultation)->first();
 
         return $nextPending?->scheduled_at;
     }
 
     public function activeCheck(Consultation $consultation): ?ConsultationMicrocheck
     {
+        return $this->activeCheckQuery($consultation)->first();
+    }
+
+    public function activeCheckForRole(Consultation $consultation, string $verifiedRole): ?ConsultationMicrocheck
+    {
+        return $this->activeCheckQueryForRole($consultation, $verifiedRole)->first();
+    }
+
+    private function createPendingPair(Consultation $consultation, CarbonInterface $referenceTime): array
+    {
+        $scheduledAt = $referenceTime->copy()->addSeconds($this->randomIntervalSeconds());
+        $expiresAt = $scheduledAt->copy()->addSeconds($this->expirySeconds());
+        $cycleKey = (string) Str::uuid();
+
+        $patientCheck = ConsultationMicrocheck::query()->create([
+            'consultation_id' => $consultation->id,
+            'cycle_key' => $cycleKey,
+            'target_role' => 'patient',
+            'status' => 'pending',
+            'scheduled_at' => $scheduledAt,
+            'expires_at' => $expiresAt,
+        ]);
+
+        $doctorCheck = ConsultationMicrocheck::query()->create([
+            'consultation_id' => $consultation->id,
+            'cycle_key' => $cycleKey,
+            'target_role' => 'doctor',
+            'status' => 'pending',
+            'scheduled_at' => $scheduledAt,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return [$patientCheck, $doctorCheck];
+    }
+
+    private function activeCheckQuery(Consultation $consultation): Builder
+    {
         return ConsultationMicrocheck::query()
             ->where('consultation_id', $consultation->id)
             ->whereIn('status', ['pending', 'claimed'])
             ->orderBy('scheduled_at')
-            ->first();
+            ->orderBy('id');
     }
 
-    private function createPendingCheck(Consultation $consultation, CarbonInterface $referenceTime): ConsultationMicrocheck
+    private function activeCheckQueryForRole(Consultation $consultation, string $verifiedRole): Builder
     {
-        $scheduledAt = $referenceTime->copy()->addSeconds($this->randomIntervalSeconds());
-
-        return ConsultationMicrocheck::query()->create([
-            'consultation_id' => $consultation->id,
-            'status' => 'pending',
-            'scheduled_at' => $scheduledAt,
-            'expires_at' => $scheduledAt->copy()->addSeconds($this->expirySeconds()),
-        ]);
+        return $this->activeCheckQuery($consultation)
+            ->where(function (Builder $query) use ($verifiedRole): void {
+                $query->where('target_role', $verifiedRole)
+                    ->orWhereNull('target_role');
+            });
     }
 
     private function randomIntervalSeconds(): int
