@@ -34,7 +34,7 @@ export default function PrivacyPolicy() {
                         Back to login
                     </Link>
 
-                    <div className="overflow-hidden rounded-4xl border border-border/60 bg-card/95 shadow-[0_28px_70px_-24px_rgba(15,23,42,0.35)] backdrop-blur dark:border-border/30">
+                    <div className="overflow-hidden rounded-[2rem] border border-border/60 bg-card/95 shadow-[0_28px_70px_-24px_rgba(15,23,42,0.35)] backdrop-blur dark:border-border/30">
                         <div className="grid gap-0 lg:grid-cols-[1.12fr_0.88fr]">
                             <div className="space-y-8 p-6 sm:p-8 lg:p-10">
                                 <div className="flex flex-wrap items-center gap-3">
