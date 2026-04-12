@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CancelConsultationRequest;
+use App\Http\Requests\RescheduleConsultationRequest;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
@@ -165,5 +167,40 @@ class ConsultationController extends Controller
         $consultation->update(['status' => 'scheduled']);
 
         return back()->with('success', 'Appointment approved and scheduled.');
+    }
+
+    public function reschedule(RescheduleConsultationRequest $request, Consultation $consultation): RedirectResponse
+    {
+        $this->authorize('update', $consultation);
+
+        abort_unless(
+            in_array($consultation->status, ['pending', 'scheduled'], true),
+            422,
+            'Only pending or scheduled consultations can be rescheduled.'
+        );
+
+        $consultation->update([
+            'scheduled_at' => $request->validated('scheduled_at'),
+        ]);
+
+        return back()->with('success', 'Consultation schedule updated.');
+    }
+
+    public function cancel(CancelConsultationRequest $request, Consultation $consultation): RedirectResponse
+    {
+        $this->authorize('update', $consultation);
+
+        abort_unless(
+            in_array($consultation->status, ['pending', 'scheduled'], true),
+            422,
+            'Only pending or scheduled consultations can be cancelled.'
+        );
+
+        $consultation->update([
+            'status' => 'cancelled',
+            'cancellation_reason' => $request->validated('cancellation_reason'),
+        ]);
+
+        return back()->with('success', 'Consultation cancelled.');
     }
 }
