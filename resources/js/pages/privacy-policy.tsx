@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
             <Head title="Data Privacy Policy" />
 
             <div className="relative min-h-svh overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(6,95,70,0.12),transparent_32%),linear-gradient(180deg,rgba(249,250,251,1)_0%,rgba(241,245,249,1)_100%)] px-4 py-8 text-foreground dark:bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.22),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(5,150,105,0.14),transparent_32%),linear-gradient(180deg,rgba(2,6,23,1)_0%,rgba(15,23,42,1)_100%)] sm:px-6 lg:px-8">
-                <div className="absolute inset-0 opacity-[0.04] bg-[linear-gradient(rgba(15,23,42,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.6)_1px,transparent_1px)] bg-size-[28px_28px] dark:bg-[linear-gradient(rgba(148,163,184,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.35)_1px,transparent_1px)]" />
+                <div className="absolute inset-0 opacity-[0.04] bg-[linear-gradient(rgba(15,23,42,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.6)_1px,transparent_1px)] bg-[size:28px_28px] dark:bg-[linear-gradient(rgba(148,163,184,0.35)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.35)_1px,transparent_1px)]" />
 
                 <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl flex-col justify-center gap-6">
                     <Link
