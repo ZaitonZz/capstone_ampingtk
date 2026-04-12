@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
+    Consultation,
     PaginatedConsultations,
     ConsultationStatus,
 } from '@/types/consultation';
@@ -38,6 +39,16 @@ const STATUS_VARIANT: Record<
     no_show: 'destructive',
 };
 
+const MICROCHECK_VARIANT: Record<
+    'pending' | 'claimed' | 'completed' | 'expired',
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+    pending: 'outline',
+    claimed: 'default',
+    completed: 'secondary',
+    expired: 'destructive',
+};
+
 interface Filters {
     search?: string;
     status?: string;
@@ -47,6 +58,45 @@ interface Filters {
 interface Props {
     consultations: PaginatedConsultations;
     filters: Filters;
+}
+
+function formatMicrocheckCell(consultation: Consultation) {
+    if (consultation.type !== 'teleconsultation') {
+        return <span className="text-muted-foreground">N/A</span>;
+    }
+
+    if (consultation.status !== 'ongoing') {
+        return (
+            <span className="text-muted-foreground">Starts when ongoing</span>
+        );
+    }
+
+    const latest = consultation.latest_microcheck;
+
+    if (!latest) {
+        return <span className="text-muted-foreground">Initializing...</span>;
+    }
+
+    return (
+        <div className="flex flex-col gap-1">
+            <Badge variant={MICROCHECK_VARIANT[latest.status]}>
+                {latest.status.charAt(0).toUpperCase() + latest.status.slice(1)}
+            </Badge>
+            {latest.latency_ms != null && (
+                <span className="text-xs text-muted-foreground">
+                    Latency: {latest.latency_ms} ms
+                </span>
+            )}
+            {consultation.next_microcheck_due_at && (
+                <span className="text-xs text-muted-foreground">
+                    Next:{' '}
+                    {new Date(
+                        consultation.next_microcheck_due_at,
+                    ).toLocaleTimeString()}
+                </span>
+            )}
+        </div>
+    );
 }
 
 export default function ConsultationsIndex({ consultations, filters }: Props) {
@@ -152,6 +202,9 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                     Chief Complaint
                                 </th>
                                 <th className="px-4 py-3 font-medium">
+                                    Microcheck
+                                </th>
+                                <th className="px-4 py-3 font-medium">
                                     Actions
                                 </th>
                             </tr>
@@ -160,7 +213,7 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                             {consultations.data.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="px-4 py-8 text-center text-muted-foreground"
                                     >
                                         No consultations found.
@@ -193,6 +246,9 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                     </td>
                                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
                                         {c.chief_complaint ?? '—'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {formatMicrocheckCell(c)}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">

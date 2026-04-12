@@ -167,12 +167,27 @@ export default function Profile({
                                 }}
                                 className="space-y-4"
                             >
-                                {({ processing, recentlySuccessful, errors }) => (
+                                {({
+                                    processing,
+                                    recentlySuccessful,
+                                    errors,
+                                }) => (
                                     <>
                                         <div className="grid gap-2">
-                                            <Label htmlFor="photo">Doctor photo</Label>
-                                            <Input id="photo" name="photo" type="file" accept="image/png,image/jpeg,image/webp" required />
-                                            <InputError className="mt-2" message={errors.photo} />
+                                            <Label htmlFor="photo">
+                                                Doctor photo
+                                            </Label>
+                                            <Input
+                                                id="photo"
+                                                name="photo"
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/webp"
+                                                required
+                                            />
+                                            <InputError
+                                                className="mt-2"
+                                                message={errors.photo}
+                                            />
                                         </div>
 
                                         <div className="flex items-center gap-4">

@@ -22,6 +22,40 @@ export interface DoctorSummary {
     };
 }
 
+export type MicrocheckStatus = 'pending' | 'claimed' | 'completed' | 'expired';
+
+export interface ConsultationMicrocheck {
+    id: number;
+    consultation_id: number;
+    status: MicrocheckStatus;
+    scheduled_at: string;
+    claimed_at: string | null;
+    completed_at: string | null;
+    expires_at: string | null;
+    latency_ms: number | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DeepfakeScanLog {
+    id: number;
+    consultation_id: number;
+    microcheck_id: number | null;
+    user_id: number | null;
+    verified_role: 'patient' | 'doctor' | null;
+    result: 'real' | 'fake' | 'inconclusive';
+    confidence_score: number | null;
+    frame_path: string | null;
+    frame_number: number | null;
+    model_version: string | null;
+    flagged: boolean;
+    scanned_at: string | null;
+    detected_user?: {
+        id: number;
+        name: string;
+    } | null;
+}
+
 export interface Consultation {
     id: number;
     patient_id: number;
@@ -41,10 +75,15 @@ export interface Consultation {
     livekit_ended_at: string | null;
     livekit_last_error: string | null;
     deepfake_verified: boolean | null;
+    next_microcheck_due_at?: string | null;
+    avg_microcheck_latency_ms?: number | null;
+    latest_microcheck?: ConsultationMicrocheck | null;
     cancellation_reason: string | null;
     duration_minutes: number | null;
     patient?: PatientSummary;
     doctor?: DoctorSummary;
+    microchecks?: ConsultationMicrocheck[];
+    deepfake_scan_logs?: DeepfakeScanLog[];
     created_at: string;
     updated_at: string;
 }

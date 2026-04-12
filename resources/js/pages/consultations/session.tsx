@@ -8,8 +8,8 @@ import {
     RoomAudioRenderer,
     useTracks,
 } from '@livekit/components-react';
-import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { Track } from 'livekit-client';
+import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useMemo } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';

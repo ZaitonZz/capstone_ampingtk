@@ -70,6 +70,34 @@ it('creates a deepfake scan log', function () {
     ]);
 });
 
+it('stores detected user and role attribution on deepfake scan logs', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.deepfake-scans.store', $consultation), [
+            'consultation_id' => $consultation->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'result' => 'real',
+            'confidence_score' => 0.8844,
+            'model_version' => 'v2.1',
+        ])
+        ->assertCreated()
+        ->assertJsonFragment([
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+        ]);
+
+    $this->assertDatabaseHas('deepfake_scan_logs', [
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+    ]);
+});
+
 it('sets consultation deepfake_verified to false when a fake scan is stored', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);

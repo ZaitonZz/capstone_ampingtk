@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { destroy as destroyPatient } from '@/actions/App/Http/Controllers/PatientController';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,7 +10,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { destroy as destroyPatient } from '@/actions/App/Http/Controllers/PatientController';
 import type { Patient } from '@/types/patient';
 
 type DeletePatientDialogProps = {

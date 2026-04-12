@@ -10,6 +10,7 @@ use App\Http\Controllers\PatientConsultationController;
 use App\Http\Controllers\PipelineDoctorFaceEmbeddingController;
 use App\Http\Controllers\PipelineFaceEmbeddingController;
 use App\Http\Controllers\PipelineFaceMatchResultController;
+use App\Http\Controllers\PipelineMicrocheckController;
 use App\Http\Controllers\PipelinePatientFaceController;
 use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
@@ -308,6 +309,7 @@ Route::prefix('internal/pipeline')
         Route::post('face-embeddings/doctor/{doctorPhoto}', [PipelineDoctorFaceEmbeddingController::class, 'store'])->name('face-embeddings-doctor.store');
         Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');
         Route::post('face-match-results', [PipelineFaceMatchResultController::class, 'store'])->name('face-match-results.store');
+        Route::post('microchecks/claim', [PipelineMicrocheckController::class, 'claim'])->name('microchecks.claim');
     });
 
 // ── Agent Testing Endpoints ──────────────────────────────────────────
