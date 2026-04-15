@@ -14,6 +14,8 @@ class DeepfakeEscalation extends Model
 
     public const TYPE_DOCTOR_DECISION = 'doctor_decision';
 
+    public const TYPE_OTP_VERIFICATION = 'otp_verification';
+
     public const STATUS_OPEN = 'open';
 
     public const STATUS_RESOLVED = 'resolved';
