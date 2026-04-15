@@ -322,16 +322,14 @@ class ConsultationIdentityVerificationService
             ];
         }
 
-        Cache::forget($this->cacheKey($consultation));
-
-        DB::transaction(function () use ($consultation, $actor): void {
+        $verificationCompleted = DB::transaction(function () use ($consultation, $actor): bool {
             $lockedConsultation = Consultation::query()
                 ->whereKey($consultation->id)
                 ->lockForUpdate()
                 ->first();
 
             if ($lockedConsultation === null) {
-                return;
+                return false;
             }
 
             $statusBeforePause = $lockedConsultation->status_before_pause ?? 'ongoing';
@@ -357,7 +355,18 @@ class ConsultationIdentityVerificationService
                 notes: 'Identity verification succeeded. Consultation resumed.',
                 resolvedBy: $actor->id,
             );
+
+            return true;
         }, attempts: 5);
+
+        if (! $verificationCompleted) {
+            return [
+                'status' => 'invalid_state',
+                'message' => 'Consultation is not waiting for identity verification.',
+            ];
+        }
+
+        Cache::forget($this->cacheKey($consultation));
 
         return [
             'status' => 'verified',
@@ -370,16 +379,14 @@ class ConsultationIdentityVerificationService
         string $reason,
         ?int $resolvedBy = null
     ): void {
-        Cache::forget($this->cacheKey($consultation));
-
-        DB::transaction(function () use ($consultation, $reason, $resolvedBy): void {
+        $consultationCancelled = DB::transaction(function () use ($consultation, $reason, $resolvedBy): bool {
             $lockedConsultation = Consultation::query()
                 ->whereKey($consultation->id)
                 ->lockForUpdate()
                 ->first();
 
             if ($lockedConsultation === null) {
-                return;
+                return false;
             }
 
             $lockedConsultation->forceFill([
@@ -401,7 +408,15 @@ class ConsultationIdentityVerificationService
                 notes: $reason,
                 resolvedBy: $resolvedBy,
             );
+
+            return true;
         }, attempts: 5);
+
+        if (! $consultationCancelled) {
+            return;
+        }
+
+        Cache::forget($this->cacheKey($consultation));
 
         $freshConsultation = Consultation::query()->find($consultation->id);
 
