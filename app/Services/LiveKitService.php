@@ -97,6 +97,98 @@ class LiveKitService
         ]);
     }
 
+    public function removeParticipantFromConsultation(Consultation $consultation, User $user): void
+    {
+        if ($consultation->livekit_room_name === null) {
+            return;
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueJwt([
+            'sub' => 'consultation-room-admin',
+            'nbf' => now()->timestamp,
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes(5)->timestamp,
+            'video' => [
+                'roomAdmin' => true,
+            ],
+        ]);
+
+        $identity = sprintf('user-%d', $user->id);
+
+        $response = Http::acceptJson()
+            ->withToken($serverToken)
+            ->asJson()
+            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/RemoveParticipant', [
+                'room' => $consultation->livekit_room_name,
+                'identity' => $identity,
+            ]);
+
+        if ($response->successful()) {
+            return;
+        }
+
+        $errorCode = (string) $response->json('code');
+
+        if ($response->status() === 404 || in_array($errorCode, ['not_found', 'participant_not_found'], true)) {
+            return;
+        }
+
+        throw new RuntimeException(
+            sprintf('LiveKit participant removal failed [%d]: %s', $response->status(), $response->body())
+        );
+    }
+
+    public function deleteRoom(Consultation $consultation): void
+    {
+        if ($consultation->livekit_room_name === null) {
+            return;
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueJwt([
+            'sub' => 'consultation-room-admin',
+            'nbf' => now()->timestamp,
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes(5)->timestamp,
+            'video' => [
+                'roomAdmin' => true,
+            ],
+        ]);
+
+        $response = Http::acceptJson()
+            ->withToken($serverToken)
+            ->asJson()
+            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/DeleteRoom', [
+                'room' => $consultation->livekit_room_name,
+            ]);
+
+        $errorCode = (string) $response->json('code');
+
+        if (! $response->successful() && ! ($response->status() === 404 || $errorCode === 'not_found')) {
+            throw new RuntimeException(
+                sprintf('LiveKit room deletion failed [%d]: %s', $response->status(), $response->body())
+            );
+        }
+
+        $consultation->forceFill([
+            'livekit_room_status' => 'ended',
+            'livekit_ended_at' => now(),
+            'livekit_last_activity_at' => now(),
+            'livekit_last_error' => null,
+        ])->save();
+    }
+
     protected function createRoom(string $roomName): ?string
     {
         $baseUrl = trim((string) config('services.livekit.url'));

@@ -2,14 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\Consultation;
-use App\Models\DeepfakeEscalation;
 use App\Models\DeepfakeScanLog;
-use Illuminate\Support\Facades\DB;
 
 class DeepfakeEscalationService
 {
     private const STREAK_THRESHOLD = 5;
+
+    public function __construct(
+        private ConsultationIdentityVerificationService $identityVerificationService,
+    ) {}
 
     public function handleNewScanLog(DeepfakeScanLog $log): void
     {
@@ -25,42 +26,7 @@ class DeepfakeEscalationService
             return;
         }
 
-        $type = $log->verified_role === 'doctor'
-            ? DeepfakeEscalation::TYPE_ADMIN_ALERT
-            : DeepfakeEscalation::TYPE_DOCTOR_DECISION;
-
-        DB::transaction(function () use ($log, $type): void {
-            $lockedConsultation = Consultation::query()
-                ->whereKey($log->consultation_id)
-                ->lockForUpdate()
-                ->first();
-
-            if ($lockedConsultation === null) {
-                return;
-            }
-
-            $alreadyOpen = DeepfakeEscalation::query()
-                ->where('consultation_id', $log->consultation_id)
-                ->where('type', $type)
-                ->where('status', DeepfakeEscalation::STATUS_OPEN)
-                ->exists();
-
-            if ($alreadyOpen) {
-                return;
-            }
-
-            DeepfakeEscalation::query()->create([
-                'consultation_id' => $log->consultation_id,
-                'triggered_by_user_id' => $log->user_id,
-                'triggered_role' => $log->verified_role,
-                'type' => $type,
-                'streak_count' => self::STREAK_THRESHOLD,
-                'status' => DeepfakeEscalation::STATUS_OPEN,
-                'notes' => $log->verified_role === 'doctor'
-                    ? 'Doctor reached 5 straight fake scans.'
-                    : 'Patient reached 5 straight fake scans; doctor decision is required.',
-            ]);
-        }, attempts: 5);
+        $this->identityVerificationService->beginForDeepfakeLog($log);
     }
 
     private function hasReachedStreakThreshold(DeepfakeScanLog $log, int $threshold): bool
