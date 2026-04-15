@@ -430,7 +430,7 @@ it('rejects scan result when submitted role does not match microcheck target rol
     expect($microcheck->fresh()->status)->toBe('claimed');
 });
 
-it('creates an admin escalation when doctor reaches 5 straight fake scans', function () {
+it('creates an OTP verification escalation when doctor reaches 5 straight fake scans', function () {
     $consultation = Consultation::factory()->create();
 
     foreach (range(1, 4) as $offset) {
@@ -461,17 +461,23 @@ it('creates an admin escalation when doctor reaches 5 straight fake scans', func
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertCreated();
 
+    $consultation->refresh();
+
     expect(
         DeepfakeEscalation::query()
             ->where('consultation_id', $consultation->id)
-            ->where('type', DeepfakeEscalation::TYPE_ADMIN_ALERT)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
             ->where('triggered_role', 'doctor')
             ->where('status', DeepfakeEscalation::STATUS_OPEN)
             ->count()
     )->toBe(1);
+
+    expect($consultation->status)->toBe('paused');
+    expect($consultation->identity_verification_target_user_id)->toBe($consultation->doctor_id);
+    expect($consultation->identity_verification_target_role)->toBe('doctor');
 });
 
-it('creates a doctor decision escalation when patient reaches 5 straight fake scans', function () {
+it('creates an OTP verification escalation when patient reaches 5 straight fake scans', function () {
     $consultation = Consultation::factory()->create();
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
@@ -504,17 +510,23 @@ it('creates a doctor decision escalation when patient reaches 5 straight fake sc
         ->postJson(route('pipeline.scan-results.store'), $data)
         ->assertCreated();
 
+    $consultation->refresh();
+
     expect(
         DeepfakeEscalation::query()
             ->where('consultation_id', $consultation->id)
-            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
             ->where('triggered_role', 'patient')
             ->where('status', DeepfakeEscalation::STATUS_OPEN)
             ->count()
     )->toBe(1);
+
+    expect($consultation->status)->toBe('paused');
+    expect($consultation->identity_verification_target_user_id)->toBe($patientUser->id);
+    expect($consultation->identity_verification_target_role)->toBe('patient');
 });
 
-it('does not create duplicate open doctor decision escalations for the same triggering log', function () {
+it('does not create duplicate open OTP verification escalations for the same triggering log', function () {
     $consultation = Consultation::factory()->create();
     $patientUser = User::factory()->patient()->create();
     $consultation->patient->update(['user_id' => $patientUser->id]);
@@ -543,11 +555,13 @@ it('does not create duplicate open doctor decision escalations for the same trig
     expect(
         DeepfakeEscalation::query()
             ->where('consultation_id', $consultation->id)
-            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
             ->where('triggered_role', 'patient')
             ->where('status', DeepfakeEscalation::STATUS_OPEN)
             ->count()
     )->toBe(1);
+
+    expect($consultation->fresh()->status)->toBe('paused');
 });
 
 it('does not escalate when a non-fake result breaks the fake streak', function () {
@@ -594,7 +608,7 @@ it('does not escalate when a non-fake result breaks the fake streak', function (
         DeepfakeEscalation::query()
             ->where('consultation_id', $consultation->id)
             ->where('triggered_role', 'patient')
-            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
             ->exists()
     )->toBeFalse();
 });
