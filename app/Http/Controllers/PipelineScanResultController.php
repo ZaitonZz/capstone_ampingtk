@@ -105,6 +105,8 @@ class PipelineScanResultController extends Controller
 
         $this->deepfakeEscalationService->handleNewScanLog($log);
 
+        $consultation->refresh();
+
         $this->microcheckService->ensurePendingCheck($consultation, $completedAt);
 
         return response()->json([

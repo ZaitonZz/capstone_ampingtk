@@ -127,6 +127,7 @@ export default function ConsultationEdit({ consultation }: Props) {
                             <option value="pending">Pending</option>
                             <option value="scheduled">Scheduled</option>
                             <option value="ongoing">Ongoing</option>
+                            <option value="paused">Paused</option>
                             <option value="completed">Completed</option>
                             <option value="cancelled">Cancelled</option>
                             <option value="no_show">No Show</option>

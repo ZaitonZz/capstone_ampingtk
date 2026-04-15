@@ -1,28 +1,10 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
-import {
-    AlertTriangle,
-    Edit,
-    Trash2,
-    CheckCircle,
-    ShieldCheck,
-    Video,
-} from 'lucide-react';
+import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -30,16 +12,6 @@ import type {
     ConsultationDeepfakeEscalation,
     ConsultationStatus,
 } from '@/types/consultation';
-
-const CANCELLATION_REASON_PRESETS = [
-    'Identity verification failed after 5 straight fake checks',
-    'High deepfake confidence persisted across consecutive scans',
-    'Patient identity could not be safely validated',
-    'Potential impersonation risk remains unresolved',
-    'Other',
-] as const;
-
-type CancellationReasonPreset = (typeof CANCELLATION_REASON_PRESETS)[number];
 
 const MICROCHECK_VARIANT: Record<
     'pending' | 'claimed' | 'completed' | 'expired',
@@ -55,6 +27,7 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     pending: 'Pending',
     scheduled: 'Scheduled',
     ongoing: 'Ongoing',
+    paused: 'Paused',
     completed: 'Completed',
     cancelled: 'Cancelled',
     no_show: 'No Show',
@@ -67,6 +40,7 @@ const STATUS_VARIANT: Record<
     pending: 'outline',
     scheduled: 'default',
     ongoing: 'secondary',
+    paused: 'outline',
     completed: 'secondary',
     cancelled: 'destructive',
     no_show: 'destructive',
@@ -91,23 +65,6 @@ export default function ConsultationShow({ consultation }: Props) {
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
     const escalationTimeline = consultation.deepfake_escalations ?? [];
-    const openDoctorDecisions = escalationTimeline.filter(
-        (escalation) =>
-            escalation.type === 'doctor_decision' &&
-            escalation.status === 'open',
-    );
-    const activeDoctorDecision = openDoctorDecisions[0] ?? null;
-    const activeDoctorDecisionStreakLabel = activeDoctorDecision
-        ? `${activeDoctorDecision.streak_count} straight fake scan${activeDoctorDecision.streak_count === 1 ? '' : 's'}`
-        : null;
-    const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
-    const [pendingEscalationId, setPendingEscalationId] = useState<number | null>(
-        null,
-    );
-    const [selectedReasonPreset, setSelectedReasonPreset] =
-        useState<CancellationReasonPreset>(CANCELLATION_REASON_PRESETS[0]);
-    const [customCancellationReason, setCustomCancellationReason] =
-        useState('');
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -127,70 +84,18 @@ export default function ConsultationShow({ consultation }: Props) {
         router.patch(ConsultationController.approve.url(consultation.id));
     }
 
-    function handleDeepfakeDecision(escalationId: number) {
-        router.patch(
-            ConsultationController.decideDeepfakeEscalation.url(
-                consultation.id,
-            ),
-            {
-                escalation_id: escalationId,
-                decision: 'continue',
-            },
-            {
-                preserveScroll: true,
-            },
-        );
-    }
-
-    function openCancelDecisionDialog(escalationId: number) {
-        setPendingEscalationId(escalationId);
-        setSelectedReasonPreset(CANCELLATION_REASON_PRESETS[0]);
-        setCustomCancellationReason('');
-        setIsCancelDialogOpen(true);
-    }
-
-    function closeCancelDecisionDialog() {
-        setIsCancelDialogOpen(false);
-        setPendingEscalationId(null);
-        setCustomCancellationReason('');
-    }
-
-    const resolvedCancellationReason = useMemo(() => {
-        if (selectedReasonPreset === 'Other') {
-            return customCancellationReason.trim();
+    function formatEscalationType(
+        type: ConsultationDeepfakeEscalation['type'],
+    ) {
+        if (type === 'admin_alert') {
+            return 'Admin Alert';
         }
 
-        return selectedReasonPreset;
-    }, [customCancellationReason, selectedReasonPreset]);
-
-    const canSubmitCancellationDecision =
-        pendingEscalationId !== null && resolvedCancellationReason.length > 0;
-
-    function submitCancelDecision() {
-        if (pendingEscalationId === null || !canSubmitCancellationDecision) {
-            return;
+        if (type === 'doctor_decision') {
+            return 'Doctor Decision';
         }
 
-        router.patch(
-            ConsultationController.decideDeepfakeEscalation.url(
-                consultation.id,
-            ),
-            {
-                escalation_id: pendingEscalationId,
-                decision: 'cancel',
-                cancellation_reason: resolvedCancellationReason,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    closeCancelDecisionDialog();
-                },
-            },
-        );
-    }
-
-    function formatEscalationType(type: ConsultationDeepfakeEscalation['type']) {
-        return type === 'admin_alert' ? 'Admin Alert' : 'Doctor Decision';
+        return 'OTP Verification';
     }
 
     return (
@@ -268,53 +173,6 @@ export default function ConsultationShow({ consultation }: Props) {
                         </Button>
                     </div>
                 </div>
-
-                {activeDoctorDecision !== null && (
-                    <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-                        <div className="mb-3 flex items-start gap-3">
-                            <AlertTriangle className="mt-0.5 h-5 w-5 text-destructive" />
-                            <div>
-                                <p className="text-sm font-semibold text-destructive">
-                                    Patient has reached{' '}
-                                    {activeDoctorDecisionStreakLabel}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Decide whether this consultation should
-                                    continue or be cancelled.
-                                </p>
-                                {activeDoctorDecision.notes && (
-                                    <p className="text-sm text-muted-foreground">
-                                        {activeDoctorDecision.notes}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    handleDeepfakeDecision(
-                                        activeDoctorDecision.id,
-                                    )
-                                }
-                            >
-                                Continue Consultation
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="destructive"
-                                onClick={() =>
-                                    openCancelDecisionDialog(
-                                        activeDoctorDecision.id,
-                                    )
-                                }
-                            >
-                                Cancel Consultation
-                            </Button>
-                        </div>
-                    </div>
-                )}
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
@@ -612,8 +470,9 @@ export default function ConsultationShow({ consultation }: Props) {
                                     </div>
                                     <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
                                         <span>
-                                            Triggered by {escalation.triggered_role}{' '}
-                                            ({escalation.streak_count} straight
+                                            Triggered by{' '}
+                                            {escalation.triggered_role} (
+                                            {escalation.streak_count} straight
                                             fake){' '}
                                             {escalation.triggered_by?.name
                                                 ? `- ${escalation.triggered_by.name}`
@@ -642,86 +501,6 @@ export default function ConsultationShow({ consultation }: Props) {
                     )}
                 </div>
             </div>
-
-            <Dialog
-                open={isCancelDialogOpen}
-                onOpenChange={(open) => {
-                    if (!open) {
-                        closeCancelDecisionDialog();
-                    }
-                }}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Confirm Consultation Cancellation
-                        </DialogTitle>
-                        <DialogDescription>
-                            Select a reason for cancelling this consultation
-                            after the deepfake escalation.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-3">
-                        <Label>Cancellation Reason</Label>
-                        <div className="flex flex-wrap gap-2">
-                            {CANCELLATION_REASON_PRESETS.map((reason) => (
-                                <Button
-                                    key={reason}
-                                    type="button"
-                                    variant={
-                                        selectedReasonPreset === reason
-                                            ? 'default'
-                                            : 'outline'
-                                    }
-                                    size="sm"
-                                    onClick={() =>
-                                        setSelectedReasonPreset(reason)
-                                    }
-                                >
-                                    {reason}
-                                </Button>
-                            ))}
-                        </div>
-
-                        {selectedReasonPreset === 'Other' && (
-                            <div className="space-y-2">
-                                <Label htmlFor="custom-cancel-reason">
-                                    Custom Reason
-                                </Label>
-                                <Input
-                                    id="custom-cancel-reason"
-                                    value={customCancellationReason}
-                                    onChange={(event) =>
-                                        setCustomCancellationReason(
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder="Enter cancellation reason"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={closeCancelDecisionDialog}
-                        >
-                            Back
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="destructive"
-                            disabled={!canSubmitCancellationDecision}
-                            onClick={submitCancelDecision}
-                        >
-                            Confirm Cancellation
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </AppLayout>
     );
 }

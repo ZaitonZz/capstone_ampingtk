@@ -1,9 +1,9 @@
 import { Head } from '@inertiajs/react';
 import { ArrowLeft, Camera, Zap } from 'lucide-react';
 import { useState } from 'react';
+import DataPrivacyNoticeDialog from '@/components/data-privacy-notice-dialog';
 import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
 import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
-import DataPrivacyNoticeDialog from '@/components/data-privacy-notice-dialog';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';

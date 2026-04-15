@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePoll } from '@inertiajs/react';
 import '@livekit/components-styles';
 import {
     ControlBar,
@@ -10,13 +10,16 @@ import {
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationIdentityVerificationState,
+} from '@/types/consultation';
 
 interface LiveKitSessionProps {
     enabled: boolean;
@@ -35,6 +38,7 @@ interface LiveKitConnectPayload {
 
 interface Props {
     consultation: Consultation;
+    verification?: ConsultationIdentityVerificationState;
     livekit: LiveKitSessionProps;
 }
 
@@ -84,12 +88,41 @@ function ConsultationCallStage() {
 
 export default function ConsultationSessionPage({
     consultation,
+    verification,
     livekit,
 }: Props) {
+    const isPaused =
+        verification?.is_paused === true || consultation.status === 'paused';
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        2000,
+        { only: ['consultation', 'verification'] },
+        { autoStart: false },
+    );
+
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
+
+    useEffect(() => {
+        if (isPaused) {
+            startPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        stopPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
+
+    const isCurrentUserVerificationTarget =
+        verification?.is_current_user_target === true;
+    const verificationTargetRole = verification?.target_role ?? 'participant';
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
@@ -182,6 +215,33 @@ export default function ConsultationSessionPage({
                             Enable LiveKit in environment config to start the
                             call UI.
                         </p>
+                    </div>
+                )}
+
+                {isPaused && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+                        <div className="mb-1 flex items-center gap-2 font-semibold">
+                            <AlertTriangle className="h-4 w-4" />
+                            Consultation paused for identity verification
+                        </div>
+                        <p className="text-sm">
+                            {isCurrentUserVerificationTarget
+                                ? 'You are required to verify your identity before rejoining this consultation.'
+                                : `This consultation is paused while the ${verificationTargetRole} completes identity verification.`}
+                        </p>
+                        {isCurrentUserVerificationTarget && (
+                            <div className="mt-3">
+                                <Button size="sm" asChild>
+                                    <Link
+                                        href={ConsultationLobbyController.show.url(
+                                            consultation.id,
+                                        )}
+                                    >
+                                        Return to Lobby Verification
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
 

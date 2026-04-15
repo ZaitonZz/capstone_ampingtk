@@ -100,3 +100,29 @@ it('allows consenting consultation patient to view session page', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page->component('consultations/session'));
 });
+
+it('includes configured OTP length in session verification payload', function () {
+    config()->set('auth_otp.otp.length', 8);
+
+    $doctor = User::factory()->doctor()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.session.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/session')
+                ->where('verification.otp_length', 8),
+        );
+});

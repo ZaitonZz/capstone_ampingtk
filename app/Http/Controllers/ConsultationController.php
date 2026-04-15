@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\CancelConsultationRequest;
-use App\Http\Requests\DecideDeepfakeEscalationRequest;
 use App\Http\Requests\RescheduleConsultationRequest;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
-use App\Models\DeepfakeEscalation;
 use App\Models\Patient;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -183,49 +181,6 @@ class ConsultationController extends Controller
         $consultation->update(['status' => 'scheduled']);
 
         return back()->with('success', 'Appointment approved and scheduled.');
-    }
-
-    public function decideDeepfakeEscalation(
-        DecideDeepfakeEscalationRequest $request,
-        Consultation $consultation
-    ): RedirectResponse {
-        $this->authorize('update', $consultation);
-
-        $validated = $request->validated();
-
-        $escalation = DeepfakeEscalation::query()
-            ->whereKey($validated['escalation_id'])
-            ->where('consultation_id', $consultation->id)
-            ->where('type', DeepfakeEscalation::TYPE_DOCTOR_DECISION)
-            ->firstOrFail();
-
-        if ($escalation->status === DeepfakeEscalation::STATUS_RESOLVED) {
-            return back()->with('success', 'Deepfake escalation decision is already resolved.');
-        }
-
-        if ($validated['decision'] === 'cancel') {
-            $consultation->update([
-                'status' => 'cancelled',
-                'cancellation_reason' => $validated['cancellation_reason'],
-            ]);
-        }
-
-        $escalation->update([
-            'status' => DeepfakeEscalation::STATUS_RESOLVED,
-            'decision' => $validated['decision'],
-            'resolved_by' => $request->user()->id,
-            'resolved_at' => now(),
-            'notes' => $validated['decision'] === 'cancel'
-                ? $validated['cancellation_reason']
-                : $escalation->notes,
-        ]);
-
-        return back()->with(
-            'success',
-            $validated['decision'] === 'cancel'
-                ? 'Consultation cancelled after deepfake escalation review.'
-                : 'Consultation marked to continue after deepfake escalation review.'
-        );
     }
 
     public function reschedule(RescheduleConsultationRequest $request, Consultation $consultation): RedirectResponse

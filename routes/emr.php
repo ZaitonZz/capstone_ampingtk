@@ -58,10 +58,6 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
         Route::post('deepfake-scans', [DeepfakeScanLogController::class, 'store'])->name('deepfake-scans.store');
         Route::get('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'show'])->name('deepfake-scans.show');
         Route::patch('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'update'])->name('deepfake-scans.update');
-
-        // Deepfake escalation decision
-        Route::patch('deepfake-decision', [ConsultationController::class, 'decideDeepfakeEscalation'])
-            ->name('deepfake-decision');
     });
 
     // ── Doctor Profile (Doctor/Admin only) ───────────────────────────────────

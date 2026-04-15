@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminDeepfakeAlertController;
 use App\Http\Controllers\ConsultationConsentController;
+use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
@@ -235,6 +236,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
         Route::get('session', [ConsultationSessionController::class, 'show'])->name('session.show');
         Route::post('livekit/connect', [ConsultationLiveKitController::class, 'connect'])->name('livekit.connect');
+        Route::post('identity-verification/verify', [ConsultationIdentityVerificationController::class, 'verify'])
+            ->name('identity-verification.verify');
+        Route::post('identity-verification/resend', [ConsultationIdentityVerificationController::class, 'resend'])
+            ->name('identity-verification.resend');
     });
 });
 
@@ -253,8 +258,8 @@ Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(functio
         $consultation = Consultation::query()
             ->where('patient_id', $patient->id)
             ->where('type', 'teleconsultation')
-            ->whereIn('status', ['ongoing', 'scheduled', 'pending'])
-            ->orderByRaw("case when status = 'ongoing' then 0 when status = 'scheduled' then 1 else 2 end")
+            ->whereIn('status', ['ongoing', 'paused', 'scheduled', 'pending'])
+            ->orderByRaw("case when status = 'ongoing' then 0 when status = 'paused' then 1 when status = 'scheduled' then 2 else 3 end")
             ->orderBy('scheduled_at')
             ->first();
 
