@@ -21,16 +21,20 @@ class VerifyConsultationIdentityOtpRequest extends FormRequest
      */
     public function rules(): array
     {
+        $otpLength = max(4, (int) config('auth_otp.otp.length', 6));
+
         return [
-            'otp_code' => ['required', 'string', 'regex:/^\d{6}$/'],
+            'otp_code' => ['required', 'string', 'regex:/^\\d{'.$otpLength.'}$/'],
         ];
     }
 
     public function messages(): array
     {
+        $otpLength = max(4, (int) config('auth_otp.otp.length', 6));
+
         return [
             'otp_code.required' => 'Verification code is required.',
-            'otp_code.regex' => 'Verification code must be exactly 6 digits.',
+            'otp_code.regex' => sprintf('Verification code must be exactly %d digits.', $otpLength),
         ];
     }
 }

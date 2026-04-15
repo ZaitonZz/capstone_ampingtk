@@ -194,6 +194,33 @@ it('exhausting OTP attempts cancels the paused consultation', function () {
     expect($escalation->fresh()->decision)->toBe('cancel');
 });
 
+it('validates consultation OTP code using configured OTP length', function () {
+    config()->set('auth_otp.otp.length', 8);
+
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_attempts' => 0,
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $this->actingAs($patientUser)
+        ->post(route('consultations.identity-verification.verify', $consultation), [
+            'otp_code' => '123456',
+        ])
+        ->assertSessionHasErrors(['otp_code']);
+});
+
 it('admin can view the deepfake alerts page', function () {
     $admin = User::factory()->admin()->create();
     $consultation = Consultation::factory()->create();
