@@ -35,8 +35,19 @@ class ConsultationSessionController extends Controller
             abort(403);
         }
 
+        $isVerificationTarget =
+            $user !== null
+            && $consultation->identity_verification_target_user_id !== null
+            && $consultation->identity_verification_target_user_id === $user->id;
+
         return Inertia::render('consultations/session', [
             'consultation' => $consultation,
+            'verification' => [
+                'is_paused' => $consultation->status === 'paused',
+                'is_current_user_target' => $isVerificationTarget,
+                'target_role' => $consultation->identity_verification_target_role,
+                'expires_at' => $consultation->identity_verification_expires_at,
+            ],
             'livekit' => [
                 'enabled' => (bool) config('services.livekit.enabled', false),
                 'ws_url' => config('services.livekit.ws_url'),

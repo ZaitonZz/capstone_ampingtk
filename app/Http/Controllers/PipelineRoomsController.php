@@ -21,6 +21,7 @@ class PipelineRoomsController extends Controller
 
         $rooms = Consultation::query()
             ->where('type', 'teleconsultation')
+            ->whereIn('status', ['pending', 'scheduled', 'ongoing'])
             ->where('livekit_room_status', 'room_ready')
             ->whereNotNull('livekit_room_name')
             ->skip($offset)

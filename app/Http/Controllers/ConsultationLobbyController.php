@@ -24,9 +24,26 @@ class ConsultationLobbyController extends Controller
             ->where('user_id', auth()->user()?->id)
             ->first();
 
+        $currentUser = auth()->user();
+        $isVerificationTarget =
+            $currentUser !== null
+            && $consultation->identity_verification_target_user_id !== null
+            && $consultation->identity_verification_target_user_id === $currentUser->id;
+
         return Inertia::render('consultations/lobby', [
             'consultation' => $consultation,
             'consent' => $consent,
+            'verification' => [
+                'is_paused' => $consultation->status === 'paused',
+                'is_current_user_target' => $isVerificationTarget,
+                'target_role' => $consultation->identity_verification_target_role,
+                'started_at' => $consultation->identity_verification_started_at,
+                'expires_at' => $consultation->identity_verification_expires_at,
+                'attempts' => $consultation->identity_verification_attempts,
+                'resend_available_at' => $consultation->identity_verification_resend_available_at,
+                'verify_url' => route('consultations.identity-verification.verify', $consultation),
+                'resend_url' => route('consultations.identity-verification.resend', $consultation),
+            ],
             'livekit' => [
                 'enabled' => (bool) config('services.livekit.enabled', false),
                 'room_status' => $consultation->livekit_room_status,

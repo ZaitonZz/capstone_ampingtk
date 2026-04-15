@@ -15,7 +15,7 @@ class UpdateConsultationRequest extends FormRequest
     {
         return [
             'type' => ['sometimes', 'in:in_person,teleconsultation'],
-            'status' => ['sometimes', 'in:pending,scheduled,ongoing,completed,cancelled,no_show'],
+            'status' => ['sometimes', 'in:pending,scheduled,ongoing,paused,completed,cancelled,no_show'],
             'chief_complaint' => ['nullable', 'string'],
             'scheduled_at' => ['nullable', 'date'],
             'started_at' => ['nullable', 'date'],
