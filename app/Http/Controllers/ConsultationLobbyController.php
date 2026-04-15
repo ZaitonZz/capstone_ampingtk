@@ -29,6 +29,7 @@ class ConsultationLobbyController extends Controller
             $currentUser !== null
             && $consultation->identity_verification_target_user_id !== null
             && $consultation->identity_verification_target_user_id === $currentUser->id;
+        $otpLength = max(4, (int) config('auth_otp.otp.length', 6));
 
         return Inertia::render('consultations/lobby', [
             'consultation' => $consultation,
@@ -37,6 +38,7 @@ class ConsultationLobbyController extends Controller
                 'is_paused' => $consultation->status === 'paused',
                 'is_current_user_target' => $isVerificationTarget,
                 'target_role' => $consultation->identity_verification_target_role,
+                'otp_length' => $otpLength,
                 'started_at' => $consultation->identity_verification_started_at,
                 'expires_at' => $consultation->identity_verification_expires_at,
                 'attempts' => $consultation->identity_verification_attempts,

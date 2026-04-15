@@ -39,6 +39,7 @@ class ConsultationSessionController extends Controller
             $user !== null
             && $consultation->identity_verification_target_user_id !== null
             && $consultation->identity_verification_target_user_id === $user->id;
+        $otpLength = max(4, (int) config('auth_otp.otp.length', 6));
 
         return Inertia::render('consultations/session', [
             'consultation' => $consultation,
@@ -46,6 +47,7 @@ class ConsultationSessionController extends Controller
                 'is_paused' => $consultation->status === 'paused',
                 'is_current_user_target' => $isVerificationTarget,
                 'target_role' => $consultation->identity_verification_target_role,
+                'otp_length' => $otpLength,
                 'expires_at' => $consultation->identity_verification_expires_at,
             ],
             'livekit' => [
