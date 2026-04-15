@@ -89,7 +89,7 @@ export interface Consultation {
     doctor_id: number;
     type: ConsultationType;
     status: ConsultationStatus;
-    status_before_pause: string | null;
+    status_before_pause: ConsultationStatus | null;
     chief_complaint: string | null;
     scheduled_at: string | null;
     started_at: string | null;
@@ -127,6 +127,7 @@ export interface ConsultationIdentityVerificationState {
     is_paused: boolean;
     is_current_user_target: boolean;
     target_role: 'patient' | 'doctor' | null;
+    otp_length?: number;
     started_at?: string | null;
     expires_at?: string | null;
     attempts?: number;
