@@ -10,7 +10,7 @@ import {
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
@@ -91,15 +91,35 @@ export default function ConsultationSessionPage({
     verification,
     livekit,
 }: Props) {
-    usePoll(2000, { only: ['consultation', 'verification'] });
+    const isPaused =
+        verification?.is_paused === true || consultation.status === 'paused';
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        2000,
+        { only: ['consultation', 'verification'] },
+        { autoStart: false },
+    );
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
 
-    const isPaused =
-        verification?.is_paused === true || consultation.status === 'paused';
+    useEffect(() => {
+        if (isPaused) {
+            startPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        stopPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
+
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
     const verificationTargetRole = verification?.target_role ?? 'participant';

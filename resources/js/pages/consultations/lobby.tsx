@@ -189,7 +189,13 @@ export default function ConsultationLobbyPage({
     livekit,
 }: Props) {
     const page = usePage<PageProps>();
-    usePoll(2000, { only: ['consultation', 'verification'] });
+    const isPaused =
+        verification?.is_paused === true || consultation.status === 'paused';
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        2000,
+        { only: ['consultation', 'verification'] },
+        { autoStart: false },
+    );
 
     const [cameraOn, setCameraOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
@@ -213,13 +219,15 @@ export default function ConsultationLobbyPage({
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
     const hasJoinPermission = isConsentConfirmed || isAdminUser;
-    const isPaused =
-        verification?.is_paused === true || consultation.status === 'paused';
     const canJoinSession = hasJoinPermission && !isPaused;
     const isLiveKitEnabled = livekit?.enabled === true;
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
     const verificationTargetRole = verification?.target_role ?? 'participant';
+    const configuredOtpLength = Number(verification?.otp_length ?? 6);
+    const otpLength = Number.isFinite(configuredOtpLength)
+        ? Math.max(4, Math.floor(configuredOtpLength))
+        : 6;
     const expiresInSeconds = secondsUntil(verification?.expires_at);
     const resendInSeconds = secondsUntil(verification?.resend_available_at);
 
@@ -229,6 +237,22 @@ export default function ConsultationLobbyPage({
             ConsultationLiveKitController.connect.url(consultation.id),
         [consultation.id, livekit?.connect_url],
     );
+
+    useEffect(() => {
+        if (isPaused) {
+            startPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        stopPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
 
     // Handle camera on/off
     useEffect(() => {
@@ -545,15 +569,18 @@ export default function ConsultationLobbyPage({
             return;
         }
 
-        if (!/^\d{6}$/.test(otpCode.trim())) {
-            toast.error('Enter a valid 6-digit OTP code.');
+        const normalizedOtpCode = otpCode.trim();
+        const otpPattern = new RegExp(`^\\d{${otpLength}}$`);
+
+        if (!otpPattern.test(normalizedOtpCode)) {
+            toast.error(`Enter a valid ${otpLength}-digit OTP code.`);
 
             return;
         }
 
         router.post(
             verification.verify_url,
-            { otp_code: otpCode.trim() },
+            { otp_code: normalizedOtpCode },
             {
                 preserveScroll: true,
                 onStart: () => setIsSubmittingOtp(true),
@@ -962,14 +989,15 @@ export default function ConsultationLobbyPage({
                                                     )
                                                 }
                                                 inputMode="numeric"
-                                                maxLength={6}
-                                                placeholder="Enter 6-digit OTP"
+                                                maxLength={otpLength}
+                                                placeholder={`Enter ${otpLength}-digit OTP`}
                                             />
                                             <Button
                                                 type="submit"
                                                 disabled={
                                                     isSubmittingOtp ||
-                                                    otpCode.trim().length !== 6
+                                                    otpCode.trim().length !==
+                                                        otpLength
                                                 }
                                                 className="w-full"
                                             >
