@@ -93,33 +93,13 @@ export default function ConsultationSessionPage({
 }: Props) {
     const isPaused =
         verification?.is_paused === true || consultation.status === 'paused';
-    const { start: startPolling, stop: stopPolling } = usePoll(
-        2000,
-        { only: ['consultation', 'verification'] },
-        { autoStart: false },
-    );
+    usePoll(5000, { only: ['consultation', 'verification'] });
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
     const hasAutoRedirectedRef = useRef(false);
-
-    useEffect(() => {
-        if (isPaused) {
-            startPolling();
-
-            return () => {
-                stopPolling();
-            };
-        }
-
-        stopPolling();
-
-        return () => {
-            stopPolling();
-        };
-    }, [isPaused, startPolling, stopPolling]);
 
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
@@ -141,6 +121,28 @@ export default function ConsultationSessionPage({
             preserveScroll: true,
         });
     }, [consultation.id, storageKey]);
+
+    const refreshVerificationState = useCallback((): void => {
+        router.reload({
+            only: ['consultation', 'verification'],
+            onSuccess: (page) => {
+                const props = page.props as {
+                    consultation?: Consultation;
+                    verification?: ConsultationIdentityVerificationState;
+                };
+
+                const refreshedIsPaused =
+                    props.verification?.is_paused === true ||
+                    props.consultation?.status === 'paused';
+                const refreshedIsCurrentUserTarget =
+                    props.verification?.is_current_user_target === true;
+
+                if (refreshedIsPaused && refreshedIsCurrentUserTarget) {
+                    redirectToLobbyForVerification();
+                }
+            },
+        });
+    }, [redirectToLobbyForVerification]);
 
     useEffect(() => {
         if (!shouldRedirectToLobbyForVerification) {
@@ -305,7 +307,11 @@ export default function ConsultationSessionPage({
                                             shouldRedirectToLobbyForVerification
                                         ) {
                                             redirectToLobbyForVerification();
+
+                                            return;
                                         }
+
+                                        refreshVerificationState();
                                     }}
                                 >
                                     <ConsultationCallStage />
