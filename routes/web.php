@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminDeepfakeAlertController;
+use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
@@ -184,6 +185,13 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
             ->name('admin.deepfake-alerts.index');
         Route::patch('admin/alerts/deepfake/{escalation}/resolve', [AdminDeepfakeAlertController::class, 'resolve'])
             ->name('admin.deepfake-alerts.resolve');
+
+        Route::get('admin/users', [AdminUserManagementController::class, 'index'])
+            ->name('admin.users.index');
+        Route::post('admin/users', [AdminUserManagementController::class, 'store'])
+            ->name('admin.users.store');
+        Route::patch('admin/users/{user}', [AdminUserManagementController::class, 'update'])
+            ->name('admin.users.update');
     });
 
     // Medical staff-specific dashboard

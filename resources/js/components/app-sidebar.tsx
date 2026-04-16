@@ -9,6 +9,7 @@ import {
     Stethoscope,
     Pill,
     ShieldAlert,
+    Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -26,6 +27,7 @@ import {
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
+import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
 import { dashboard as patientDashboard } from '@/routes/patient';
@@ -109,6 +111,11 @@ export function AppSidebar() {
     }
 
     if (isAdmin) {
+        mainNavItems.push({
+            title: 'User Management',
+            href: adminUsers(),
+            icon: Users,
+        });
         mainNavItems.push({
             title: 'Deepfake Alerts',
             href: adminDeepfakeAlerts(),
