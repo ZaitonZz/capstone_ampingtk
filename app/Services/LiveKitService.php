@@ -51,7 +51,7 @@ class LiveKitService
         $issuedAt = now();
 
         return $this->issueJwt([
-            'sub' => sprintf('user-%d', $user->id),
+            'sub' => $this->buildParticipantIdentity($user),
             'name' => $user->name,
             'nbf' => $issuedAt->timestamp,
             'iat' => $issuedAt->timestamp,
@@ -99,8 +99,17 @@ class LiveKitService
 
     public function removeParticipantFromConsultation(Consultation $consultation, User $user): void
     {
-        if ($consultation->livekit_room_name === null) {
-            return;
+        foreach ($this->candidateParticipantIdentities($user) as $identity) {
+            if ($this->removeParticipantByIdentity($consultation, $identity)) {
+                return;
+            }
+        }
+    }
+
+    public function removeParticipantByIdentity(Consultation $consultation, string $identity): bool
+    {
+        if ($consultation->livekit_room_name === null || trim($identity) === '') {
+            return false;
         }
 
         $baseUrl = trim((string) config('services.livekit.url'));
@@ -109,17 +118,7 @@ class LiveKitService
             throw new RuntimeException('Missing services.livekit.url configuration value.');
         }
 
-        $serverToken = $this->issueJwt([
-            'sub' => 'consultation-room-admin',
-            'nbf' => now()->timestamp,
-            'iat' => now()->timestamp,
-            'exp' => now()->addMinutes(5)->timestamp,
-            'video' => [
-                'roomAdmin' => true,
-            ],
-        ]);
-
-        $identity = sprintf('user-%d', $user->id);
+        $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
 
         $response = Http::acceptJson()
             ->withToken($serverToken)
@@ -130,13 +129,13 @@ class LiveKitService
             ]);
 
         if ($response->successful()) {
-            return;
+            return true;
         }
 
         $errorCode = (string) $response->json('code');
 
         if ($response->status() === 404 || in_array($errorCode, ['not_found', 'participant_not_found'], true)) {
-            return;
+            return false;
         }
 
         throw new RuntimeException(
@@ -156,15 +155,7 @@ class LiveKitService
             throw new RuntimeException('Missing services.livekit.url configuration value.');
         }
 
-        $serverToken = $this->issueJwt([
-            'sub' => 'consultation-room-admin',
-            'nbf' => now()->timestamp,
-            'iat' => now()->timestamp,
-            'exp' => now()->addMinutes(5)->timestamp,
-            'video' => [
-                'roomAdmin' => true,
-            ],
-        ]);
+        $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
 
         $response = Http::acceptJson()
             ->withToken($serverToken)
@@ -269,5 +260,40 @@ class LiveKitService
     protected function base64UrlEncode(string $value): string
     {
         return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function candidateParticipantIdentities(User $user): array
+    {
+        return array_values(array_unique([
+            $this->buildParticipantIdentity($user),
+            (string) $user->id,
+        ]));
+    }
+
+    private function buildParticipantIdentity(User $user): string
+    {
+        return sprintf('user-%d', $user->id);
+    }
+
+    private function issueRoomAdminToken(?string $roomName = null): string
+    {
+        $videoGrant = [
+            'roomAdmin' => true,
+        ];
+
+        if ($roomName !== null && $roomName !== '') {
+            $videoGrant['room'] = $roomName;
+        }
+
+        return $this->issueJwt([
+            'sub' => 'consultation-room-admin',
+            'nbf' => now()->timestamp,
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes(5)->timestamp,
+            'video' => $videoGrant,
+        ]);
     }
 }
