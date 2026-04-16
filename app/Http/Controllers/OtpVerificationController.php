@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpMail;
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,6 @@ class OtpVerificationController extends Controller
     {
         $pendingLoginToken = session('pending_login_token');
 
-        if (! $pendingLoginToken) {
         if (! $pendingLoginToken) {
             return redirect()->route('login');
         }
@@ -227,7 +227,6 @@ class OtpVerificationController extends Controller
                 otp: $otp,
                 expiryMinutes: intval(config('auth_otp.otp.ttl', 300) / 60),
             ));
-
 
             logger("OTP sent to {$user->email} (ensureOtp)");
         } catch (\Throwable $e) {
@@ -543,6 +542,84 @@ class OtpVerificationController extends Controller
     private function isOtpEnabled(): bool
     {
         return (bool) config('auth_otp.enabled', true);
+    }
+
+    private function logFailedLoginAttempt(Request $request, string $email, ?int $userId, string $reason): void
+    {
+        ActivityLog::create([
+            'user_id' => $userId,
+            'event_type' => 'failed_login',
+            'severity' => 'warning',
+            'title' => 'Failed login attempt',
+            'description' => sprintf('A login attempt failed (%s).', str_replace('_', ' ', $reason)),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'reason' => $reason,
+                'email' => $email,
+            ],
+        ]);
+    }
+
+    private function logSuccessfulLogin(Request $request, User $user): void
+    {
+        $currentIp = $request->ip();
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'event_type' => 'login_success',
+            'severity' => 'info',
+            'title' => 'Successful login',
+            'description' => 'User login completed successfully.',
+            'ip_address' => $currentIp,
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'role' => $user->role,
+            ],
+        ]);
+
+        if ($currentIp === null) {
+            return;
+        }
+
+        $uniqueIpCount = ActivityLog::query()
+            ->where('event_type', 'login_success')
+            ->where('user_id', $user->id)
+            ->where('occurred_at', '>=', now()->subDay())
+            ->whereNotNull('ip_address')
+            ->where('ip_address', '!=', '')
+            ->distinct()
+            ->count('ip_address');
+
+        if ($uniqueIpCount < 3) {
+            return;
+        }
+
+        $recentDuplicateWarning = ActivityLog::query()
+            ->where('event_type', 'unusual_access_pattern')
+            ->where('user_id', $user->id)
+            ->where('occurred_at', '>=', now()->subHours(6))
+            ->exists();
+
+        if ($recentDuplicateWarning) {
+            return;
+        }
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'event_type' => 'unusual_access_pattern',
+            'severity' => 'high',
+            'title' => 'Unusual access pattern detected',
+            'description' => sprintf('User accessed from %d different IP addresses in the last 24 hours.', $uniqueIpCount),
+            'ip_address' => $currentIp,
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'unique_ip_count_24h' => $uniqueIpCount,
+            ],
+        ]);
     }
 
     private function determineRedirectUrl(User $user): string

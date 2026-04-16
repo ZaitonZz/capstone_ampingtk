@@ -21,6 +21,7 @@ use App\Models\ActivityLog;
 use App\Models\Consultation;
 use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeScanLog;
+use App\Models\Patient;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
