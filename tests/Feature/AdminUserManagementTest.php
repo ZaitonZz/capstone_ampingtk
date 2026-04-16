@@ -13,9 +13,10 @@ it('admin can view the user management page', function () {
     $this->actingAsVerified($admin)
         ->get(route('admin.users.index'))
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('admin/users')
-            ->has('users.data')
+        ->assertInertia(
+            fn (Assert $page) => $page
+                ->component('admin/users')
+                ->has('users.data')
         );
 });
 

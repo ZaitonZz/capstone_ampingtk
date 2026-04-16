@@ -76,7 +76,10 @@ const ROLE_LABELS: Record<UserRole, string> = {
     patient: 'Patient',
 };
 
-const STATUS_BADGE_VARIANT: Record<UserStatus, 'default' | 'secondary' | 'destructive'> = {
+const STATUS_BADGE_VARIANT: Record<
+    UserStatus,
+    'default' | 'secondary' | 'destructive'
+> = {
     active: 'default',
     inactive: 'secondary',
     suspended: 'destructive',
@@ -201,7 +204,8 @@ export default function AdminUsers({ users, filters, options }: Props) {
                             User Management
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Appoint roles and update account status for platform users.
+                            Appoint roles and update account status for platform
+                            users.
                         </p>
                     </div>
 
@@ -222,7 +226,9 @@ export default function AdminUsers({ users, filters, options }: Props) {
                                 <Input
                                     id="search"
                                     value={search}
-                                    onChange={(event) => setSearch(event.target.value)}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
                                     className="pl-9"
                                     placeholder="Name or email"
                                 />
@@ -236,7 +242,11 @@ export default function AdminUsers({ users, filters, options }: Props) {
                             <select
                                 id="role_filter"
                                 value={roleFilter}
-                                onChange={(event) => setRoleFilter(event.target.value as UserRole | 'all')}
+                                onChange={(event) =>
+                                    setRoleFilter(
+                                        event.target.value as UserRole | 'all',
+                                    )
+                                }
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                                 <option value="all">All roles</option>
@@ -249,13 +259,22 @@ export default function AdminUsers({ users, filters, options }: Props) {
                         </div>
 
                         <div>
-                            <Label htmlFor="status_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="status_filter"
+                                className="mb-2 block"
+                            >
                                 Status
                             </Label>
                             <select
                                 id="status_filter"
                                 value={statusFilter}
-                                onChange={(event) => setStatusFilter(event.target.value as UserStatus | 'all')}
+                                onChange={(event) =>
+                                    setStatusFilter(
+                                        event.target.value as
+                                            | UserStatus
+                                            | 'all',
+                                    )
+                                }
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
                                 <option value="all">All status</option>
@@ -286,36 +305,64 @@ export default function AdminUsers({ users, filters, options }: Props) {
                             <table className="w-full text-sm">
                                 <thead className="border-b text-left">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Name</th>
-                                        <th className="px-3 py-2 font-medium">Email</th>
-                                        <th className="px-3 py-2 font-medium">Role</th>
-                                        <th className="px-3 py-2 font-medium">Status</th>
-                                        <th className="px-3 py-2 font-medium">Password</th>
-                                        <th className="px-3 py-2 font-medium">Action</th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Name
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Email
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Role
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Password
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Action
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {users.data.map((user) => (
                                         <tr key={user.id}>
-                                            <td className="px-3 py-2">{user.name}</td>
-                                            <td className="px-3 py-2 text-muted-foreground">{user.email}</td>
                                             <td className="px-3 py-2">
-                                                <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
+                                                {user.name}
+                                            </td>
+                                            <td className="px-3 py-2 text-muted-foreground">
+                                                {user.email}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <Badge variant={STATUS_BADGE_VARIANT[user.status]}>
+                                                <Badge variant="secondary">
+                                                    {ROLE_LABELS[user.role]}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <Badge
+                                                    variant={
+                                                        STATUS_BADGE_VARIANT[
+                                                            user.status
+                                                        ]
+                                                    }
+                                                >
                                                     {user.status}
                                                 </Badge>
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {user.must_change_password ? 'Change required' : 'Up to date'}
+                                                {user.must_change_password
+                                                    ? 'Change required'
+                                                    : 'Up to date'}
                                             </td>
                                             <td className="px-3 py-2">
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => openEditDialog(user)}
+                                                    onClick={() =>
+                                                        openEditDialog(user)
+                                                    }
                                                 >
                                                     Edit
                                                 </Button>
@@ -329,7 +376,10 @@ export default function AdminUsers({ users, filters, options }: Props) {
                 </div>
             </div>
 
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog
+                open={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+            >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Create User</DialogTitle>
@@ -355,7 +405,10 @@ export default function AdminUsers({ users, filters, options }: Props) {
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={createForm.processing}>
+                            <Button
+                                type="submit"
+                                disabled={createForm.processing}
+                            >
                                 Save User
                             </Button>
                         </DialogFooter>
@@ -389,7 +442,10 @@ export default function AdminUsers({ users, filters, options }: Props) {
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={updateForm.processing}>
+                            <Button
+                                type="submit"
+                                disabled={updateForm.processing}
+                            >
                                 Save Changes
                             </Button>
                         </DialogFooter>
@@ -402,16 +458,28 @@ export default function AdminUsers({ users, filters, options }: Props) {
 
 type UserFormFieldsProps = {
     data: UserFormPayload;
-    setData: (key: keyof UserFormPayload, value: UserFormPayload[keyof UserFormPayload]) => void;
+    setData: (
+        key: keyof UserFormPayload,
+        value: UserFormPayload[keyof UserFormPayload],
+    ) => void;
     errors: Record<string, string>;
     roles: UserRole[];
     statuses: UserStatus[];
 };
 
-function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFieldsProps) {
+function UserFormFields({
+    data,
+    setData,
+    errors,
+    roles,
+    statuses,
+}: UserFormFieldsProps) {
     const isDoctorRole = data.role === 'doctor';
 
-    const setDoctorProfileField = (key: keyof DoctorProfilePayload, value: string) => {
+    const setDoctorProfileField = (
+        key: keyof DoctorProfilePayload,
+        value: string,
+    ) => {
         setData('doctor_profile', {
             ...data.doctor_profile,
             [key]: value,
@@ -426,7 +494,9 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                     <Input
                         id="name"
                         value={data.name}
-                        onChange={(event) => setData('name', event.target.value)}
+                        onChange={(event) =>
+                            setData('name', event.target.value)
+                        }
                         required
                     />
                     <InputError message={errors.name} />
@@ -438,7 +508,9 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                         id="email"
                         type="email"
                         value={data.email}
-                        onChange={(event) => setData('email', event.target.value)}
+                        onChange={(event) =>
+                            setData('email', event.target.value)
+                        }
                         required
                     />
                     <InputError message={errors.email} />
@@ -451,7 +523,9 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                     <select
                         id="role"
                         value={data.role}
-                        onChange={(event) => setData('role', event.target.value as UserRole)}
+                        onChange={(event) =>
+                            setData('role', event.target.value as UserRole)
+                        }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         required
                     >
@@ -469,7 +543,9 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                     <select
                         id="status"
                         value={data.status}
-                        onChange={(event) => setData('status', event.target.value as UserStatus)}
+                        onChange={(event) =>
+                            setData('status', event.target.value as UserStatus)
+                        }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         required
                     >
@@ -493,21 +569,39 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                             <Input
                                 id="specialty"
                                 value={data.doctor_profile.specialty}
-                                onChange={(event) => setDoctorProfileField('specialty', event.target.value)}
+                                onChange={(event) =>
+                                    setDoctorProfileField(
+                                        'specialty',
+                                        event.target.value,
+                                    )
+                                }
                                 required
                             />
-                            <InputError message={errors['doctor_profile.specialty']} />
+                            <InputError
+                                message={errors['doctor_profile.specialty']}
+                            />
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="license_number">License Number</Label>
+                            <Label htmlFor="license_number">
+                                License Number
+                            </Label>
                             <Input
                                 id="license_number"
                                 value={data.doctor_profile.license_number}
-                                onChange={(event) => setDoctorProfileField('license_number', event.target.value)}
+                                onChange={(event) =>
+                                    setDoctorProfileField(
+                                        'license_number',
+                                        event.target.value,
+                                    )
+                                }
                                 required
                             />
-                            <InputError message={errors['doctor_profile.license_number']} />
+                            <InputError
+                                message={
+                                    errors['doctor_profile.license_number']
+                                }
+                            />
                         </div>
                     </div>
 
@@ -517,9 +611,16 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                             <Input
                                 id="clinic_name"
                                 value={data.doctor_profile.clinic_name}
-                                onChange={(event) => setDoctorProfileField('clinic_name', event.target.value)}
+                                onChange={(event) =>
+                                    setDoctorProfileField(
+                                        'clinic_name',
+                                        event.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={errors['doctor_profile.clinic_name']} />
+                            <InputError
+                                message={errors['doctor_profile.clinic_name']}
+                            />
                         </div>
 
                         <div className="space-y-2">
@@ -527,9 +628,16 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                             <Input
                                 id="phone"
                                 value={data.doctor_profile.phone}
-                                onChange={(event) => setDoctorProfileField('phone', event.target.value)}
+                                onChange={(event) =>
+                                    setDoctorProfileField(
+                                        'phone',
+                                        event.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={errors['doctor_profile.phone']} />
+                            <InputError
+                                message={errors['doctor_profile.phone']}
+                            />
                         </div>
                     </div>
 
@@ -538,9 +646,16 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                         <Input
                             id="clinic_address"
                             value={data.doctor_profile.clinic_address}
-                            onChange={(event) => setDoctorProfileField('clinic_address', event.target.value)}
+                            onChange={(event) =>
+                                setDoctorProfileField(
+                                    'clinic_address',
+                                    event.target.value,
+                                )
+                            }
                         />
-                        <InputError message={errors['doctor_profile.clinic_address']} />
+                        <InputError
+                            message={errors['doctor_profile.clinic_address']}
+                        />
                     </div>
 
                     <div className="space-y-2">
@@ -548,7 +663,9 @@ function UserFormFields({ data, setData, errors, roles, statuses }: UserFormFiel
                         <textarea
                             id="bio"
                             value={data.doctor_profile.bio}
-                            onChange={(event) => setDoctorProfileField('bio', event.target.value)}
+                            onChange={(event) =>
+                                setDoctorProfileField('bio', event.target.value)
+                            }
                             className="min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                         />
                         <InputError message={errors['doctor_profile.bio']} />
