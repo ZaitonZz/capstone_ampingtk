@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AdminDeepfakeAlertController;
+use App\Http\Controllers\AdminDeepfakeLogController;
+use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
@@ -180,6 +182,11 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
         Route::get('admin/dashboard', function () {
             return inertia('dashboard');
         })->name('admin.dashboard');
+
+        Route::get('admin/logs/microchecks', [AdminMicrocheckLogController::class, 'index'])
+            ->name('admin.microcheck-logs.index');
+        Route::get('admin/logs/deepfake', [AdminDeepfakeLogController::class, 'index'])
+            ->name('admin.deepfake-logs.index');
 
         Route::get('admin/alerts/deepfake', [AdminDeepfakeAlertController::class, 'index'])
             ->name('admin.deepfake-alerts.index');
