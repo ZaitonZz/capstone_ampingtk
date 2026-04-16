@@ -157,6 +157,12 @@ class User extends Authenticatable
         return $this->hasMany(ConsultationConsent::class);
     }
 
+    /** Activity logs performed by this user */
+    public function activityLogs(): HasMany
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
+
     /** Doctor photos for ArcFace enrollment */
     public function doctorPhotos(): HasMany
     {
