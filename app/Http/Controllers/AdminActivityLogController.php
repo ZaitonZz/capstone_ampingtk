@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,6 +16,31 @@ class AdminActivityLogController extends Controller
         $search = trim($request->string('search')->toString());
         $typeFilter = trim($request->string('type')->toString());
         $dateFilter = trim($request->string('date')->toString());
+
+        if (! Schema::hasTable('activity_logs')) {
+            $logs = new LengthAwarePaginator(
+                items: [],
+                total: 0,
+                perPage: 15,
+                currentPage: max(1, $request->integer('page', 1)),
+                options: [
+                    'path' => $request->url(),
+                    'query' => $request->query(),
+                ]
+            );
+
+            return Inertia::render('admin/activity-logs', [
+                'logs' => $logs,
+                'filters' => [
+                    'search' => $search !== '' ? $search : null,
+                    'type' => $typeFilter !== '' ? $typeFilter : null,
+                    'date' => $dateFilter !== '' ? $dateFilter : null,
+                ],
+                'options' => [
+                    'types' => [],
+                ],
+            ]);
+        }
 
         $logs = ActivityLog::query()
             ->with(['actor:id,name,email'])
