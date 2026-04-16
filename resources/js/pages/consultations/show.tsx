@@ -7,7 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation, ConsultationStatus } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationDeepfakeEscalation,
+    ConsultationStatus,
+} from '@/types/consultation';
 
 const MICROCHECK_VARIANT: Record<
     'pending' | 'claimed' | 'completed' | 'expired',
@@ -23,6 +27,7 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     pending: 'Pending',
     scheduled: 'Scheduled',
     ongoing: 'Ongoing',
+    paused: 'Paused',
     completed: 'Completed',
     cancelled: 'Cancelled',
     no_show: 'No Show',
@@ -35,6 +40,7 @@ const STATUS_VARIANT: Record<
     pending: 'outline',
     scheduled: 'default',
     ongoing: 'secondary',
+    paused: 'outline',
     completed: 'secondary',
     cancelled: 'destructive',
     no_show: 'destructive',
@@ -58,6 +64,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default function ConsultationShow({ consultation }: Props) {
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
+    const escalationTimeline = consultation.deepfake_escalations ?? [];
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -75,6 +82,20 @@ export default function ConsultationShow({ consultation }: Props) {
 
     function handleApprove() {
         router.patch(ConsultationController.approve.url(consultation.id));
+    }
+
+    function formatEscalationType(
+        type: ConsultationDeepfakeEscalation['type'],
+    ) {
+        if (type === 'admin_alert') {
+            return 'Admin Alert';
+        }
+
+        if (type === 'doctor_decision') {
+            return 'Doctor Decision';
+        }
+
+        return 'OTP Verification';
     }
 
     return (
@@ -272,6 +293,9 @@ export default function ConsultationShow({ consultation }: Props) {
                                             Status
                                         </th>
                                         <th className="px-2 py-2 font-medium">
+                                            Role
+                                        </th>
+                                        <th className="px-2 py-2 font-medium">
                                             Scheduled
                                         </th>
                                         <th className="px-2 py-2 font-medium">
@@ -298,6 +322,9 @@ export default function ConsultationShow({ consultation }: Props) {
                                                         .toUpperCase() +
                                                         check.status.slice(1)}
                                                 </Badge>
+                                            </td>
+                                            <td className="px-2 py-2 text-muted-foreground">
+                                                {check.target_role ?? '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {new Date(
@@ -400,6 +427,76 @@ export default function ConsultationShow({ consultation }: Props) {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    )}
+                </div>
+
+                <div className="mt-4 rounded-xl border p-4">
+                    <h2 className="mb-3 text-base font-semibold">
+                        Escalation Timeline
+                    </h2>
+
+                    {escalationTimeline.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No escalation events recorded yet.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {escalationTimeline.map((escalation) => (
+                                <div
+                                    key={escalation.id}
+                                    className="rounded-lg border p-3"
+                                >
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant="outline">
+                                            {formatEscalationType(
+                                                escalation.type,
+                                            )}
+                                        </Badge>
+                                        <Badge
+                                            variant={
+                                                escalation.status === 'open'
+                                                    ? 'destructive'
+                                                    : 'secondary'
+                                            }
+                                        >
+                                            {escalation.status}
+                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                            {new Date(
+                                                escalation.created_at,
+                                            ).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
+                                        <span>
+                                            Triggered by{' '}
+                                            {escalation.triggered_role} (
+                                            {escalation.streak_count} straight
+                                            fake){' '}
+                                            {escalation.triggered_by?.name
+                                                ? `- ${escalation.triggered_by.name}`
+                                                : ''}
+                                        </span>
+                                        {escalation.decision && (
+                                            <span>
+                                                Decision: {escalation.decision}
+                                                {escalation.resolver?.name
+                                                    ? ` by ${escalation.resolver.name}`
+                                                    : ''}
+                                                {escalation.resolved_at
+                                                    ? ` at ${new Date(escalation.resolved_at).toLocaleString()}`
+                                                    : ''}
+                                            </span>
+                                        )}
+                                        {escalation.notes && (
+                                            <span>
+                                                Notes: {escalation.notes}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>

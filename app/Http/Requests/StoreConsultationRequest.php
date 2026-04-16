@@ -17,7 +17,7 @@ class StoreConsultationRequest extends FormRequest
             'patient_id' => ['required', 'exists:patients,id'],
             'doctor_id' => ['required', 'exists:users,id'],
             'type' => ['required', 'in:in_person,teleconsultation'],
-            'status' => ['sometimes', 'in:pending,scheduled,ongoing,completed,cancelled,no_show'],
+            'status' => ['sometimes', 'in:pending,scheduled,ongoing,paused,completed,cancelled,no_show'],
             'chief_complaint' => ['nullable', 'string'],
             'scheduled_at' => ['nullable', 'date'],
             'cancellation_reason' => ['nullable', 'string'],

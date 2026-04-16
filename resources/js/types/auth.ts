@@ -1,4 +1,5 @@
-export type UserRole = 'admin' | 'doctor' | 'patient';
+export type UserRole = 'admin' | 'doctor' | 'medicalstaff' | 'patient';
+export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export type User = {
     id: number;
@@ -8,6 +9,8 @@ export type User = {
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
     role: UserRole;
+    status: UserStatus;
+    must_change_password: boolean;
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

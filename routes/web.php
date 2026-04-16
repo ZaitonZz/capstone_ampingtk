@@ -1,6 +1,9 @@
 <?php
 
+use App\Http\Controllers\AdminDeepfakeAlertController;
+use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\ConsultationConsentController;
+use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
@@ -27,6 +30,7 @@ Route::get('/', function () {
         return match (auth()->user()->role) {
             'doctor' => redirect()->route('doctor.dashboard'),
             'patient' => redirect()->route('patient.dashboard'),
+            'medicalstaff' => redirect()->route('medicalstaff.dashboard'),
             'admin' => redirect()->route('admin.dashboard'),
             default => redirect()->route('dashboard'),
         };
@@ -34,6 +38,8 @@ Route::get('/', function () {
 
     return redirect()->route('login');
 })->name('home');
+
+Route::inertia('privacy-policy', 'privacy-policy')->name('privacy-policy');
 
 // ── Email OTP Authentication Routes ──────────────────────────────────────────
 // Step 1: Start email/password login (validates credentials, sends OTP)
@@ -316,7 +322,61 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                 ],
             ]);
         })->name('admin.dashboard');
+
+        Route::get('admin/alerts/deepfake', [AdminDeepfakeAlertController::class, 'index'])
+            ->name('admin.deepfake-alerts.index');
+        Route::patch('admin/alerts/deepfake/{escalation}/resolve', [AdminDeepfakeAlertController::class, 'resolve'])
+            ->name('admin.deepfake-alerts.resolve');
+
+        Route::get('admin/users', [AdminUserManagementController::class, 'index'])
+            ->name('admin.users.index');
+        Route::post('admin/users', [AdminUserManagementController::class, 'store'])
+            ->name('admin.users.store');
+        Route::patch('admin/users/{user}', [AdminUserManagementController::class, 'update'])
+            ->name('admin.users.update');
     });
+
+    // Medical staff-specific dashboard
+    Route::get('medicalstaff/dashboard', function () {
+        abort_unless(auth()->user()?->isMedicalStaff(), 403, 'Access restricted to medical staff accounts.');
+
+        $pendingConsultations = Consultation::query()
+            ->with(['patient:id,first_name,last_name', 'doctor:id,name'])
+            ->where('status', 'pending')
+            ->orderBy('scheduled_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (Consultation $consultation) => [
+                'id' => $consultation->id,
+                'patient_name' => $consultation->patient?->full_name ?? 'Unknown Patient',
+                'doctor_name' => $consultation->doctor?->name ?? 'Unassigned',
+                'type' => $consultation->type,
+                'scheduled_at' => $consultation->scheduled_at?->toIso8601String(),
+                'reschedule_url' => route('consultations.reschedule', $consultation),
+                'cancel_url' => route('consultations.cancel', $consultation),
+            ]);
+
+        $recentRegistrations = Patient::query()
+            ->latest('created_at')
+            ->limit(5)
+            ->get(['id', 'first_name', 'last_name', 'created_at', 'user_id'])
+            ->map(fn (Patient $patient) => [
+                'id' => $patient->id,
+                'name' => $patient->full_name,
+                'registered_at' => $patient->created_at?->toIso8601String(),
+                'has_account' => $patient->user_id !== null,
+            ]);
+
+        return inertia('medicalstaff/dashboard', [
+            'metrics' => [
+                'pending_consultations' => Consultation::query()->where('status', 'pending')->count(),
+                'todays_consultations' => Consultation::query()->whereDate('scheduled_at', today())->count(),
+                'patients_without_account' => Patient::query()->whereNull('user_id')->count(),
+            ],
+            'pending_consultations' => $pendingConsultations,
+            'recent_registrations' => $recentRegistrations,
+        ]);
+    })->name('medicalstaff.dashboard');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -326,6 +386,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
         Route::get('session', [ConsultationSessionController::class, 'show'])->name('session.show');
         Route::post('livekit/connect', [ConsultationLiveKitController::class, 'connect'])->name('livekit.connect');
+        Route::post('identity-verification/verify', [ConsultationIdentityVerificationController::class, 'verify'])
+            ->name('identity-verification.verify');
+        Route::post('identity-verification/resend', [ConsultationIdentityVerificationController::class, 'resend'])
+            ->name('identity-verification.resend');
     });
 });
 
@@ -344,8 +408,8 @@ Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(functio
         $consultation = Consultation::query()
             ->where('patient_id', $patient->id)
             ->where('type', 'teleconsultation')
-            ->whereIn('status', ['ongoing', 'scheduled', 'pending'])
-            ->orderByRaw("case when status = 'ongoing' then 0 when status = 'scheduled' then 1 else 2 end")
+            ->whereIn('status', ['ongoing', 'paused', 'scheduled', 'pending'])
+            ->orderByRaw("case when status = 'ongoing' then 0 when status = 'paused' then 1 when status = 'scheduled' then 2 else 3 end")
             ->orderBy('scheduled_at')
             ->first();
 

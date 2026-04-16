@@ -1,8 +1,11 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\DeepfakeEscalation;
 use App\Models\Patient;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 
 // ── Calendar page ─────────────────────────────────────────────────────────────
 
@@ -45,6 +48,20 @@ it('doctor sees only their own consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
+it('medical staff can access consultations index', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctorA = User::factory()->doctor()->create();
+    $doctorB = User::factory()->doctor()->create();
+
+    Consultation::factory()->create(['doctor_id' => $doctorA->id]);
+    Consultation::factory()->create(['doctor_id' => $doctorB->id]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 2));
+});
+
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 it('approves a pending consultation and transitions it to scheduled', function () {
@@ -71,6 +88,156 @@ it('cannot approve a consultation that is not pending', function () {
     $this->actingAs($doctor)
         ->patch(route('consultations.approve', $consultation))
         ->assertStatus(422);
+});
+
+it('flagged participant can verify OTP and resume a paused consultation', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_attempts' => 0,
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $escalation = DeepfakeEscalation::factory()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $patientUser->id,
+        'triggered_role' => 'patient',
+        'type' => DeepfakeEscalation::TYPE_OTP_VERIFICATION,
+        'status' => DeepfakeEscalation::STATUS_OPEN,
+    ]);
+
+    $expiresAt = now()->addMinutes(5);
+
+    Cache::put("consultation:identity_verification:{$consultation->id}", [
+        'otp_hash' => Hash::make('123456'),
+        'target_user_id' => $patientUser->id,
+        'target_role' => 'patient',
+        'attempts' => 0,
+        'max_attempts' => 5,
+        'resend_count' => 0,
+        'max_resends' => 3,
+        'expires_at' => $expiresAt->toIso8601String(),
+        'resend_available_at' => now()->addSeconds(30)->toIso8601String(),
+    ], $expiresAt);
+
+    $this->actingAs($patientUser)
+        ->post(route('consultations.identity-verification.verify', $consultation), [
+            'otp_code' => '123456',
+        ])
+        ->assertRedirect();
+
+    expect($consultation->fresh()->status)->toBe('ongoing');
+    expect($consultation->fresh()->identity_verification_target_user_id)->toBeNull();
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
+    expect($escalation->fresh()->decision)->toBe('continue');
+});
+
+it('exhausting OTP attempts cancels the paused consultation', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_attempts' => 0,
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $escalation = DeepfakeEscalation::factory()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $patientUser->id,
+        'triggered_role' => 'patient',
+        'type' => DeepfakeEscalation::TYPE_OTP_VERIFICATION,
+        'status' => DeepfakeEscalation::STATUS_OPEN,
+    ]);
+
+    $expiresAt = now()->addMinutes(5);
+
+    Cache::put("consultation:identity_verification:{$consultation->id}", [
+        'otp_hash' => Hash::make('654321'),
+        'target_user_id' => $patientUser->id,
+        'target_role' => 'patient',
+        'attempts' => 0,
+        'max_attempts' => 1,
+        'resend_count' => 0,
+        'max_resends' => 3,
+        'expires_at' => $expiresAt->toIso8601String(),
+        'resend_available_at' => now()->addSeconds(30)->toIso8601String(),
+    ], $expiresAt);
+
+    $this->actingAs($patientUser)
+        ->post(route('consultations.identity-verification.verify', $consultation), [
+            'otp_code' => '000000',
+        ])
+        ->assertRedirect();
+
+    expect($consultation->fresh()->status)->toBe('cancelled');
+    expect($consultation->fresh()->cancellation_reason)->toBe('Identity verification failed after maximum OTP attempts.');
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
+    expect($escalation->fresh()->decision)->toBe('cancel');
+});
+
+it('validates consultation OTP code using configured OTP length', function () {
+    config()->set('auth_otp.otp.length', 8);
+
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_attempts' => 0,
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $this->actingAs($patientUser)
+        ->post(route('consultations.identity-verification.verify', $consultation), [
+            'otp_code' => '123456',
+        ])
+        ->assertSessionHasErrors(['otp_code']);
+});
+
+it('admin can view the deepfake alerts page', function () {
+    $admin = User::factory()->admin()->create();
+    $consultation = Consultation::factory()->create();
+
+    DeepfakeEscalation::factory()->doctorAlert()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $consultation->doctor_id,
+    ]);
+
+    $this->actingAsVerified($admin)
+        ->get(route('admin.deepfake-alerts.index'))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('admin/deepfake-alerts')
+                ->has('alerts.data', 1)
+        );
 });
 
 // ── Patient access control ────────────────────────────────────────────────────

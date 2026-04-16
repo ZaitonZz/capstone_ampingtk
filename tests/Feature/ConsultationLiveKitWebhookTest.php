@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\User;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Build a LiveKit-style webhook JWT whose payload includes a sha256 body hash.
@@ -98,6 +100,84 @@ it('updates last activity on participant_joined event', function () {
 
     expect($consultation->livekit_last_activity_at->isAfter(now()->subMinute()))->toBeTrue();
     expect($consultation->livekit_room_status)->toBe('room_ready');
+});
+
+it('removes the verification target participant if they join while consultation is paused', function () {
+    config()->set('services.livekit.url', 'https://livekit.test');
+
+    $targetUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'status' => 'paused',
+        'livekit_room_name' => 'consultation-77-pausedroom',
+        'identity_verification_target_user_id' => $targetUser->id,
+        'identity_verification_target_role' => 'patient',
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([], 200),
+    ]);
+
+    $data = [
+        'event' => 'participant_joined',
+        'room' => ['name' => 'consultation-77-pausedroom'],
+        'participant' => ['identity' => sprintf('user-%d', $targetUser->id)],
+        'id' => 'EV_join_paused',
+        'createdAt' => now()->timestamp,
+    ];
+
+    $body = json_encode($data);
+    $token = livekitWebhookToken($body);
+
+    $this->withHeaders(['Authorization' => $token])
+        ->postJson(route('livekit.webhook'), $data)
+        ->assertNoContent();
+
+    Http::assertSent(function ($request) use ($consultation, $targetUser) {
+        return $request->url() === 'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant'
+            && $request['room'] === $consultation->livekit_room_name
+            && $request['identity'] === sprintf('user-%d', $targetUser->id);
+    });
+
+    expect($consultation->fresh()->status)->toBe('paused');
+});
+
+it('removes paused verification target when joined identity is a plain user id', function () {
+    config()->set('services.livekit.url', 'https://livekit.test');
+
+    $targetUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'status' => 'paused',
+        'livekit_room_name' => 'consultation-88-pausedroom',
+        'identity_verification_target_user_id' => $targetUser->id,
+        'identity_verification_target_role' => 'patient',
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([], 200),
+    ]);
+
+    $data = [
+        'event' => 'participant_joined',
+        'room' => ['name' => 'consultation-88-pausedroom'],
+        'participant' => ['identity' => (string) $targetUser->id],
+        'id' => 'EV_join_paused_legacy',
+        'createdAt' => now()->timestamp,
+    ];
+
+    $body = json_encode($data);
+    $token = livekitWebhookToken($body);
+
+    $this->withHeaders(['Authorization' => $token])
+        ->postJson(route('livekit.webhook'), $data)
+        ->assertNoContent();
+
+    Http::assertSent(function ($request) use ($consultation, $targetUser) {
+        return $request->url() === 'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant'
+            && $request['room'] === $consultation->livekit_room_name
+            && $request['identity'] === (string) $targetUser->id;
+    });
 });
 
 it('returns no content for unknown room names', function () {

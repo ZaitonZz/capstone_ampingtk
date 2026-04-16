@@ -8,6 +8,8 @@ import {
     ClipboardList,
     Stethoscope,
     Pill,
+    ShieldAlert,
+    Users,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -24,6 +26,8 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
+import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
 import { dashboard as patientDashboard } from '@/routes/patient';
@@ -47,14 +51,20 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
-    const isMedicalStaff = user.role === 'doctor' || user.role === 'admin';
-        const dashboardHref = isPatient
-                ? patientDashboard()
-                : user.role === 'doctor'
-                    ? doctorDashboard()
-                    : user.role === 'admin'
-                        ? adminDashboard()
-                        : dashboard();
+    const isMedicalStaff =
+        user.role === 'doctor' ||
+        user.role === 'admin' ||
+        user.role === 'medicalstaff';
+    const isAdmin = user.role === 'admin';
+    const dashboardHref = isPatient
+        ? patientDashboard()
+        : user.role === 'doctor'
+          ? doctorDashboard()
+          : user.role === 'admin'
+            ? adminDashboard()
+            : user.role === 'medicalstaff'
+              ? '/medicalstaff/dashboard'
+              : dashboard();
 
     const mainNavItems: NavItem[] = [
         {
@@ -97,6 +107,19 @@ export function AppSidebar() {
             title: 'Prescriptions',
             href: '/patient/prescriptions',
             icon: Pill,
+        });
+    }
+
+    if (isAdmin) {
+        mainNavItems.push({
+            title: 'User Management',
+            href: adminUsers(),
+            icon: Users,
+        });
+        mainNavItems.push({
+            title: 'Deepfake Alerts',
+            href: adminDeepfakeAlerts(),
+            icon: ShieldAlert,
         });
     }
 

@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { ArrowLeft, Camera, Zap } from 'lucide-react';
 import { useState } from 'react';
+import DataPrivacyNoticeDialog from '@/components/data-privacy-notice-dialog';
 import CameraPreviewPanel from '@/components/facial-recognition/camera-preview-panel';
 import FaceScanStatus from '@/components/facial-recognition/face-scan-status';
 import InputError from '@/components/input-error';
@@ -208,6 +209,8 @@ export default function Login({
             subtitle={isFaceLogin ? "Secure facial recognition login" : "Secure access for doctors and patients"}
         >
             <Head title={isFaceLogin ? "Face Login" : "Log in"} />
+
+            <DataPrivacyNoticeDialog />
 
             <div className="relative w-full overflow-hidden">
                 <div

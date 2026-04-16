@@ -29,6 +29,8 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'role' => 'doctor',
+            'status' => 'active',
+            'must_change_password' => false,
             'remember_token' => Str::random(10),
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
@@ -49,6 +51,21 @@ class UserFactory extends Factory
     public function patient(): static
     {
         return $this->state(fn (array $attributes) => ['role' => 'patient']);
+    }
+
+    public function medicalStaff(): static
+    {
+        return $this->state(fn (array $attributes) => ['role' => 'medicalstaff']);
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => ['status' => 'inactive']);
+    }
+
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes) => ['status' => 'suspended']);
     }
 
     /**

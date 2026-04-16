@@ -112,3 +112,19 @@ it('allows the consultation patient to view the teleconsultation lobby', functio
                 ->has('livekit.connect_url'),
         );
 });
+
+it('includes configured OTP length in lobby verification payload', function () {
+    config()->set('auth_otp.otp.length', 8);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/lobby')
+                ->where('verification.otp_length', 8),
+        );
+});

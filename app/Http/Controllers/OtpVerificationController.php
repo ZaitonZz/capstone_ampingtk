@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpMail;
-use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +23,7 @@ class OtpVerificationController extends Controller
     {
         $pendingLoginToken = session('pending_login_token');
 
+        if (! $pendingLoginToken) {
         if (! $pendingLoginToken) {
             return redirect()->route('login');
         }
@@ -76,16 +76,16 @@ class OtpVerificationController extends Controller
         RateLimiter::hit($throttleKey);
 
         // Find user by email
-        $user = \App\Models\User::where('email', $validated['email'])->first();
+        $user = User::where('email', $validated['email'])->first();
 
         // Validate credentials
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
-            $this->logFailedLoginAttempt($request, $validated['email'], $user?->id, 'invalid_credentials');
-
             throw ValidationException::withMessages([
                 'email' => 'Invalid email or password.',
             ]);
         }
+
+        $this->assertAccountIsActive($user, 'email');
 
         if (! $this->isOtpEnabled()) {
             Auth::login($user, $request->boolean('remember'));
@@ -103,7 +103,7 @@ class OtpVerificationController extends Controller
             return response()->json([
                 'success' => true,
                 'requires_otp' => false,
-                'redirect_url' => $redirectUrl,
+                'redirect_url' => $this->determineRedirectUrl($user),
                 'message' => 'Login successful.',
             ]);
         }
@@ -228,6 +228,7 @@ class OtpVerificationController extends Controller
                 expiryMinutes: intval(config('auth_otp.otp.ttl', 300) / 60),
             ));
 
+
             logger("OTP sent to {$user->email} (ensureOtp)");
         } catch (\Throwable $e) {
             logger()->error('Failed to send OTP email (ensureOtp)', [
@@ -347,7 +348,16 @@ class OtpVerificationController extends Controller
         // OTP is valid - authenticate the user
         RateLimiter::clear($throttleKey);
 
-        $user = \App\Models\User::findOrFail($pendingLoginState['user_id']);
+        $user = User::findOrFail($pendingLoginState['user_id']);
+
+        try {
+            $this->assertAccountIsActive($user, 'otp_code');
+        } catch (ValidationException $exception) {
+            Cache::forget($cacheKey);
+            session()->forget('pending_login_token');
+
+            throw $exception;
+        }
 
         // Fully authenticate the user
         Auth::login($user, $pendingLoginState['remember']);
@@ -364,16 +374,9 @@ class OtpVerificationController extends Controller
         session()->forget('pending_login_token');
 
         // Determine redirect URL based on user role
-        $redirectUrl = match ($user->role) {
-            'doctor' => route('doctor.dashboard'),
-            'patient' => route('patient.dashboard'),
-            'admin' => route('admin.dashboard'),
-            default => route('dashboard'),
-        };
-
         return response()->json([
             'success' => true,
-            'redirect_url' => $redirectUrl,
+            'redirect_url' => $this->determineRedirectUrl($user),
             'message' => 'OTP verified successfully. Logging you in...',
         ]);
     }
@@ -542,81 +545,33 @@ class OtpVerificationController extends Controller
         return (bool) config('auth_otp.enabled', true);
     }
 
-    private function logFailedLoginAttempt(Request $request, string $email, ?int $userId, string $reason): void
+    private function determineRedirectUrl(User $user): string
     {
-        ActivityLog::create([
-            'user_id' => $userId,
-            'event_type' => 'failed_login',
-            'severity' => 'warning',
-            'title' => 'Failed login attempt',
-            'description' => sprintf('A login attempt failed (%s).', str_replace('_', ' ', $reason)),
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
-                'reason' => $reason,
-                'email' => $email,
-            ],
-        ]);
+        if ($user->requiresPasswordChange()) {
+            return route('user-password.edit');
+        }
+
+        return match ($user->role) {
+            'doctor' => route('doctor.dashboard'),
+            'patient' => route('patient.dashboard'),
+            'medicalstaff' => route('medicalstaff.dashboard'),
+            'admin' => route('admin.dashboard'),
+            default => route('dashboard'),
+        };
     }
 
-    private function logSuccessfulLogin(Request $request, User $user): void
+    private function assertAccountIsActive(User $user, string $errorField): void
     {
-        $currentIp = $request->ip();
-
-        ActivityLog::create([
-            'user_id' => $user->id,
-            'event_type' => 'login_success',
-            'severity' => 'info',
-            'title' => 'Successful login',
-            'description' => 'User login completed successfully.',
-            'ip_address' => $currentIp,
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
-                'role' => $user->role,
-            ],
-        ]);
-
-        if ($currentIp === null) {
+        if ($user->isActive()) {
             return;
         }
 
-        $uniqueIpCount = ActivityLog::query()
-            ->where('event_type', 'login_success')
-            ->where('user_id', $user->id)
-            ->where('occurred_at', '>=', now()->subDay())
-            ->whereNotNull('ip_address')
-            ->where('ip_address', '!=', '')
-            ->distinct()
-            ->count('ip_address');
+        $message = $user->isSuspended()
+            ? 'Your account is suspended. Please contact an administrator.'
+            : 'Your account is inactive. Please contact an administrator.';
 
-        if ($uniqueIpCount < 3) {
-            return;
-        }
-
-        $recentDuplicateWarning = ActivityLog::query()
-            ->where('event_type', 'unusual_access_pattern')
-            ->where('user_id', $user->id)
-            ->where('occurred_at', '>=', now()->subHours(6))
-            ->exists();
-
-        if ($recentDuplicateWarning) {
-            return;
-        }
-
-        ActivityLog::create([
-            'user_id' => $user->id,
-            'event_type' => 'unusual_access_pattern',
-            'severity' => 'high',
-            'title' => 'Unusual access pattern detected',
-            'description' => sprintf('User accessed from %d different IP addresses in the last 24 hours.', $uniqueIpCount),
-            'ip_address' => $currentIp,
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
-                'unique_ip_count_24h' => $uniqueIpCount,
-            ],
+        throw ValidationException::withMessages([
+            $errorField => $message,
         ]);
     }
 }

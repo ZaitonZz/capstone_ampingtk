@@ -48,3 +48,21 @@ test('correct password must be provided to update password', function () {
         ->assertSessionHasErrors('current_password')
         ->assertRedirect(route('user-password.edit'));
 });
+
+test('password update clears required password change flag', function () {
+    $user = User::factory()->create([
+        'must_change_password' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('user-password.edit'))
+        ->put(route('user-password.update'), [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('user-password.edit'));
+
+    expect($user->fresh()->must_change_password)->toBeFalse();
+});

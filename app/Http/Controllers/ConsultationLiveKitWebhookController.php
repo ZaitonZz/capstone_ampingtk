@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Consultation;
+use App\Services\LiveKitService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ConsultationLiveKitWebhookController extends Controller
 {
+    public function __construct(private LiveKitService $liveKitService) {}
+
     public function handle(Request $request): Response
     {
         $rawBody = $request->getContent();
@@ -59,6 +63,28 @@ class ConsultationLiveKitWebhookController extends Controller
             ])->save(),
             default => null,
         };
+
+        if (
+            $eventType === 'participant_joined'
+            && $consultation->status === 'paused'
+            && $consultation->identity_verification_target_user_id !== null
+        ) {
+            $participantIdentity = (string) ($event['participant']['identity'] ?? '');
+            $targetUserId = (int) $consultation->identity_verification_target_user_id;
+            $targetIdentity = sprintf('user-%d', $targetUserId);
+
+            if ($participantIdentity === $targetIdentity || $participantIdentity === (string) $targetUserId) {
+                try {
+                    $this->liveKitService->removeParticipantByIdentity($consultation, $participantIdentity);
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    $consultation->forceFill([
+                        'livekit_last_error' => $exception->getMessage(),
+                    ])->save();
+                }
+            }
+        }
 
         return response()->noContent();
     }

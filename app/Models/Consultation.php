@@ -18,6 +18,7 @@ class Consultation extends Model
         'doctor_id',
         'type',
         'status',
+        'status_before_pause',
         'chief_complaint',
         'scheduled_at',
         'started_at',
@@ -31,6 +32,12 @@ class Consultation extends Model
         'livekit_ended_at',
         'livekit_last_error',
         'deepfake_verified',
+        'identity_verification_target_user_id',
+        'identity_verification_target_role',
+        'identity_verification_started_at',
+        'identity_verification_expires_at',
+        'identity_verification_attempts',
+        'identity_verification_resend_available_at',
         'cancellation_reason',
     ];
 
@@ -52,6 +59,10 @@ class Consultation extends Model
             'livekit_last_activity_at' => 'datetime',
             'livekit_ended_at' => 'datetime',
             'deepfake_verified' => 'boolean',
+            'identity_verification_started_at' => 'datetime',
+            'identity_verification_expires_at' => 'datetime',
+            'identity_verification_attempts' => 'integer',
+            'identity_verification_resend_available_at' => 'datetime',
         ];
     }
 
@@ -94,6 +105,11 @@ class Consultation extends Model
     public function deepfakeScanLogs(): HasMany
     {
         return $this->hasMany(DeepfakeScanLog::class);
+    }
+
+    public function deepfakeEscalations(): HasMany
+    {
+        return $this->hasMany(DeepfakeEscalation::class);
     }
 
     public function faceVerificationLogs(): HasMany

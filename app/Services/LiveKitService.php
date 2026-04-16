@@ -51,7 +51,7 @@ class LiveKitService
         $issuedAt = now();
 
         return $this->issueJwt([
-            'sub' => sprintf('user-%d', $user->id),
+            'sub' => $this->buildParticipantIdentity($user),
             'name' => $user->name,
             'nbf' => $issuedAt->timestamp,
             'iat' => $issuedAt->timestamp,
@@ -95,6 +95,89 @@ class LiveKitService
                 'recorder' => true,
             ],
         ]);
+    }
+
+    public function removeParticipantFromConsultation(Consultation $consultation, User $user): void
+    {
+        foreach ($this->candidateParticipantIdentities($user) as $identity) {
+            if ($this->removeParticipantByIdentity($consultation, $identity)) {
+                return;
+            }
+        }
+    }
+
+    public function removeParticipantByIdentity(Consultation $consultation, string $identity): bool
+    {
+        if ($consultation->livekit_room_name === null || trim($identity) === '') {
+            return false;
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
+
+        $response = Http::acceptJson()
+            ->withToken($serverToken)
+            ->asJson()
+            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/RemoveParticipant', [
+                'room' => $consultation->livekit_room_name,
+                'identity' => $identity,
+            ]);
+
+        if ($response->successful()) {
+            return true;
+        }
+
+        $errorCode = (string) $response->json('code');
+
+        if ($response->status() === 404 || in_array($errorCode, ['not_found', 'participant_not_found'], true)) {
+            return false;
+        }
+
+        throw new RuntimeException(
+            sprintf('LiveKit participant removal failed [%d]: %s', $response->status(), $response->body())
+        );
+    }
+
+    public function deleteRoom(Consultation $consultation): void
+    {
+        if ($consultation->livekit_room_name === null) {
+            return;
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
+
+        $response = Http::acceptJson()
+            ->withToken($serverToken)
+            ->asJson()
+            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/DeleteRoom', [
+                'room' => $consultation->livekit_room_name,
+            ]);
+
+        $errorCode = (string) $response->json('code');
+
+        if (! $response->successful() && ! ($response->status() === 404 || $errorCode === 'not_found')) {
+            throw new RuntimeException(
+                sprintf('LiveKit room deletion failed [%d]: %s', $response->status(), $response->body())
+            );
+        }
+
+        $consultation->forceFill([
+            'livekit_room_status' => 'ended',
+            'livekit_ended_at' => now(),
+            'livekit_last_activity_at' => now(),
+            'livekit_last_error' => null,
+        ])->save();
     }
 
     protected function createRoom(string $roomName): ?string
@@ -177,5 +260,40 @@ class LiveKitService
     protected function base64UrlEncode(string $value): string
     {
         return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function candidateParticipantIdentities(User $user): array
+    {
+        return array_values(array_unique([
+            $this->buildParticipantIdentity($user),
+            (string) $user->id,
+        ]));
+    }
+
+    private function buildParticipantIdentity(User $user): string
+    {
+        return sprintf('user-%d', $user->id);
+    }
+
+    private function issueRoomAdminToken(?string $roomName = null): string
+    {
+        $videoGrant = [
+            'roomAdmin' => true,
+        ];
+
+        if ($roomName !== null && $roomName !== '') {
+            $videoGrant['room'] = $roomName;
+        }
+
+        return $this->issueJwt([
+            'sub' => 'consultation-room-admin',
+            'nbf' => now()->timestamp,
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes(5)->timestamp,
+            'video' => $videoGrant,
+        ]);
     }
 }

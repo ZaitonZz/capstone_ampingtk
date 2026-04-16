@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Middleware\EnsureActiveUserStatus;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureDoctor;
+use App\Http\Middleware\EnsureDoctorOrAdmin;
 use App\Http\Middleware\EnsureMedicalStaff;
+use App\Http\Middleware\EnsurePasswordChangeRequired;
 use App\Http\Middleware\EnsurePatient;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -33,13 +36,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'patient' => EnsurePatient::class,
             'doctor' => EnsureDoctor::class,
             'admin' => EnsureAdmin::class,
+            'doctor.or.admin' => EnsureDoctorOrAdmin::class,
             'require-otp' => RequireOtpVerification::class,
             'pipeline.internal' => VerifyPipelineSignature::class,
+            'active.user' => EnsureActiveUserStatus::class,
+            'password.change.required' => EnsurePasswordChangeRequired::class,
         ]);
 
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,
+            EnsureActiveUserStatus::class,
+            EnsurePasswordChangeRequired::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
     })

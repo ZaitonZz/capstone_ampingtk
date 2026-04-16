@@ -6,13 +6,17 @@ use App\Models\Consultation;
 use App\Models\ConsultationMicrocheck;
 use App\Models\DeepfakeScanLog;
 use App\Services\ConsultationMicrocheckService;
+use App\Services\DeepfakeEscalationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class PipelineScanResultController extends Controller
 {
-    public function __construct(private ConsultationMicrocheckService $microcheckService) {}
+    public function __construct(
+        private ConsultationMicrocheckService $microcheckService,
+        private DeepfakeEscalationService $deepfakeEscalationService,
+    ) {}
 
     public function store(Request $request): JsonResponse
     {
@@ -56,6 +60,12 @@ class PipelineScanResultController extends Controller
             ], 422);
         }
 
+        if ($microcheck->target_role !== null && $microcheck->target_role !== $validated['verified_role']) {
+            return response()->json([
+                'message' => 'Microcheck role does not match the submitted verification role.',
+            ], 422);
+        }
+
         if ($microcheck->status !== 'claimed') {
             return response()->json([
                 'message' => 'Microcheck must be claimed before scan result submission.',
@@ -92,6 +102,10 @@ class PipelineScanResultController extends Controller
         if ($log->result === 'fake') {
             $consultation->update(['deepfake_verified' => false]);
         }
+
+        $this->deepfakeEscalationService->handleNewScanLog($log);
+
+        $consultation->refresh();
 
         $this->microcheckService->ensurePendingCheck($consultation, $completedAt);
 

@@ -1,4 +1,4 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -15,7 +15,7 @@ import {
     Volume2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ElementType } from 'react';
+import type { ChangeEvent, ElementType, FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -31,11 +31,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation, ConsultationConsent } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationConsent,
+    ConsultationIdentityVerificationState,
+} from '@/types/consultation';
 
 interface LiveKitLobbyProps {
     enabled: boolean;
@@ -68,6 +73,7 @@ interface PageProps {
 interface Props {
     consultation: Consultation;
     consent: ConsultationConsent | null;
+    verification?: ConsultationIdentityVerificationState;
     livekit?: LiveKitLobbyProps;
 }
 
@@ -155,12 +161,42 @@ function getCookie(name: string): string | null {
     return decodeURIComponent(match[1]);
 }
 
+function secondsUntil(dateString: string | null | undefined): number {
+    if (!dateString) {
+        return 0;
+    }
+
+    const target = new Date(dateString).getTime();
+
+    if (Number.isNaN(target)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.floor((target - Date.now()) / 1000));
+}
+
+function formatCountdown(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function ConsultationLobbyPage({
     consultation,
     consent,
+    verification,
     livekit,
 }: Props) {
     const page = usePage<PageProps>();
+    const isPaused =
+        verification?.is_paused === true || consultation.status === 'paused';
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        2000,
+        { only: ['consultation', 'verification'] },
+        { autoStart: false },
+    );
+
     const [cameraOn, setCameraOn] = useState(true);
     const [micOn, setMicOn] = useState(true);
     const [deviceTestOpen, setDeviceTestOpen] = useState(false);
@@ -176,10 +212,24 @@ export default function ConsultationLobbyPage({
 
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [connectError, setConnectError] = useState<string | null>(null);
+    const [otpCode, setOtpCode] = useState('');
+    const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
+    const [isResendingOtp, setIsResendingOtp] = useState(false);
+
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
-    const canJoinSession = isConsentConfirmed || isAdminUser;
+    const hasJoinPermission = isConsentConfirmed || isAdminUser;
+    const canJoinSession = hasJoinPermission && !isPaused;
     const isLiveKitEnabled = livekit?.enabled === true;
+    const isCurrentUserVerificationTarget =
+        verification?.is_current_user_target === true;
+    const verificationTargetRole = verification?.target_role ?? 'participant';
+    const configuredOtpLength = Number(verification?.otp_length ?? 6);
+    const otpLength = Number.isFinite(configuredOtpLength)
+        ? Math.max(4, Math.floor(configuredOtpLength))
+        : 6;
+    const expiresInSeconds = secondsUntil(verification?.expires_at);
+    const resendInSeconds = secondsUntil(verification?.resend_available_at);
 
     const connectEndpoint = useMemo(
         () =>
@@ -187,6 +237,22 @@ export default function ConsultationLobbyPage({
             ConsultationLiveKitController.connect.url(consultation.id),
         [consultation.id, livekit?.connect_url],
     );
+
+    useEffect(() => {
+        if (isPaused) {
+            startPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        stopPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
 
     // Handle camera on/off
     useEffect(() => {
@@ -384,6 +450,20 @@ export default function ConsultationLobbyPage({
     ];
 
     async function handleJoinCall(): Promise<void> {
+        if (isPaused) {
+            if (isCurrentUserVerificationTarget) {
+                toast.error(
+                    'Verify your OTP in the lobby before rejoining the consultation.',
+                );
+            } else {
+                toast.error(
+                    `Consultation is paused while the ${verificationTargetRole} completes identity verification.`,
+                );
+            }
+
+            return;
+        }
+
         if (!canJoinSession) {
             toast.error(
                 'Consent is required before joining this teleconsultation.',
@@ -480,17 +560,81 @@ export default function ConsultationLobbyPage({
         }
     }
 
+    function handleVerifyOtp(event: FormEvent<HTMLFormElement>): void {
+        event.preventDefault();
+
+        if (!verification?.verify_url) {
+            toast.error('Verification endpoint is unavailable.');
+
+            return;
+        }
+
+        const normalizedOtpCode = otpCode.trim();
+        const otpPattern = new RegExp(`^\\d{${otpLength}}$`);
+
+        if (!otpPattern.test(normalizedOtpCode)) {
+            toast.error(`Enter a valid ${otpLength}-digit OTP code.`);
+
+            return;
+        }
+
+        router.post(
+            verification.verify_url,
+            { otp_code: normalizedOtpCode },
+            {
+                preserveScroll: true,
+                onStart: () => setIsSubmittingOtp(true),
+                onFinish: () => setIsSubmittingOtp(false),
+                onSuccess: () => {
+                    setOtpCode('');
+                    toast.success('Identity verification submitted.');
+                },
+                onError: (errors) => {
+                    const otpError =
+                        typeof errors.otp_code === 'string'
+                            ? errors.otp_code
+                            : 'OTP verification failed.';
+                    toast.error(otpError);
+                },
+            },
+        );
+    }
+
+    function handleResendOtp(): void {
+        if (!verification?.resend_url) {
+            toast.error('Resend endpoint is unavailable.');
+
+            return;
+        }
+
+        router.post(
+            verification.resend_url,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setIsResendingOtp(true),
+                onFinish: () => setIsResendingOtp(false),
+            },
+        );
+    }
+
     const statusLabel = !isLiveKitEnabled
         ? 'LiveKit disabled'
-        : isAdminUser
+        : isPaused
+          ? isCurrentUserVerificationTarget
+              ? 'Paused: verification required'
+              : `Paused: waiting for ${verificationTargetRole}`
+          : isAdminUser
             ? 'Admin audit access'
             : isConsentConfirmed
-                ? 'Ready to join'
-                : 'Consent required';
+              ? 'Ready to join'
+              : 'Consent required';
 
     const statusPillClass = !isLiveKitEnabled
         ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
-        : canJoinSession
+        : isPaused
+          ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700'
+          : canJoinSession
             ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
             : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
 
@@ -545,9 +689,9 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative w-full aspect-video max-h-[550px] overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5 flex items-center justify-center">
+                            <div className="relative flex aspect-video max-h-[550px] w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
                                 {/* Corner label */}
-                                <span className="absolute top-3 left-3 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm z-10">
+                                <span className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                                     Preview
                                 </span>
@@ -597,7 +741,7 @@ export default function ConsultationLobbyPage({
                                     const heights = ['h-1.5', 'h-2.5', 'h-3.5'];
 
                                     return (
-                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 backdrop-blur-sm ring-1 ring-white/10">
+                                        <div className="absolute right-3 bottom-3 flex items-center gap-2 rounded-full bg-black/35 px-2.5 py-1 ring-1 ring-white/10 backdrop-blur-sm">
                                             {micActive ? (
                                                 <Mic className="h-3.5 w-3.5 text-white/80" />
                                             ) : (
@@ -611,7 +755,10 @@ export default function ConsultationLobbyPage({
                                                         className={[
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
-                                                            showLevelBars && micLevel >= t ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]' : 'bg-white/10',
+                                                            showLevelBars &&
+                                                            micLevel >= t
+                                                                ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
+                                                                : 'bg-white/10',
                                                         ].join(' ')}
                                                     />
                                                 ))}
@@ -665,7 +812,7 @@ export default function ConsultationLobbyPage({
                     </div>
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
-                    <div className="flex flex-col gap-3 w-full lg:w-80">
+                    <div className="flex w-full flex-col gap-3 lg:w-80">
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
@@ -705,8 +852,8 @@ export default function ConsultationLobbyPage({
                                         consultation.type === 'teleconsultation'
                                             ? 'Video Teleconsult'
                                             : consultation.type === 'in_person'
-                                                ? 'In-person Consultation'
-                                                : '—'
+                                              ? 'In-person Consultation'
+                                              : '—'
                                     }
                                 />
                                 <SessionRow
@@ -716,8 +863,8 @@ export default function ConsultationLobbyPage({
                                     value={
                                         consultation.scheduled_at
                                             ? new Date(
-                                                consultation.scheduled_at,
-                                            ).toLocaleString()
+                                                  consultation.scheduled_at,
+                                              ).toLocaleString()
                                             : '—'
                                     }
                                 />
@@ -736,10 +883,10 @@ export default function ConsultationLobbyPage({
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
                                 <div
-                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${canJoinSession ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
+                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${hasJoinPermission ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
                                 >
                                     <CheckCircle2
-                                        className={`h-3 w-3 ${canJoinSession ? 'text-emerald-500' : 'text-amber-500'}`}
+                                        className={`h-3 w-3 ${hasJoinPermission ? 'text-emerald-500' : 'text-amber-500'}`}
                                     />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
@@ -747,7 +894,7 @@ export default function ConsultationLobbyPage({
                                 </p>
                             </div>
 
-                            {canJoinSession ? (
+                            {hasJoinPermission ? (
                                 <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
                                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                                     <span className="font-semibold">
@@ -785,7 +932,7 @@ export default function ConsultationLobbyPage({
                                         <CheckCircle2
                                             className={[
                                                 'h-3 w-3 shrink-0',
-                                                canJoinSession
+                                                hasJoinPermission
                                                     ? 'text-emerald-500'
                                                     : 'text-muted-foreground/30',
                                             ].join(' ')}
@@ -800,7 +947,7 @@ export default function ConsultationLobbyPage({
                             <div className="flex items-center gap-2">
                                 <Checkbox
                                     id="lobby-consent-check"
-                                    checked={canJoinSession}
+                                    checked={hasJoinPermission}
                                     disabled
                                 />
                                 <Label
@@ -813,6 +960,89 @@ export default function ConsultationLobbyPage({
                                 </Label>
                             </div>
                         </div>
+
+                        {isPaused && (
+                            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm dark:border-amber-800 dark:bg-amber-950/40">
+                                <p className="text-xs font-semibold tracking-wider text-amber-700 uppercase dark:text-amber-300">
+                                    Consultation Paused
+                                </p>
+
+                                {isCurrentUserVerificationTarget ? (
+                                    <>
+                                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                                            Your identity must be verified
+                                            before you can rejoin. Enter the OTP
+                                            sent to your email.
+                                        </p>
+
+                                        <form
+                                            className="mt-3 flex flex-col gap-2"
+                                            onSubmit={handleVerifyOtp}
+                                        >
+                                            <Input
+                                                value={otpCode}
+                                                onChange={(
+                                                    event: ChangeEvent<HTMLInputElement>,
+                                                ) =>
+                                                    setOtpCode(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                inputMode="numeric"
+                                                maxLength={otpLength}
+                                                placeholder={`Enter ${otpLength}-digit OTP`}
+                                            />
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    isSubmittingOtp ||
+                                                    otpCode.trim().length !==
+                                                        otpLength
+                                                }
+                                                className="w-full"
+                                            >
+                                                {isSubmittingOtp
+                                                    ? 'Verifying...'
+                                                    : 'Verify Identity'}
+                                            </Button>
+                                        </form>
+
+                                        <div className="mt-2 flex items-center justify-between gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                    isResendingOtp ||
+                                                    resendInSeconds > 0
+                                                }
+                                                onClick={handleResendOtp}
+                                            >
+                                                {resendInSeconds > 0
+                                                    ? `Resend in ${formatCountdown(resendInSeconds)}`
+                                                    : isResendingOtp
+                                                      ? 'Sending...'
+                                                      : 'Resend OTP'}
+                                            </Button>
+                                            {expiresInSeconds > 0 && (
+                                                <span className="text-[11px] text-amber-700 dark:text-amber-300">
+                                                    Expires in{' '}
+                                                    {formatCountdown(
+                                                        expiresInSeconds,
+                                                    )}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                                        Consultation is paused while the{' '}
+                                        {verificationTargetRole} completes
+                                        identity verification.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         {connectState === 'error' && connectError && (
                             <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 shadow-sm dark:border-rose-800 dark:bg-rose-950/40">
@@ -852,9 +1082,16 @@ export default function ConsultationLobbyPage({
                                 )}
                             </Button>
 
-                            {!canJoinSession && (
+                            {!hasJoinPermission && (
                                 <p className="text-center text-xs text-muted-foreground">
                                     Complete consent to enable joining.
+                                </p>
+                            )}
+
+                            {hasJoinPermission && isPaused && (
+                                <p className="text-center text-xs text-muted-foreground">
+                                    Joining is disabled until identity
+                                    verification is completed.
                                 </p>
                             )}
 
