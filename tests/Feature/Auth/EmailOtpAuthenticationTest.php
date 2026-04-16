@@ -57,6 +57,16 @@ describe('Email OTP Authentication', function () {
 
             $response->assertUnprocessable();
             $response->assertJsonValidationErrors('email');
+
+            $failedLogin = ActivityLog::query()
+                ->where('event_type', 'failed_login')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($failedLogin)->not()->toBeNull();
+            expect(data_get($failedLogin?->context, 'reason'))->toBe('invalid_credentials');
+            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
         });
 
         it('creates pending login state and sends OTP email for valid credentials', function () {
@@ -127,6 +137,15 @@ describe('Email OTP Authentication', function () {
             $this->assertAuthenticatedAs($patient);
             expect(session('otp_verified'))->toBeTrue();
             Mail::assertNothingSent();
+
+            $successfulLogin = ActivityLog::query()
+                ->where('event_type', 'login_success')
+                ->where('user_id', $patient->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($successfulLogin)->not()->toBeNull();
+            expect(data_get($successfulLogin?->context, 'role'))->toBe($patient->role);
         });
 
         it('logs unusual access pattern once the third unique IP is reached', function () {
@@ -395,6 +414,15 @@ describe('Email OTP Authentication', function () {
 
             // Verify pending login state is cleared
             expect(Cache::has($cacheKey))->toBeFalse();
+
+            $successfulLogin = ActivityLog::query()
+                ->where('event_type', 'login_success')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($successfulLogin)->not()->toBeNull();
+            expect(data_get($successfulLogin?->context, 'role'))->toBe($user->role);
         });
 
         it('rejects incorrect OTP and increments attempts', function () {
@@ -429,6 +457,16 @@ describe('Email OTP Authentication', function () {
             // Verify attempts were incremented
             $updatedState = Cache::get($cacheKey);
             expect($updatedState['attempts'])->toBe(1);
+
+            $failedLogin = ActivityLog::query()
+                ->where('event_type', 'failed_login')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($failedLogin)->not()->toBeNull();
+            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_invalid');
+            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
         });
 
         it('rejects expired OTP', function () {
@@ -460,6 +498,16 @@ describe('Email OTP Authentication', function () {
 
             $response->assertUnprocessable();
             $response->assertJsonValidationErrors('otp_code');
+
+            $failedLogin = ActivityLog::query()
+                ->where('event_type', 'failed_login')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($failedLogin)->not()->toBeNull();
+            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_expired');
+            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
         });
 
         it('rejects OTP after max attempts exceeded', function () {
@@ -491,6 +539,16 @@ describe('Email OTP Authentication', function () {
             ]);
 
             $response->assertUnprocessable();
+
+            $failedLogin = ActivityLog::query()
+                ->where('event_type', 'failed_login')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($failedLogin)->not()->toBeNull();
+            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_max_attempts');
+            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
         });
 
         it('enforces rate limiting on verify attempts', function () {
