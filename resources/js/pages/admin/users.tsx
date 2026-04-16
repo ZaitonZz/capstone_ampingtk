@@ -18,9 +18,7 @@ import AppLayout from '@/layouts/app-layout';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import * as AdminUsersRoute from '@/routes/admin/users';
 import type { BreadcrumbItem } from '@/types';
-
-type UserRole = 'admin' | 'doctor' | 'medicalstaff' | 'patient';
-type UserStatus = 'active' | 'inactive' | 'suspended';
+import type { UserRole, UserStatus } from '@/types/auth';
 
 type DoctorProfilePayload = {
     specialty: string;
