@@ -188,7 +188,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                         'title' => $log->title,
                         'description' => $log->description,
                         'user_name' => $log->user?->name,
-                        'user_email' => $log->context['email'] ?? $log->user?->email,
+                        'user_email' => data_get($log->context, 'email') ?? $log->user?->email,
                         'ip_address' => $log->ip_address,
                         'occurred_at' => $log->occurred_at?->toIso8601String(),
                     ];
