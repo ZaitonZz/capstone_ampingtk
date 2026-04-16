@@ -14,8 +14,11 @@ use App\Http\Controllers\PipelineMicrocheckController;
 use App\Http\Controllers\PipelinePatientFaceController;
 use App\Http\Controllers\PipelineRoomsController;
 use App\Http\Controllers\PipelineScanResultController;
+use App\Models\ActivityLog;
 use App\Models\Consultation;
+use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeScanLog;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -171,7 +174,147 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Admin-specific dashboard
     Route::middleware('admin')->group(function () {
         Route::get('admin/dashboard', function () {
-            return inertia('dashboard');
+            $failedLogins = ActivityLog::query()
+                ->where('event_type', 'failed_login')
+                ->with('user:id,name,email')
+                ->latest('occurred_at')
+                ->limit(20)
+                ->get()
+                ->map(function (ActivityLog $log): array {
+                    return [
+                        'id' => sprintf('activity-%d', $log->id),
+                        'event_type' => 'failed_login',
+                        'severity' => $log->severity,
+                        'title' => $log->title,
+                        'description' => $log->description,
+                        'user_name' => $log->user?->name,
+                        'user_email' => $log->context['email'] ?? $log->user?->email,
+                        'ip_address' => $log->ip_address,
+                        'occurred_at' => $log->occurred_at?->toIso8601String(),
+                    ];
+                });
+
+            $faceFailureGroups = ConsultationFaceVerificationLog::query()
+                ->selectRaw('user_id, verified_role, count(*) as failure_count, max(checked_at) as last_failed_at')
+                ->whereNotNull('user_id')
+                ->where('checked_at', '>=', now()->subDay())
+                ->where(function ($query): void {
+                    $query->where('matched', false)
+                        ->orWhere('flagged', true);
+                })
+                ->groupBy('user_id', 'verified_role')
+                ->havingRaw('count(*) >= 3')
+                ->get();
+
+            $deepfakeFailureGroups = DeepfakeScanLog::query()
+                ->selectRaw('user_id, verified_role, count(*) as failure_count, max(scanned_at) as last_failed_at')
+                ->whereNotNull('user_id')
+                ->where('scanned_at', '>=', now()->subDay())
+                ->where(function ($query): void {
+                    $query->where('result', 'fake')
+                        ->orWhere('flagged', true);
+                })
+                ->groupBy('user_id', 'verified_role')
+                ->havingRaw('count(*) >= 3')
+                ->get();
+
+            $identityFailureUserIds = $faceFailureGroups
+                ->pluck('user_id')
+                ->merge($deepfakeFailureGroups->pluck('user_id'))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $identityFailureUsers = User::query()
+                ->whereIn('id', $identityFailureUserIds)
+                ->get(['id', 'name', 'email'])
+                ->keyBy('id');
+
+            $repeatedIdentityFailures = $faceFailureGroups
+                ->map(function ($group) use ($identityFailureUsers): array {
+                    $user = $identityFailureUsers->get($group->user_id);
+
+                    return [
+                        'id' => sprintf('face-%d-%s', $group->user_id, $group->verified_role ?? 'unknown'),
+                        'event_type' => 'repeated_identity_check_failure',
+                        'severity' => 'high',
+                        'title' => 'Repeated identity-check failures detected',
+                        'description' => sprintf(
+                            '%d failed face-match checks in the last 24 hours.',
+                            (int) $group->failure_count
+                        ),
+                        'user_name' => $user?->name,
+                        'user_email' => $user?->email,
+                        'ip_address' => null,
+                        'occurred_at' => filled($group->last_failed_at)
+                            ? \Illuminate\Support\Carbon::parse($group->last_failed_at)->toIso8601String()
+                            : null,
+                    ];
+                })
+                ->merge(
+                    $deepfakeFailureGroups->map(function ($group) use ($identityFailureUsers): array {
+                        $user = $identityFailureUsers->get($group->user_id);
+
+                        return [
+                            'id' => sprintf('deepfake-%d-%s', $group->user_id, $group->verified_role ?? 'unknown'),
+                            'event_type' => 'repeated_identity_check_failure',
+                            'severity' => 'high',
+                            'title' => 'Repeated identity-check failures detected',
+                            'description' => sprintf(
+                                '%d deepfake/flagged scan results in the last 24 hours.',
+                                (int) $group->failure_count
+                            ),
+                            'user_name' => $user?->name,
+                            'user_email' => $user?->email,
+                            'ip_address' => null,
+                            'occurred_at' => filled($group->last_failed_at)
+                                ? \Illuminate\Support\Carbon::parse($group->last_failed_at)->toIso8601String()
+                                : null,
+                        ];
+                    })
+                );
+
+            $unusualAccessPatterns = ActivityLog::query()
+                ->where('event_type', 'unusual_access_pattern')
+                ->with('user:id,name,email')
+                ->latest('occurred_at')
+                ->limit(20)
+                ->get()
+                ->map(function (ActivityLog $log): array {
+                    return [
+                        'id' => sprintf('activity-%d', $log->id),
+                        'event_type' => 'unusual_access_pattern',
+                        'severity' => $log->severity,
+                        'title' => $log->title,
+                        'description' => $log->description,
+                        'user_name' => $log->user?->name,
+                        'user_email' => $log->user?->email,
+                        'ip_address' => $log->ip_address,
+                        'occurred_at' => $log->occurred_at?->toIso8601String(),
+                    ];
+                });
+
+            $activityLogs = $failedLogins
+                ->merge($repeatedIdentityFailures)
+                ->merge($unusualAccessPatterns)
+                ->sortByDesc('occurred_at')
+                ->take(30)
+                ->values();
+
+            return inertia('dashboard', [
+                'admin_activity_logs' => $activityLogs,
+                'admin_activity_summary' => [
+                    'failed_logins_24h' => ActivityLog::query()
+                        ->where('event_type', 'failed_login')
+                        ->where('occurred_at', '>=', now()->subDay())
+                        ->count(),
+                    'repeated_identity_failures_24h' => $repeatedIdentityFailures->count(),
+                    'unusual_access_patterns_24h' => ActivityLog::query()
+                        ->where('event_type', 'unusual_access_pattern')
+                        ->where('occurred_at', '>=', now()->subDay())
+                        ->count(),
+                ],
+            ]);
         })->name('admin.dashboard');
     });
 });
