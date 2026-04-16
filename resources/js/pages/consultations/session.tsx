@@ -1,4 +1,4 @@
-import { Head, Link, usePoll } from '@inertiajs/react';
+import { Head, Link, router, usePoll } from '@inertiajs/react';
 import '@livekit/components-styles';
 import {
     ControlBar,
@@ -10,7 +10,7 @@ import {
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
@@ -103,6 +103,7 @@ export default function ConsultationSessionPage({
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
+    const hasAutoRedirectedRef = useRef(false);
 
     useEffect(() => {
         if (isPaused) {
@@ -123,6 +124,31 @@ export default function ConsultationSessionPage({
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
     const verificationTargetRole = verification?.target_role ?? 'participant';
+
+    const shouldRedirectToLobbyForVerification =
+        isPaused && isCurrentUserVerificationTarget;
+
+    const redirectToLobbyForVerification = useCallback((): void => {
+        if (hasAutoRedirectedRef.current) {
+            return;
+        }
+
+        hasAutoRedirectedRef.current = true;
+        window.sessionStorage.removeItem(storageKey);
+
+        router.visit(ConsultationLobbyController.show.url(consultation.id), {
+            replace: true,
+            preserveScroll: true,
+        });
+    }, [consultation.id, storageKey]);
+
+    useEffect(() => {
+        if (!shouldRedirectToLobbyForVerification) {
+            return;
+        }
+
+        redirectToLobbyForVerification();
+    }, [shouldRedirectToLobbyForVerification, redirectToLobbyForVerification]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
@@ -274,6 +300,12 @@ export default function ConsultationSessionPage({
                                         window.sessionStorage.removeItem(
                                             storageKey,
                                         );
+
+                                        if (
+                                            shouldRedirectToLobbyForVerification
+                                        ) {
+                                            redirectToLobbyForVerification();
+                                        }
                                     }}
                                 >
                                     <ConsultationCallStage />
