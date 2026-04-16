@@ -63,7 +63,8 @@ class AdminDeepfakeLogController extends Controller
                 $flaggedFilter === 'unflagged',
                 fn ($query) => $query->where('flagged', false)
             )
-            ->latest('scanned_at')
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
 
