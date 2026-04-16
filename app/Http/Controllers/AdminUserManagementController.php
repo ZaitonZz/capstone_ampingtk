@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class AdminUserManagementController extends Controller
 {
@@ -79,12 +80,18 @@ class AdminUserManagementController extends Controller
             return $user;
         });
 
-        Mail::send(new AdminUserTemporaryPasswordMail(
-            recipientName: $user->name,
-            recipientEmail: $user->email,
-            role: $this->displayRole($user->role),
-            temporaryPassword: $temporaryPassword,
-        ));
+        try {
+            Mail::send(new AdminUserTemporaryPasswordMail(
+                recipientName: $user->name,
+                recipientEmail: $user->email,
+                role: $this->displayRole($user->role),
+                temporaryPassword: $temporaryPassword,
+            ));
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'User account was created, but temporary credentials email failed to send. Please trigger a password reset manually.');
+        }
 
         return back()->with('success', 'User account created successfully. Temporary credentials were emailed.');
     }

@@ -22,22 +22,24 @@ class StoreAdminUserRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique(User::class)],
             'role' => ['required', 'string', 'in:admin,doctor,medicalstaff,patient'],
             'status' => ['required', 'string', 'in:active,inactive,suspended'],
-            'doctor_profile' => [Rule::requiredIf($requiresDoctorProfile), 'array'],
+            'doctor_profile' => ['exclude_unless:role,doctor', Rule::requiredIf($requiresDoctorProfile), 'array'],
             'doctor_profile.specialty' => [
+                'exclude_unless:role,doctor',
                 Rule::requiredIf($requiresDoctorProfile),
                 'string',
                 'max:191',
             ],
             'doctor_profile.license_number' => [
+                'exclude_unless:role,doctor',
                 Rule::requiredIf($requiresDoctorProfile),
                 'string',
                 'max:191',
                 Rule::unique('doctor_profiles', 'license_number'),
             ],
-            'doctor_profile.clinic_name' => ['nullable', 'string', 'max:191'],
-            'doctor_profile.clinic_address' => ['nullable', 'string'],
-            'doctor_profile.phone' => ['nullable', 'string', 'max:30'],
-            'doctor_profile.bio' => ['nullable', 'string'],
+            'doctor_profile.clinic_name' => ['exclude_unless:role,doctor', 'nullable', 'string', 'max:191'],
+            'doctor_profile.clinic_address' => ['exclude_unless:role,doctor', 'nullable', 'string'],
+            'doctor_profile.phone' => ['exclude_unless:role,doctor', 'nullable', 'string', 'max:30'],
+            'doctor_profile.bio' => ['exclude_unless:role,doctor', 'nullable', 'string'],
         ];
     }
 
