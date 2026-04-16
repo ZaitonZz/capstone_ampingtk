@@ -1,6 +1,7 @@
 <?php
 
 use App\Mail\AdminUserTemporaryPasswordMail;
+use App\Models\DoctorProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -69,6 +70,78 @@ it('admin can create a doctor account and send temporary credentials', function 
     });
 });
 
+it('keeps the user when temporary credential email sending fails', function () {
+    $admin = User::factory()->admin()->create();
+
+    Mail::shouldReceive('send')
+        ->once()
+        ->withArgs(fn ($mailable): bool => $mailable instanceof AdminUserTemporaryPasswordMail)
+        ->andThrow(new RuntimeException('SMTP transport unavailable'));
+
+    $payload = [
+        'name' => 'Patient Mail Failure',
+        'email' => 'patient.mail.failure@example.com',
+        'role' => 'patient',
+        'status' => 'active',
+        'doctor_profile' => [
+            'specialty' => '',
+            'license_number' => '',
+            'clinic_name' => '',
+            'clinic_address' => '',
+            'phone' => '',
+            'bio' => '',
+        ],
+    ];
+
+    $this->actingAsVerified($admin)
+        ->from(route('admin.users.index'))
+        ->post(route('admin.users.store'), $payload)
+        ->assertRedirect(route('admin.users.index'))
+        ->assertSessionHas('error', 'User account was created, but temporary credentials email failed to send. Please trigger a password reset manually.');
+
+    $createdUser = User::query()->where('email', 'patient.mail.failure@example.com')->first();
+
+    expect($createdUser)->not->toBeNull();
+    expect($createdUser->role)->toBe('patient');
+    expect($createdUser->must_change_password)->toBeTrue();
+    expect($createdUser->email_verified_at)->not->toBeNull();
+});
+
+it('ignores doctor profile payload when creating a non-doctor account', function () {
+    $admin = User::factory()->admin()->create();
+    DoctorProfile::factory()->create([
+        'license_number' => 'LIC-USED-STORE-001',
+    ]);
+    Mail::fake();
+
+    $this->actingAsVerified($admin)
+        ->post(route('admin.users.store'), [
+            'name' => 'Non Doctor With Profile Payload',
+            'email' => 'non.doctor.profile.store@example.com',
+            'role' => 'patient',
+            'status' => 'active',
+            'doctor_profile' => [
+                'specialty' => 'Should Be Ignored',
+                'license_number' => 'LIC-USED-STORE-001',
+                'clinic_name' => 'Ignored Clinic',
+                'clinic_address' => 'Ignored Address',
+                'phone' => '+63-999-8888',
+                'bio' => 'Ignored Bio',
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors(['doctor_profile.license_number']);
+
+    $createdUser = User::query()->where('email', 'non.doctor.profile.store@example.com')->first();
+
+    expect($createdUser)->not->toBeNull();
+    expect($createdUser->role)->toBe('patient');
+
+    $this->assertDatabaseMissing('doctor_profiles', [
+        'user_id' => $createdUser->id,
+    ]);
+});
+
 it('requires doctor profile details when creating a doctor account', function () {
     $admin = User::factory()->admin()->create();
 
@@ -99,6 +172,41 @@ it('admin can update another users role and status', function () {
 
     expect($targetUser->fresh()->role)->toBe('medicalstaff');
     expect($targetUser->fresh()->status)->toBe('suspended');
+});
+
+it('ignores doctor profile payload when updating to a non-doctor role', function () {
+    $admin = User::factory()->admin()->create();
+    DoctorProfile::factory()->create([
+        'license_number' => 'LIC-USED-UPDATE-001',
+    ]);
+    $targetUser = User::factory()->patient()->create([
+        'status' => 'active',
+    ]);
+
+    $this->actingAsVerified($admin)
+        ->patch(route('admin.users.update', $targetUser), [
+            'name' => 'Updated Non Doctor',
+            'email' => $targetUser->email,
+            'role' => 'medicalstaff',
+            'status' => 'suspended',
+            'doctor_profile' => [
+                'specialty' => 'Should Be Ignored',
+                'license_number' => 'LIC-USED-UPDATE-001',
+                'clinic_name' => 'Ignored Clinic',
+                'clinic_address' => 'Ignored Address',
+                'phone' => '+63-999-7777',
+                'bio' => 'Ignored Bio',
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionDoesntHaveErrors(['doctor_profile.license_number']);
+
+    expect($targetUser->fresh()->role)->toBe('medicalstaff');
+    expect($targetUser->fresh()->status)->toBe('suspended');
+
+    $this->assertDatabaseMissing('doctor_profiles', [
+        'user_id' => $targetUser->id,
+    ]);
 });
 
 it('admin cannot remove their own admin role', function () {
