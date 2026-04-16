@@ -13,7 +13,9 @@ class AdminDeepfakeLogController extends Controller
     {
         $search = $request->string('search')->toString();
         $resultFilter = $request->query('result');
+        $resultFilter = in_array($resultFilter, ['real', 'fake', 'inconclusive'], true) ? $resultFilter : null;
         $flaggedFilter = $request->query('flagged');
+        $flaggedFilter = in_array($flaggedFilter, ['flagged', 'unflagged'], true) ? $flaggedFilter : null;
 
         $deepfakeLogs = DeepfakeScanLog::query()
             ->with([
