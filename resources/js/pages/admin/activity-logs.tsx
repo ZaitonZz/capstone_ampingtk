@@ -65,14 +65,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function eventBadgeVariant(event: string): 'default' | 'secondary' | 'destructive' {
-    if (event.startsWith('auth.')) {
-        return 'secondary';
-    }
-
     if (event.includes('failed') || event.includes('denied') || event.includes('deleted')) {
         return 'destructive';
     }
 
+    if (event.startsWith('auth.')) {
+        return 'secondary';
+    }
     return 'default';
 }
 
