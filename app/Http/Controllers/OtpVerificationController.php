@@ -582,17 +582,14 @@ class OtpVerificationController extends Controller
             return;
         }
 
-        $recentSuccessfulLogins = ActivityLog::query()
+        $uniqueIpCount = ActivityLog::query()
             ->where('event_type', 'login_success')
             ->where('user_id', $user->id)
             ->where('occurred_at', '>=', now()->subDay())
-            ->get(['ip_address']);
-
-        $uniqueIpCount = $recentSuccessfulLogins
-            ->pluck('ip_address')
-            ->filter()
-            ->unique()
-            ->count();
+            ->whereNotNull('ip_address')
+            ->where('ip_address', '!=', '')
+            ->distinct()
+            ->count('ip_address');
 
         if ($uniqueIpCount < 3) {
             return;

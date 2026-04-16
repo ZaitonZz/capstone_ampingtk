@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
@@ -9,7 +10,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function () {
     // Use array driver for cache in tests
     config(['cache.default' => 'array']);
-    
+
     // Use fake mail driver
     Mail::fake();
 });
@@ -95,7 +96,7 @@ describe('Email OTP Authentication', function () {
 
             // Verify pending login state is in cache
             $pendingLoginToken = session('pending_login_token');
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             $cachedState = Cache::get($cacheKey);
 
             expect($cachedState)->toBeArray();
@@ -128,6 +129,85 @@ describe('Email OTP Authentication', function () {
             Mail::assertNothingSent();
         });
 
+        it('logs unusual access pattern once the third unique IP is reached', function () {
+            config(['auth_otp.enabled' => false]);
+
+            $user = User::factory()->create([
+                'password' => Hash::make('correct-password'),
+            ]);
+
+            ActivityLog::query()->create([
+                'user_id' => $user->id,
+                'event_type' => 'login_success',
+                'severity' => 'info',
+                'title' => 'Successful login',
+                'description' => 'User login completed successfully.',
+                'ip_address' => '203.0.113.10',
+                'user_agent' => 'Pest',
+                'occurred_at' => now()->subHour(),
+                'context' => ['role' => $user->role],
+            ]);
+
+            ActivityLog::query()->create([
+                'user_id' => $user->id,
+                'event_type' => 'login_success',
+                'severity' => 'info',
+                'title' => 'Successful login',
+                'description' => 'User login completed successfully.',
+                'ip_address' => '198.51.100.20',
+                'user_agent' => 'Pest',
+                'occurred_at' => now()->subMinutes(30),
+                'context' => ['role' => $user->role],
+            ]);
+
+            ActivityLog::query()->create([
+                'user_id' => $user->id,
+                'event_type' => 'login_success',
+                'severity' => 'info',
+                'title' => 'Successful login',
+                'description' => 'User login completed successfully.',
+                'ip_address' => null,
+                'user_agent' => 'Pest',
+                'occurred_at' => now()->subMinutes(20),
+                'context' => ['role' => $user->role],
+            ]);
+
+            ActivityLog::query()->create([
+                'user_id' => $user->id,
+                'event_type' => 'login_success',
+                'severity' => 'info',
+                'title' => 'Successful login',
+                'description' => 'User login completed successfully.',
+                'ip_address' => '',
+                'user_agent' => 'Pest',
+                'occurred_at' => now()->subMinutes(10),
+                'context' => ['role' => $user->role],
+            ]);
+
+            $response = $this->withServerVariables([
+                'REMOTE_ADDR' => '192.0.2.30',
+            ])->postJson(route('auth.email-login-start'), [
+                'email' => $user->email,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertOk();
+            $response->assertJson([
+                'success' => true,
+                'requires_otp' => false,
+            ]);
+
+            $warning = ActivityLog::query()
+                ->where('event_type', 'unusual_access_pattern')
+                ->where('user_id', $user->id)
+                ->latest('occurred_at')
+                ->first();
+
+            expect($warning)->not()->toBeNull();
+            expect($warning?->context)->toBeArray();
+            expect(data_get($warning?->context, 'unique_ip_count_24h'))->toBe(3);
+        });
+
         it('masks email correctly in response', function () {
             $user = User::factory()->create([
                 'email' => 'johndoe@example.com',
@@ -141,7 +221,7 @@ describe('Email OTP Authentication', function () {
 
             $response->assertOk();
             $maskedEmail = $response->json('masked_email');
-            
+
             // Should show first letter and mask the rest
             expect($maskedEmail)->toContain('j******@example.com');
         });
@@ -156,7 +236,7 @@ describe('Email OTP Authentication', function () {
             // Make max + 1 requests
             for ($i = 0; $i < $maxAttempts; $i++) {
                 $this->postJson(route('auth.email-login-start'), [
-                    'email' => 'nonexistent' . $i . '@example.com',
+                    'email' => 'nonexistent'.$i.'@example.com',
                     'password' => 'password',
                 ]);
             }
@@ -195,7 +275,7 @@ describe('Email OTP Authentication', function () {
             ]);
 
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
 
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
@@ -243,7 +323,7 @@ describe('Email OTP Authentication', function () {
             session(['pending_login_token' => $pendingLoginToken]);
 
             // Store pending login state in cache
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -282,7 +362,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -323,7 +403,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -357,7 +437,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -389,7 +469,7 @@ describe('Email OTP Authentication', function () {
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
             $maxAttempts = config('auth_otp.otp.max_attempts', 5);
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -419,7 +499,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -467,7 +547,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -500,7 +580,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -543,7 +623,7 @@ describe('Email OTP Authentication', function () {
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
             $maxResends = config('auth_otp.otp.max_resends', 3);
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -571,7 +651,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
@@ -609,7 +689,7 @@ describe('Email OTP Authentication', function () {
             $otp = '123456';
             $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
 
-            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:') . $pendingLoginToken;
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
                 'user_id' => $user->id,
                 'user_email' => $user->email,
