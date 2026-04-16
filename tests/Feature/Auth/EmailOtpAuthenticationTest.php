@@ -58,6 +58,34 @@ describe('Email OTP Authentication', function () {
             $response->assertJsonValidationErrors('email');
         });
 
+        it('blocks login for inactive accounts', function () {
+            $user = User::factory()->inactive()->create([
+                'password' => Hash::make('correct-password'),
+            ]);
+
+            $response = $this->postJson(route('auth.email-login-start'), [
+                'email' => $user->email,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertUnprocessable();
+            $response->assertJsonValidationErrors('email');
+        });
+
+        it('blocks login for suspended accounts', function () {
+            $user = User::factory()->suspended()->create([
+                'password' => Hash::make('correct-password'),
+            ]);
+
+            $response = $this->postJson(route('auth.email-login-start'), [
+                'email' => $user->email,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertUnprocessable();
+            $response->assertJsonValidationErrors('email');
+        });
+
         it('creates pending login state and sends OTP email for valid credentials', function () {
             config(['auth_otp.enabled' => true]);
 
@@ -150,6 +178,29 @@ describe('Email OTP Authentication', function () {
             $this->assertAuthenticatedAs($medicalStaff);
             expect(session('otp_verified'))->toBeTrue();
             Mail::assertNothingSent();
+        });
+
+        it('redirects to password settings when OTP is disabled and password change is required', function () {
+            config(['auth_otp.enabled' => false]);
+
+            $doctor = User::factory()->doctor()->create([
+                'password' => Hash::make('correct-password'),
+                'must_change_password' => true,
+            ]);
+
+            $response = $this->postJson(route('auth.email-login-start'), [
+                'email' => $doctor->email,
+                'password' => 'correct-password',
+            ]);
+
+            $response->assertOk();
+            $response->assertJson([
+                'success' => true,
+                'requires_otp' => false,
+                'redirect_url' => route('user-password.edit'),
+            ]);
+
+            $this->assertAuthenticatedAs($doctor);
         });
 
         it('masks email correctly in response', function () {
@@ -339,6 +390,44 @@ describe('Email OTP Authentication', function () {
 
             // Verify pending login state is cleared
             expect(Cache::has($cacheKey))->toBeFalse();
+        });
+
+        it('redirects to password settings after OTP verification when password change is required', function () {
+            $user = User::factory()->doctor()->create([
+                'must_change_password' => true,
+            ]);
+
+            $otp = '123456';
+            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+
+            $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
+            Cache::put($cacheKey, [
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'otp_hash' => Hash::make($otp),
+                'created_at' => now()->toIso8601String(),
+                'expires_at' => now()->addMinutes(5)->toIso8601String(),
+                'attempts' => 0,
+                'max_attempts' => 5,
+                'resend_available_at' => now()->toIso8601String(),
+                'resend_count' => 0,
+                'max_resends' => 3,
+                'remember' => false,
+            ], now()->addMinutes(5));
+
+            $this->withSession(['pending_login_token' => $pendingLoginToken]);
+
+            $response = $this->postJson(route('auth.verify-otp-post'), [
+                'otp_code' => $otp,
+            ]);
+
+            $response->assertOk();
+            $response->assertJson([
+                'success' => true,
+                'redirect_url' => route('user-password.edit'),
+            ]);
+
+            $this->assertAuthenticatedAs($user);
         });
 
         it('rejects incorrect OTP and increments attempts', function () {
