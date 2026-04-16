@@ -12,8 +12,12 @@ class AdminMicrocheckLogController extends Controller
     public function index(Request $request): Response
     {
         $search = $request->string('search')->toString();
-        $statusFilter = $request->query('status');
-        $targetRoleFilter = $request->query('target_role');
+        $allowedStatuses = ['pending', 'claimed', 'completed', 'expired'];
+        $allowedTargetRoles = ['patient', 'doctor'];
+        $rawStatusFilter = $request->query('status');
+        $rawTargetRoleFilter = $request->query('target_role');
+        $statusFilter = in_array($rawStatusFilter, $allowedStatuses, true) ? $rawStatusFilter : null;
+        $targetRoleFilter = in_array($rawTargetRoleFilter, $allowedTargetRoles, true) ? $rawTargetRoleFilter : null;
 
         $microcheckLogs = ConsultationMicrocheck::query()
             ->with([
@@ -41,11 +45,11 @@ class AdminMicrocheckLogController extends Controller
                 });
             })
             ->when(
-                in_array($statusFilter, ['pending', 'claimed', 'completed', 'expired'], true),
+                $statusFilter !== null,
                 fn ($query) => $query->where('status', $statusFilter)
             )
             ->when(
-                in_array($targetRoleFilter, ['patient', 'doctor'], true),
+                $targetRoleFilter !== null,
                 fn ($query) => $query->where('target_role', $targetRoleFilter)
             )
             ->latest()
@@ -60,8 +64,8 @@ class AdminMicrocheckLogController extends Controller
                 'target_role' => $targetRoleFilter,
             ],
             'options' => [
-                'statuses' => ['pending', 'claimed', 'completed', 'expired'],
-                'target_roles' => ['patient', 'doctor'],
+                'statuses' => $allowedStatuses,
+                'target_roles' => $allowedTargetRoles,
             ],
         ]);
     }
