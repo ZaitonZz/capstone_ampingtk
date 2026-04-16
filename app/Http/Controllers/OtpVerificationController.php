@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpMail;
+use App\Models\ActivityLog;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,14 +24,14 @@ class OtpVerificationController extends Controller
     {
         $pendingLoginToken = session('pending_login_token');
 
-        if (!$pendingLoginToken) {
+        if (! $pendingLoginToken) {
             return redirect()->route('login');
         }
 
         $cacheKey = $this->getPendingLoginCacheKey($pendingLoginToken);
         $pendingLoginState = Cache::get($cacheKey);
 
-        if (!$pendingLoginState) {
+        if (! $pendingLoginState) {
             session()->forget('pending_login_token');
 
             return redirect()->route('login');
@@ -47,17 +49,19 @@ class OtpVerificationController extends Controller
 
     /**
      * Start the email-password login flow.
-     * 
+     *
      * Validates email and password, then initiates OTP verification.
      * User is NOT fully authenticated yet.
      */
     public function startEmailLogin(Request $request): JsonResponse
     {
         // Rate limiting for login start attempts
-        $throttleKey = 'otp-login-start:' . $request->ip();
+        $throttleKey = 'otp-login-start:'.$request->ip();
         $maxAttempts = config('auth_otp.rate_limit.login_start_per_minute', 5);
 
         if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+            $this->logFailedLoginAttempt($request, (string) $request->input('email', ''), null, 'rate_limited');
+
             throw ValidationException::withMessages([
                 'email' => 'Too many login attempts. Please try again later.',
             ]);
@@ -75,16 +79,19 @@ class OtpVerificationController extends Controller
         $user = \App\Models\User::where('email', $validated['email'])->first();
 
         // Validate credentials
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            $this->logFailedLoginAttempt($request, $validated['email'], $user?->id, 'invalid_credentials');
+
             throw ValidationException::withMessages([
                 'email' => 'Invalid email or password.',
             ]);
         }
 
-        if (!$this->isOtpEnabled()) {
+        if (! $this->isOtpEnabled()) {
             Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             session(['otp_verified' => true]);
+            $this->logSuccessfulLogin($request, $user);
 
             $redirectUrl = match ($user->role) {
                 'doctor' => route('doctor.dashboard'),
@@ -173,11 +180,11 @@ class OtpVerificationController extends Controller
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
-        if (!$this->isOtpEnabled()) {
+        if (! $this->isOtpEnabled()) {
             session(['otp_verified' => true]);
 
             return redirect()->route('dashboard');
@@ -220,7 +227,7 @@ class OtpVerificationController extends Controller
                 otp: $otp,
                 expiryMinutes: intval(config('auth_otp.otp.ttl', 300) / 60),
             ));
-            
+
             logger("OTP sent to {$user->email} (ensureOtp)");
         } catch (\Throwable $e) {
             logger()->error('Failed to send OTP email (ensureOtp)', [
@@ -230,7 +237,7 @@ class OtpVerificationController extends Controller
 
             Cache::forget($cacheKey);
             session()->forget('pending_login_token');
-            
+
             return redirect()->route('dashboard')->with('error', 'Failed to send OTP email.');
         }
 
@@ -253,7 +260,7 @@ class OtpVerificationController extends Controller
         // Get pending login token from session
         $pendingLoginToken = session('pending_login_token');
 
-        if (!$pendingLoginToken) {
+        if (! $pendingLoginToken) {
             throw ValidationException::withMessages([
                 'otp_code' => 'No pending login found. Please try logging in again.',
             ]);
@@ -263,7 +270,7 @@ class OtpVerificationController extends Controller
         $cacheKey = $this->getPendingLoginCacheKey($pendingLoginToken);
         $pendingLoginState = Cache::get($cacheKey);
 
-        if (!$pendingLoginState) {
+        if (! $pendingLoginState) {
             session()->forget('pending_login_token');
             throw ValidationException::withMessages([
                 'otp_code' => 'Verification code has expired. Please try logging in again.',
@@ -271,10 +278,17 @@ class OtpVerificationController extends Controller
         }
 
         // Rate limiting for OTP verification attempts
-        $throttleKey = 'otp-verify:' . $pendingLoginState['user_id'] . ':' . $request->ip();
+        $throttleKey = 'otp-verify:'.$pendingLoginState['user_id'].':'.$request->ip();
         $maxAttempts = config('auth_otp.rate_limit.verify_per_minute', 5);
 
         if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+            $this->logFailedLoginAttempt(
+                $request,
+                (string) ($pendingLoginState['user_email'] ?? ''),
+                isset($pendingLoginState['user_id']) ? (int) $pendingLoginState['user_id'] : null,
+                'otp_rate_limited'
+            );
+
             throw ValidationException::withMessages([
                 'otp_code' => 'Too many verification attempts. Please try again later.',
             ]);
@@ -283,6 +297,12 @@ class OtpVerificationController extends Controller
         // Check if OTP has expired
         if (now()->isAfter($pendingLoginState['expires_at'])) {
             RateLimiter::hit($throttleKey);
+            $this->logFailedLoginAttempt(
+                $request,
+                (string) ($pendingLoginState['user_email'] ?? ''),
+                isset($pendingLoginState['user_id']) ? (int) $pendingLoginState['user_id'] : null,
+                'otp_expired'
+            );
             Cache::forget($cacheKey);
             session()->forget('pending_login_token');
             throw ValidationException::withMessages([
@@ -293,6 +313,12 @@ class OtpVerificationController extends Controller
         // Check if max attempts exceeded
         if ($pendingLoginState['attempts'] >= intval($pendingLoginState['max_attempts'])) {
             RateLimiter::hit($throttleKey);
+            $this->logFailedLoginAttempt(
+                $request,
+                (string) ($pendingLoginState['user_email'] ?? ''),
+                isset($pendingLoginState['user_id']) ? (int) $pendingLoginState['user_id'] : null,
+                'otp_max_attempts'
+            );
             Cache::forget($cacheKey);
             session()->forget('pending_login_token');
             throw ValidationException::withMessages([
@@ -301,11 +327,17 @@ class OtpVerificationController extends Controller
         }
 
         // Compare OTP using Hash::check for secure comparison
-        if (!Hash::check($validated['otp_code'], $pendingLoginState['otp_hash'])) {
+        if (! Hash::check($validated['otp_code'], $pendingLoginState['otp_hash'])) {
             $pendingLoginState['attempts']++;
             $ttlSeconds = intval(config('auth_otp.otp.ttl', 300));
             Cache::put($cacheKey, $pendingLoginState, now()->addSeconds($ttlSeconds));
             RateLimiter::hit($throttleKey);
+            $this->logFailedLoginAttempt(
+                $request,
+                (string) ($pendingLoginState['user_email'] ?? ''),
+                isset($pendingLoginState['user_id']) ? (int) $pendingLoginState['user_id'] : null,
+                'otp_invalid'
+            );
 
             throw ValidationException::withMessages([
                 'otp_code' => 'Invalid verification code.',
@@ -325,6 +357,7 @@ class OtpVerificationController extends Controller
 
         // Mark user as OTP verified in session
         session(['otp_verified' => true]);
+        $this->logSuccessfulLogin($request, $user);
 
         // Clear pending login data
         Cache::forget($cacheKey);
@@ -353,7 +386,7 @@ class OtpVerificationController extends Controller
         // Get pending login token from session
         $pendingLoginToken = session('pending_login_token');
 
-        if (!$pendingLoginToken) {
+        if (! $pendingLoginToken) {
             throw ValidationException::withMessages([
                 'message' => 'No pending login found. Please try logging in again.',
             ]);
@@ -363,7 +396,7 @@ class OtpVerificationController extends Controller
         $cacheKey = $this->getPendingLoginCacheKey($pendingLoginToken);
         $pendingLoginState = Cache::get($cacheKey);
 
-        if (!$pendingLoginState) {
+        if (! $pendingLoginState) {
             session()->forget('pending_login_token');
             throw ValidationException::withMessages([
                 'message' => 'Verification code has expired. Please try logging in again.',
@@ -371,7 +404,7 @@ class OtpVerificationController extends Controller
         }
 
         // Rate limiting for resend attempts
-        $throttleKey = 'otp-resend:' . $pendingLoginState['user_id'] . ':' . $request->ip();
+        $throttleKey = 'otp-resend:'.$pendingLoginState['user_id'].':'.$request->ip();
         $maxResends = config('auth_otp.rate_limit.resend_per_minute', 3);
 
         if (RateLimiter::tooManyAttempts($throttleKey, $maxResends)) {
@@ -383,7 +416,7 @@ class OtpVerificationController extends Controller
         // Check resend cooldown (server-side)
         if (now()->isBefore($pendingLoginState['resend_available_at'])) {
             $secondsRemaining = now()->diffInSeconds($pendingLoginState['resend_available_at'], false);
-            
+
             return response()->json([
                 'message' => 'Please wait before requesting a new code.',
                 'resend_available_in' => max(0, $secondsRemaining),
@@ -471,6 +504,7 @@ class OtpVerificationController extends Controller
     private function generateOtp(): string
     {
         $length = config('auth_otp.otp.length', 6);
+
         return str_pad((string) random_int(0, pow(10, $length) - 1), $length, '0', STR_PAD_LEFT);
     }
 
@@ -480,7 +514,8 @@ class OtpVerificationController extends Controller
     private function getPendingLoginCacheKey(string $token): string
     {
         $prefix = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:');
-        return $prefix . $token;
+
+        return $prefix.$token;
     }
 
     /**
@@ -497,13 +532,94 @@ class OtpVerificationController extends Controller
         $domain = $parts[1];
 
         // Show first character and hide the rest with asterisks
-        $masked = substr($localPart, 0, 1) . str_repeat('*', max(1, strlen($localPart) - 1));
+        $masked = substr($localPart, 0, 1).str_repeat('*', max(1, strlen($localPart) - 1));
 
-        return $masked . '@' . $domain;
+        return $masked.'@'.$domain;
     }
 
     private function isOtpEnabled(): bool
     {
         return (bool) config('auth_otp.enabled', true);
+    }
+
+    private function logFailedLoginAttempt(Request $request, string $email, ?int $userId, string $reason): void
+    {
+        ActivityLog::create([
+            'user_id' => $userId,
+            'event_type' => 'failed_login',
+            'severity' => 'warning',
+            'title' => 'Failed login attempt',
+            'description' => sprintf('A login attempt failed (%s).', str_replace('_', ' ', $reason)),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'reason' => $reason,
+                'email' => $email,
+            ],
+        ]);
+    }
+
+    private function logSuccessfulLogin(Request $request, User $user): void
+    {
+        $currentIp = $request->ip();
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'event_type' => 'login_success',
+            'severity' => 'info',
+            'title' => 'Successful login',
+            'description' => 'User login completed successfully.',
+            'ip_address' => $currentIp,
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'role' => $user->role,
+            ],
+        ]);
+
+        if ($currentIp === null) {
+            return;
+        }
+
+        $recentSuccessfulLogins = ActivityLog::query()
+            ->where('event_type', 'login_success')
+            ->where('user_id', $user->id)
+            ->where('occurred_at', '>=', now()->subDay())
+            ->get(['ip_address']);
+
+        $uniqueIpCount = $recentSuccessfulLogins
+            ->pluck('ip_address')
+            ->filter()
+            ->unique()
+            ->count();
+
+        if ($uniqueIpCount < 3) {
+            return;
+        }
+
+        $recentDuplicateWarning = ActivityLog::query()
+            ->where('event_type', 'unusual_access_pattern')
+            ->where('user_id', $user->id)
+            ->where('occurred_at', '>=', now()->subHours(6))
+            ->exists();
+
+        if ($recentDuplicateWarning) {
+            return;
+        }
+
+        ActivityLog::create([
+            'user_id' => $user->id,
+            'event_type' => 'unusual_access_pattern',
+            'severity' => 'high',
+            'title' => 'Unusual access pattern detected',
+            'description' => sprintf('User accessed from %d different IP addresses in the last 24 hours.', $uniqueIpCount),
+            'ip_address' => $currentIp,
+            'user_agent' => $request->userAgent(),
+            'occurred_at' => now(),
+            'context' => [
+                'unique_ip_count_24h' => $uniqueIpCount,
+            ],
+        ]);
     }
 }
