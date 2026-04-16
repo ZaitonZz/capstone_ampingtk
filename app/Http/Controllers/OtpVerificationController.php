@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\OtpMail;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,7 +73,7 @@ class OtpVerificationController extends Controller
         RateLimiter::hit($throttleKey);
 
         // Find user by email
-        $user = \App\Models\User::where('email', $validated['email'])->first();
+        $user = User::where('email', $validated['email'])->first();
 
         // Validate credentials
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
@@ -81,23 +82,17 @@ class OtpVerificationController extends Controller
             ]);
         }
 
+        $this->assertAccountIsActive($user, 'email');
+
         if (! $this->isOtpEnabled()) {
             Auth::login($user, $request->boolean('remember'));
             $request->session()->regenerate();
             session(['otp_verified' => true]);
 
-            $redirectUrl = match ($user->role) {
-                'doctor' => route('doctor.dashboard'),
-                'patient' => route('patient.dashboard'),
-                'medicalstaff' => route('medicalstaff.dashboard'),
-                'admin' => route('admin.dashboard'),
-                default => route('dashboard'),
-            };
-
             return response()->json([
                 'success' => true,
                 'requires_otp' => false,
-                'redirect_url' => $redirectUrl,
+                'redirect_url' => $this->determineRedirectUrl($user),
                 'message' => 'Login successful.',
             ]);
         }
@@ -316,7 +311,16 @@ class OtpVerificationController extends Controller
         // OTP is valid - authenticate the user
         RateLimiter::clear($throttleKey);
 
-        $user = \App\Models\User::findOrFail($pendingLoginState['user_id']);
+        $user = User::findOrFail($pendingLoginState['user_id']);
+
+        try {
+            $this->assertAccountIsActive($user, 'otp_code');
+        } catch (ValidationException $exception) {
+            Cache::forget($cacheKey);
+            session()->forget('pending_login_token');
+
+            throw $exception;
+        }
 
         // Fully authenticate the user
         Auth::login($user, $pendingLoginState['remember']);
@@ -332,16 +336,9 @@ class OtpVerificationController extends Controller
         session()->forget('pending_login_token');
 
         // Determine redirect URL based on user role
-        $redirectUrl = match ($user->role) {
-            'doctor' => route('doctor.dashboard'),
-            'patient' => route('patient.dashboard'),
-            'admin' => route('admin.dashboard'),
-            default => route('dashboard'),
-        };
-
         return response()->json([
             'success' => true,
-            'redirect_url' => $redirectUrl,
+            'redirect_url' => $this->determineRedirectUrl($user),
             'message' => 'OTP verified successfully. Logging you in...',
         ]);
     }
@@ -508,5 +505,35 @@ class OtpVerificationController extends Controller
     private function isOtpEnabled(): bool
     {
         return (bool) config('auth_otp.enabled', true);
+    }
+
+    private function determineRedirectUrl(User $user): string
+    {
+        if ($user->requiresPasswordChange()) {
+            return route('user-password.edit');
+        }
+
+        return match ($user->role) {
+            'doctor' => route('doctor.dashboard'),
+            'patient' => route('patient.dashboard'),
+            'medicalstaff' => route('medicalstaff.dashboard'),
+            'admin' => route('admin.dashboard'),
+            default => route('dashboard'),
+        };
+    }
+
+    private function assertAccountIsActive(User $user, string $errorField): void
+    {
+        if ($user->isActive()) {
+            return;
+        }
+
+        $message = $user->isSuspended()
+            ? 'Your account is suspended. Please contact an administrator.'
+            : 'Your account is inactive. Please contact an administrator.';
+
+        throw ValidationException::withMessages([
+            $errorField => $message,
+        ]);
     }
 }
