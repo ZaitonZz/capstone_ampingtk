@@ -23,6 +23,7 @@ class StoreFaceMatchResultRequest extends FormRequest
     {
         return [
             'consultation_id' => ['required', 'integer', 'exists:consultations,id,deleted_at,NULL'],
+            'microcheck_id' => ['nullable', 'integer', 'exists:consultation_microchecks,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'verified_role' => ['required', 'string', 'in:patient,doctor'],
             'matched' => ['required', 'boolean'],
