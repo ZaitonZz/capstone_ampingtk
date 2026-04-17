@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ActivityLog extends Model
 {
@@ -12,26 +13,28 @@ class ActivityLog extends Model
 
     protected $fillable = [
         'user_id',
-        'event_type',
-        'severity',
-        'title',
+        'event',
         'description',
+        'subject_type',
+        'subject_id',
         'ip_address',
-        'user_agent',
-        'occurred_at',
-        'context',
+        'properties',
     ];
 
     protected function casts(): array
     {
         return [
-            'occurred_at' => 'datetime',
-            'context' => 'array',
+            'properties' => 'array',
         ];
     }
 
-    public function user(): BelongsTo
+    public function actor(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function subject(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

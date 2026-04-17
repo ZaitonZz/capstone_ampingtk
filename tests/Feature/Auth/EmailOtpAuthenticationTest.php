@@ -1,10 +1,12 @@
 <?php
 
+use App\Mail\OtpMail;
 use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -59,14 +61,14 @@ describe('Email OTP Authentication', function () {
             $response->assertJsonValidationErrors('email');
 
             $failedLogin = ActivityLog::query()
-                ->where('event_type', 'failed_login')
+                ->where('event', 'failed_login')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($failedLogin)->not()->toBeNull();
-            expect(data_get($failedLogin?->context, 'reason'))->toBe('invalid_credentials');
-            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
+            expect(data_get($failedLogin?->properties, 'reason'))->toBe('invalid_credentials');
+            expect(data_get($failedLogin?->properties, 'email'))->toBe($user->email);
         });
 
         it('blocks login for inactive accounts', function () {
@@ -125,7 +127,7 @@ describe('Email OTP Authentication', function () {
             ]);
 
             // Verify OTP email was sent
-            Mail::assertSent(\App\Mail\OtpMail::class, function ($mail) use ($user) {
+            Mail::assertSent(OtpMail::class, function ($mail) use ($user) {
                 return $mail->hasTo($user->email);
             });
 
@@ -167,13 +169,13 @@ describe('Email OTP Authentication', function () {
             Mail::assertNothingSent();
 
             $successfulLogin = ActivityLog::query()
-                ->where('event_type', 'login_success')
+                ->where('event', 'login_success')
                 ->where('user_id', $patient->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($successfulLogin)->not()->toBeNull();
-            expect(data_get($successfulLogin?->context, 'role'))->toBe($patient->role);
+            expect(data_get($successfulLogin?->properties, 'role'))->toBe($patient->role);
         });
 
         it('logs unusual access pattern once the third unique IP is reached', function () {
@@ -185,50 +187,34 @@ describe('Email OTP Authentication', function () {
 
             ActivityLog::query()->create([
                 'user_id' => $user->id,
-                'event_type' => 'login_success',
-                'severity' => 'info',
-                'title' => 'Successful login',
+                'event' => 'login_success',
                 'description' => 'User login completed successfully.',
                 'ip_address' => '203.0.113.10',
-                'user_agent' => 'Pest',
-                'occurred_at' => now()->subHour(),
-                'context' => ['role' => $user->role],
+                'properties' => ['role' => $user->role, 'severity' => 'info'],
             ]);
 
             ActivityLog::query()->create([
                 'user_id' => $user->id,
-                'event_type' => 'login_success',
-                'severity' => 'info',
-                'title' => 'Successful login',
+                'event' => 'login_success',
                 'description' => 'User login completed successfully.',
                 'ip_address' => '198.51.100.20',
-                'user_agent' => 'Pest',
-                'occurred_at' => now()->subMinutes(30),
-                'context' => ['role' => $user->role],
+                'properties' => ['role' => $user->role, 'severity' => 'info'],
             ]);
 
             ActivityLog::query()->create([
                 'user_id' => $user->id,
-                'event_type' => 'login_success',
-                'severity' => 'info',
-                'title' => 'Successful login',
+                'event' => 'login_success',
                 'description' => 'User login completed successfully.',
                 'ip_address' => null,
-                'user_agent' => 'Pest',
-                'occurred_at' => now()->subMinutes(20),
-                'context' => ['role' => $user->role],
+                'properties' => ['role' => $user->role, 'severity' => 'info'],
             ]);
 
             ActivityLog::query()->create([
                 'user_id' => $user->id,
-                'event_type' => 'login_success',
-                'severity' => 'info',
-                'title' => 'Successful login',
+                'event' => 'login_success',
                 'description' => 'User login completed successfully.',
                 'ip_address' => '',
-                'user_agent' => 'Pest',
-                'occurred_at' => now()->subMinutes(10),
-                'context' => ['role' => $user->role],
+                'properties' => ['role' => $user->role, 'severity' => 'info'],
             ]);
 
             $response = $this->withServerVariables([
@@ -245,14 +231,14 @@ describe('Email OTP Authentication', function () {
             ]);
 
             $warning = ActivityLog::query()
-                ->where('event_type', 'unusual_access_pattern')
+                ->where('event', 'unusual_access_pattern')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($warning)->not()->toBeNull();
-            expect($warning?->context)->toBeArray();
-            expect(data_get($warning?->context, 'unique_ip_count_24h'))->toBe(3);
+            expect($warning?->properties)->toBeArray();
+            expect(data_get($warning?->properties, 'unique_ip_count_24h'))->toBe(3);
         });
 
         it('returns medical staff dashboard redirect when OTP is disabled', function () {
@@ -353,7 +339,7 @@ describe('Email OTP Authentication', function () {
         });
 
         it('redirects to login when pending login state is missing from cache', function () {
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $response = $this->withSession([
                 'pending_login_token' => $pendingLoginToken,
@@ -368,7 +354,7 @@ describe('Email OTP Authentication', function () {
                 'email' => 'jane@example.com',
             ]);
 
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
 
             Cache::put($cacheKey, [
@@ -413,7 +399,7 @@ describe('Email OTP Authentication', function () {
             $this->actingAs($user);
 
             // Store a pending login token in session
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
             session(['pending_login_token' => $pendingLoginToken]);
 
             // Store pending login state in cache
@@ -454,7 +440,7 @@ describe('Email OTP Authentication', function () {
 
             // Generate OTP and pending login state
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -491,13 +477,13 @@ describe('Email OTP Authentication', function () {
             expect(Cache::has($cacheKey))->toBeFalse();
 
             $successfulLogin = ActivityLog::query()
-                ->where('event_type', 'login_success')
+                ->where('event', 'login_success')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($successfulLogin)->not()->toBeNull();
-            expect(data_get($successfulLogin?->context, 'role'))->toBe($user->role);
+            expect(data_get($successfulLogin?->properties, 'role'))->toBe($user->role);
         });
 
         it('redirects to password settings after OTP verification when password change is required', function () {
@@ -506,7 +492,7 @@ describe('Email OTP Authentication', function () {
             ]);
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -542,7 +528,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -572,21 +558,21 @@ describe('Email OTP Authentication', function () {
             expect($updatedState['attempts'])->toBe(1);
 
             $failedLogin = ActivityLog::query()
-                ->where('event_type', 'failed_login')
+                ->where('event', 'failed_login')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($failedLogin)->not()->toBeNull();
-            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_invalid');
-            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
+            expect(data_get($failedLogin?->properties, 'reason'))->toBe('otp_invalid');
+            expect(data_get($failedLogin?->properties, 'email'))->toBe($user->email);
         });
 
         it('rejects expired OTP', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -613,21 +599,21 @@ describe('Email OTP Authentication', function () {
             $response->assertJsonValidationErrors('otp_code');
 
             $failedLogin = ActivityLog::query()
-                ->where('event_type', 'failed_login')
+                ->where('event', 'failed_login')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($failedLogin)->not()->toBeNull();
-            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_expired');
-            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
+            expect(data_get($failedLogin?->properties, 'reason'))->toBe('otp_expired');
+            expect(data_get($failedLogin?->properties, 'email'))->toBe($user->email);
         });
 
         it('rejects OTP after max attempts exceeded', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
             $maxAttempts = config('auth_otp.otp.max_attempts', 5);
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
@@ -654,21 +640,21 @@ describe('Email OTP Authentication', function () {
             $response->assertUnprocessable();
 
             $failedLogin = ActivityLog::query()
-                ->where('event_type', 'failed_login')
+                ->where('event', 'failed_login')
                 ->where('user_id', $user->id)
-                ->latest('occurred_at')
+                ->latest()
                 ->first();
 
             expect($failedLogin)->not()->toBeNull();
-            expect(data_get($failedLogin?->context, 'reason'))->toBe('otp_max_attempts');
-            expect(data_get($failedLogin?->context, 'email'))->toBe($user->email);
+            expect(data_get($failedLogin?->properties, 'reason'))->toBe('otp_max_attempts');
+            expect(data_get($failedLogin?->properties, 'email'))->toBe($user->email);
         });
 
         it('enforces rate limiting on verify attempts', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -716,7 +702,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -749,7 +735,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -779,7 +765,7 @@ describe('Email OTP Authentication', function () {
             ]);
 
             // Verify new OTP email was sent
-            Mail::assertSent(\App\Mail\OtpMail::class);
+            Mail::assertSent(OtpMail::class);
 
             // Verify state was updated
             $updatedState = Cache::get($cacheKey);
@@ -791,7 +777,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
             $maxResends = config('auth_otp.otp.max_resends', 3);
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
@@ -820,7 +806,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [
@@ -858,7 +844,7 @@ describe('Email OTP Authentication', function () {
             $user = User::factory()->create();
 
             $otp = '123456';
-            $pendingLoginToken = \Illuminate\Support\Str::uuid()->toString();
+            $pendingLoginToken = Str::uuid()->toString();
 
             $cacheKey = config('auth_otp.cache.pending_login_prefix', 'otp:pending_login:').$pendingLoginToken;
             Cache::put($cacheKey, [

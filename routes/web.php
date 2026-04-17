@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminDeepfakeAlertController;
+use App\Http\Controllers\AdminDeepfakeLogController;
+use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
+use App\Http\Controllers\AgentTestController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
@@ -23,6 +27,7 @@ use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeScanLog;
 use App\Models\Patient;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -182,22 +187,22 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     Route::middleware('admin')->group(function () {
         Route::get('admin/dashboard', function () {
             $failedLogins = ActivityLog::query()
-                ->where('event_type', 'failed_login')
-                ->with('user:id,name,email')
-                ->latest('occurred_at')
+                ->where('event', 'failed_login')
+                ->with('actor:id,name,email')
+                ->latest()
                 ->limit(20)
                 ->get()
                 ->map(function (ActivityLog $log): array {
                     return [
                         'id' => sprintf('activity-%d', $log->id),
                         'event_type' => 'failed_login',
-                        'severity' => $log->severity,
-                        'title' => $log->title,
+                        'severity' => data_get($log->properties, 'severity', 'warning'),
+                        'title' => data_get($log->properties, 'title', 'Failed login attempt'),
                         'description' => $log->description,
-                        'user_name' => $log->user?->name,
-                        'user_email' => data_get($log->context, 'email') ?? $log->user?->email,
+                        'user_name' => $log->actor?->name,
+                        'user_email' => data_get($log->properties, 'email') ?? $log->actor?->email,
                         'ip_address' => $log->ip_address,
-                        'occurred_at' => $log->occurred_at?->toIso8601String(),
+                        'occurred_at' => $log->created_at?->toIso8601String(),
                     ];
                 });
 
@@ -254,7 +259,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                         'user_email' => $user?->email,
                         'ip_address' => null,
                         'occurred_at' => filled($group->last_failed_at)
-                            ? \Illuminate\Support\Carbon::parse($group->last_failed_at)->toIso8601String()
+                            ? Carbon::parse($group->last_failed_at)->toIso8601String()
                             : null,
                     ];
                 })
@@ -275,29 +280,29 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                             'user_email' => $user?->email,
                             'ip_address' => null,
                             'occurred_at' => filled($group->last_failed_at)
-                                ? \Illuminate\Support\Carbon::parse($group->last_failed_at)->toIso8601String()
+                                ? Carbon::parse($group->last_failed_at)->toIso8601String()
                                 : null,
                         ];
                     })
                 );
 
             $unusualAccessPatterns = ActivityLog::query()
-                ->where('event_type', 'unusual_access_pattern')
-                ->with('user:id,name,email')
-                ->latest('occurred_at')
+                ->where('event', 'unusual_access_pattern')
+                ->with('actor:id,name,email')
+                ->latest()
                 ->limit(20)
                 ->get()
                 ->map(function (ActivityLog $log): array {
                     return [
                         'id' => sprintf('activity-%d', $log->id),
                         'event_type' => 'unusual_access_pattern',
-                        'severity' => $log->severity,
-                        'title' => $log->title,
+                        'severity' => data_get($log->properties, 'severity', 'high'),
+                        'title' => data_get($log->properties, 'title', 'Unusual access pattern detected'),
                         'description' => $log->description,
-                        'user_name' => $log->user?->name,
-                        'user_email' => $log->user?->email,
+                        'user_name' => $log->actor?->name,
+                        'user_email' => $log->actor?->email,
                         'ip_address' => $log->ip_address,
-                        'occurred_at' => $log->occurred_at?->toIso8601String(),
+                        'occurred_at' => $log->created_at?->toIso8601String(),
                     ];
                 });
 
@@ -312,17 +317,22 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                 'admin_activity_logs' => $activityLogs,
                 'admin_activity_summary' => [
                     'failed_logins_24h' => ActivityLog::query()
-                        ->where('event_type', 'failed_login')
-                        ->where('occurred_at', '>=', now()->subDay())
+                        ->where('event', 'failed_login')
+                        ->where('created_at', '>=', now()->subDay())
                         ->count(),
                     'repeated_identity_failures_24h' => $repeatedIdentityFailures->count(),
                     'unusual_access_patterns_24h' => ActivityLog::query()
-                        ->where('event_type', 'unusual_access_pattern')
-                        ->where('occurred_at', '>=', now()->subDay())
+                        ->where('event', 'unusual_access_pattern')
+                        ->where('created_at', '>=', now()->subDay())
                         ->count(),
                 ],
             ]);
         })->name('admin.dashboard');
+
+        Route::get('admin/logs/microchecks', [AdminMicrocheckLogController::class, 'index'])
+            ->name('admin.microcheck-logs.index');
+        Route::get('admin/logs/deepfake', [AdminDeepfakeLogController::class, 'index'])
+            ->name('admin.deepfake-logs.index');
 
         Route::get('admin/alerts/deepfake', [AdminDeepfakeAlertController::class, 'index'])
             ->name('admin.deepfake-alerts.index');
@@ -335,6 +345,9 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
             ->name('admin.users.store');
         Route::patch('admin/users/{user}', [AdminUserManagementController::class, 'update'])
             ->name('admin.users.update');
+
+        Route::get('admin/logs/activity', [AdminActivityLogController::class, 'index'])
+            ->name('admin.activity-logs.index');
     });
 
     // Medical staff-specific dashboard
@@ -477,8 +490,8 @@ Route::prefix('internal/pipeline')
     });
 
 // ── Agent Testing Endpoints ──────────────────────────────────────────
-Route::post('api/frame-results', [\App\Http\Controllers\AgentTestController::class, 'storeResult'])->name('agent.store-result');
-Route::get('test-agent-verify', [\App\Http\Controllers\AgentTestController::class, 'verifyPage'])->name('agent.verify');
+Route::post('api/frame-results', [AgentTestController::class, 'storeResult'])->name('agent.store-result');
+Route::get('test-agent-verify', [AgentTestController::class, 'verifyPage'])->name('agent.verify');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/emr.php';

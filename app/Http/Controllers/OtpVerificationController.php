@@ -552,16 +552,14 @@ class OtpVerificationController extends Controller
     {
         ActivityLog::create([
             'user_id' => $userId,
-            'event_type' => 'failed_login',
-            'severity' => 'warning',
-            'title' => 'Failed login attempt',
+            'event' => 'failed_login',
             'description' => sprintf('A login attempt failed (%s).', str_replace('_', ' ', $reason)),
             'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
+            'properties' => [
                 'reason' => $reason,
                 'email' => $email,
+                'severity' => 'warning',
+                'user_agent' => $request->userAgent(),
             ],
         ]);
     }
@@ -572,15 +570,13 @@ class OtpVerificationController extends Controller
 
         ActivityLog::create([
             'user_id' => $user->id,
-            'event_type' => 'login_success',
-            'severity' => 'info',
-            'title' => 'Successful login',
+            'event' => 'login_success',
             'description' => 'User login completed successfully.',
             'ip_address' => $currentIp,
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
+            'properties' => [
                 'role' => $user->role,
+                'severity' => 'info',
+                'user_agent' => $request->userAgent(),
             ],
         ]);
 
@@ -589,9 +585,9 @@ class OtpVerificationController extends Controller
         }
 
         $uniqueIpCount = ActivityLog::query()
-            ->where('event_type', 'login_success')
+            ->where('event', 'login_success')
             ->where('user_id', $user->id)
-            ->where('occurred_at', '>=', now()->subDay())
+            ->where('created_at', '>=', now()->subDay())
             ->whereNotNull('ip_address')
             ->where('ip_address', '!=', '')
             ->distinct()
@@ -602,9 +598,9 @@ class OtpVerificationController extends Controller
         }
 
         $recentDuplicateWarning = ActivityLog::query()
-            ->where('event_type', 'unusual_access_pattern')
+            ->where('event', 'unusual_access_pattern')
             ->where('user_id', $user->id)
-            ->where('occurred_at', '>=', now()->subHours(6))
+            ->where('created_at', '>=', now()->subHours(6))
             ->exists();
 
         if ($recentDuplicateWarning) {
@@ -613,15 +609,13 @@ class OtpVerificationController extends Controller
 
         ActivityLog::create([
             'user_id' => $user->id,
-            'event_type' => 'unusual_access_pattern',
-            'severity' => 'high',
-            'title' => 'Unusual access pattern detected',
+            'event' => 'unusual_access_pattern',
             'description' => sprintf('User accessed from %d different IP addresses in the last 24 hours.', $uniqueIpCount),
             'ip_address' => $currentIp,
-            'user_agent' => $request->userAgent(),
-            'occurred_at' => now(),
-            'context' => [
+            'properties' => [
                 'unique_ip_count_24h' => $uniqueIpCount,
+                'severity' => 'high',
+                'user_agent' => $request->userAgent(),
             ],
         ]);
     }
