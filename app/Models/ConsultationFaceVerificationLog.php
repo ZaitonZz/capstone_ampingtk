@@ -12,6 +12,7 @@ class ConsultationFaceVerificationLog extends Model
 
     protected $fillable = [
         'consultation_id',
+        'microcheck_id',
         'user_id',
         'verified_role',
         'matched',
@@ -33,6 +34,11 @@ class ConsultationFaceVerificationLog extends Model
     public function consultation(): BelongsTo
     {
         return $this->belongsTo(Consultation::class);
+    }
+
+    public function microcheck(): BelongsTo
+    {
+        return $this->belongsTo(ConsultationMicrocheck::class, 'microcheck_id');
     }
 
     public function user(): BelongsTo
