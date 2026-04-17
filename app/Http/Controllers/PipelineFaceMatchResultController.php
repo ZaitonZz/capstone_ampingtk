@@ -68,7 +68,6 @@ class PipelineFaceMatchResultController extends Controller
                 [
                     'consultation_id' => $consultation->id,
                     'microcheck_id' => $microcheck->id,
-                    'user_id' => $validated['user_id'],
                     'verified_role' => $validated['verified_role'],
                 ],
                 $logPayload,
