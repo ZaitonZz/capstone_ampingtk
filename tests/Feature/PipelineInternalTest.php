@@ -983,3 +983,245 @@ it('stores multiple face verification records for one consultation', function ()
 
     expect($count)->toBe(2);
 });
+
+it('upserts face verification result when the same microcheck is retried after participant relink', function () {
+    $consultation = Consultation::factory()->create();
+    $originalPatientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $originalPatientUser->id]);
+
+    $microcheck = ConsultationMicrocheck::factory()->claimed()->forPatientRole()->create([
+        'consultation_id' => $consultation->id,
+    ]);
+
+    $first = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $originalPatientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.25,
+        'flagged' => true,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($first)))
+        ->postJson(route('pipeline.face-match-results.store'), $first)
+        ->assertOk()
+        ->assertJson(['microcheck_id' => $microcheck->id]);
+
+    $replacementPatientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $replacementPatientUser->id]);
+
+    $second = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microcheck->id,
+        'user_id' => $replacementPatientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.22,
+        'flagged' => true,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($second)))
+        ->postJson(route('pipeline.face-match-results.store'), $second)
+        ->assertOk()
+        ->assertJson(['microcheck_id' => $microcheck->id]);
+
+    $logs = ConsultationFaceVerificationLog::query()
+        ->where('consultation_id', $consultation->id)
+        ->where('microcheck_id', $microcheck->id)
+        ->where('verified_role', 'patient')
+        ->get();
+
+    expect($logs)->toHaveCount(1);
+    expect((float) $logs->first()->face_match_score)->toBe(0.22);
+    expect($logs->first()->flagged)->toBeTrue();
+    expect($logs->first()->user_id)->toBe($replacementPatientUser->id);
+});
+
+it('pauses consultation when patient reaches 3 straight explicit face mismatches', function () {
+    $consultation = Consultation::factory()->ongoing()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microchecks = ConsultationMicrocheck::factory()
+        ->count(3)
+        ->claimed()
+        ->forPatientRole()
+        ->create([
+            'consultation_id' => $consultation->id,
+            'scheduled_at' => now()->subSeconds(4),
+            'claimed_at' => now()->subSeconds(2),
+        ]);
+
+    foreach ($microchecks as $index => $microcheck) {
+        $payload = [
+            'consultation_id' => $consultation->id,
+            'microcheck_id' => $microcheck->id,
+            'user_id' => $patientUser->id,
+            'verified_role' => 'patient',
+            'matched' => false,
+            'face_match_score' => 0.24 - ($index * 0.01),
+            'flagged' => true,
+        ];
+
+        $this->withHeaders(pipelineSignedHeaders(json_encode($payload)))
+            ->postJson(route('pipeline.face-match-results.store'), $payload)
+            ->assertOk();
+    }
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe('paused');
+    expect($consultation->identity_verification_target_user_id)->toBe($patientUser->id);
+    expect($consultation->identity_verification_target_role)->toBe('patient');
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
+            ->where('triggered_role', 'patient')
+            ->where('streak_count', 3)
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
+
+it('does not pause consultation when explicit face mismatch streak is broken', function () {
+    $consultation = Consultation::factory()->ongoing()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microchecks = ConsultationMicrocheck::factory()
+        ->count(3)
+        ->claimed()
+        ->forPatientRole()
+        ->create([
+            'consultation_id' => $consultation->id,
+            'scheduled_at' => now()->subSeconds(4),
+            'claimed_at' => now()->subSeconds(2),
+        ]);
+
+    $firstFailure = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[0]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.23,
+        'flagged' => true,
+    ];
+    $successfulCheck = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[1]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => true,
+        'face_match_score' => 0.82,
+        'flagged' => false,
+    ];
+    $secondFailure = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[2]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.22,
+        'flagged' => true,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($firstFailure)))
+        ->postJson(route('pipeline.face-match-results.store'), $firstFailure)
+        ->assertOk();
+    $this->withHeaders(pipelineSignedHeaders(json_encode($successfulCheck)))
+        ->postJson(route('pipeline.face-match-results.store'), $successfulCheck)
+        ->assertOk();
+    $this->withHeaders(pipelineSignedHeaders(json_encode($secondFailure)))
+        ->postJson(route('pipeline.face-match-results.store'), $secondFailure)
+        ->assertOk();
+
+    expect($consultation->fresh()->status)->toBe('ongoing');
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
+            ->where('triggered_role', 'patient')
+            ->where('streak_count', 3)
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->exists()
+    )->toBeFalse();
+});
+
+it('pauses consultation when non-microcheck logs exist between microcheck mismatch failures', function () {
+    $consultation = Consultation::factory()->ongoing()->create();
+    $patientUser = User::factory()->patient()->create();
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $microchecks = ConsultationMicrocheck::factory()
+        ->count(3)
+        ->claimed()
+        ->forPatientRole()
+        ->create([
+            'consultation_id' => $consultation->id,
+            'scheduled_at' => now()->subSeconds(4),
+            'claimed_at' => now()->subSeconds(2),
+        ]);
+
+    $firstFailure = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[0]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.23,
+        'flagged' => true,
+    ];
+    $secondFailure = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[1]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.22,
+        'flagged' => true,
+    ];
+    $nonMicrocheckLog = [
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => true,
+        'face_match_score' => 0.89,
+        'flagged' => false,
+    ];
+    $thirdFailure = [
+        'consultation_id' => $consultation->id,
+        'microcheck_id' => $microchecks[2]->id,
+        'user_id' => $patientUser->id,
+        'verified_role' => 'patient',
+        'matched' => false,
+        'face_match_score' => 0.21,
+        'flagged' => true,
+    ];
+
+    $this->withHeaders(pipelineSignedHeaders(json_encode($firstFailure)))
+        ->postJson(route('pipeline.face-match-results.store'), $firstFailure)
+        ->assertOk();
+    $this->withHeaders(pipelineSignedHeaders(json_encode($secondFailure)))
+        ->postJson(route('pipeline.face-match-results.store'), $secondFailure)
+        ->assertOk();
+    $this->withHeaders(pipelineSignedHeaders(json_encode($nonMicrocheckLog)))
+        ->postJson(route('pipeline.face-match-results.store'), $nonMicrocheckLog)
+        ->assertOk();
+    $this->withHeaders(pipelineSignedHeaders(json_encode($thirdFailure)))
+        ->postJson(route('pipeline.face-match-results.store'), $thirdFailure)
+        ->assertOk();
+
+    expect($consultation->fresh()->status)->toBe('paused');
+    expect(
+        DeepfakeEscalation::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('type', DeepfakeEscalation::TYPE_OTP_VERIFICATION)
+            ->where('triggered_role', 'patient')
+            ->where('streak_count', 3)
+            ->where('status', DeepfakeEscalation::STATUS_OPEN)
+            ->count()
+    )->toBe(1);
+});
