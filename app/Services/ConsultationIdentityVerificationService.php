@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\ConsultationIdentityOtpMail;
 use App\Models\Consultation;
+use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeEscalation;
 use App\Models\DeepfakeScanLog;
 use App\Models\User;
@@ -28,6 +29,54 @@ class ConsultationIdentityVerificationService
             return;
         }
 
+        $this->beginIdentityVerificationForTarget(
+            consultationId: $log->consultation_id,
+            userId: $log->user_id,
+            targetRole: $log->verified_role,
+            streakCount: 5,
+            notes: sprintf(
+                '%s reached 5 straight fake scans. Consultation paused pending OTP verification.',
+                $log->verified_role === 'doctor' ? 'Doctor' : 'Patient'
+            ),
+        );
+    }
+
+    public function beginForFaceMatchLog(
+        ConsultationFaceVerificationLog $log,
+        int $streakCount = 3,
+    ): void {
+        if (! in_array($log->verified_role, ['patient', 'doctor'], true) || $log->user_id === null) {
+            return;
+        }
+
+        if ($log->matched || ! $log->flagged) {
+            return;
+        }
+
+        $this->beginIdentityVerificationForTarget(
+            consultationId: $log->consultation_id,
+            userId: $log->user_id,
+            targetRole: $log->verified_role,
+            streakCount: $streakCount,
+            notes: sprintf(
+                '%s reached %d straight facial recognition mismatches. Consultation paused pending OTP verification.',
+                $log->verified_role === 'doctor' ? 'Doctor' : 'Patient',
+                $streakCount,
+            ),
+        );
+    }
+
+    private function beginIdentityVerificationForTarget(
+        int $consultationId,
+        int $userId,
+        string $targetRole,
+        int $streakCount,
+        string $notes,
+    ): void {
+        if (! in_array($targetRole, ['patient', 'doctor'], true)) {
+            return;
+        }
+
         $otp = $this->generateOtp();
         $otpHash = Hash::make($otp);
         $ttlSeconds = max(60, (int) config('auth_otp.otp.ttl', 300));
@@ -39,7 +88,11 @@ class ConsultationIdentityVerificationService
         $resendAvailableAt = $now->copy()->addSeconds($resendCooldownSeconds);
 
         $payload = DB::transaction(function () use (
-            $log,
+            $consultationId,
+            $userId,
+            $targetRole,
+            $streakCount,
+            $notes,
             $otpHash,
             $maxAttempts,
             $maxResends,
@@ -49,7 +102,7 @@ class ConsultationIdentityVerificationService
             $otp
         ): ?array {
             $consultation = Consultation::query()
-                ->whereKey($log->consultation_id)
+                ->whereKey($consultationId)
                 ->lockForUpdate()
                 ->first();
 
@@ -61,7 +114,7 @@ class ConsultationIdentityVerificationService
                 return null;
             }
 
-            $targetUser = User::query()->find($log->user_id);
+            $targetUser = User::query()->find($userId);
 
             if ($targetUser === null || trim((string) $targetUser->email) === '') {
                 return null;
@@ -80,14 +133,11 @@ class ConsultationIdentityVerificationService
             DeepfakeEscalation::query()->create([
                 'consultation_id' => $consultation->id,
                 'triggered_by_user_id' => $targetUser->id,
-                'triggered_role' => $log->verified_role,
+                'triggered_role' => $targetRole,
                 'type' => DeepfakeEscalation::TYPE_OTP_VERIFICATION,
-                'streak_count' => 5,
+                'streak_count' => $streakCount,
                 'status' => DeepfakeEscalation::STATUS_OPEN,
-                'notes' => sprintf(
-                    '%s reached 5 straight fake scans. Consultation paused pending OTP verification.',
-                    $log->verified_role === 'doctor' ? 'Doctor' : 'Patient'
-                ),
+                'notes' => $notes,
             ]);
 
             $statusBeforePause = $consultation->status === 'paused'
@@ -98,7 +148,7 @@ class ConsultationIdentityVerificationService
                 'status' => 'paused',
                 'status_before_pause' => $statusBeforePause,
                 'identity_verification_target_user_id' => $targetUser->id,
-                'identity_verification_target_role' => $log->verified_role,
+                'identity_verification_target_role' => $targetRole,
                 'identity_verification_started_at' => $now,
                 'identity_verification_expires_at' => $expiresAt,
                 'identity_verification_attempts' => 0,
@@ -110,7 +160,7 @@ class ConsultationIdentityVerificationService
                 [
                     'otp_hash' => $otpHash,
                     'target_user_id' => $targetUser->id,
-                    'target_role' => $log->verified_role,
+                    'target_role' => $targetRole,
                     'attempts' => 0,
                     'max_attempts' => $maxAttempts,
                     'resend_count' => 0,
@@ -126,7 +176,7 @@ class ConsultationIdentityVerificationService
                 'target_user_id' => $targetUser->id,
                 'target_user_email' => $targetUser->email,
                 'target_user_name' => $targetUser->name,
-                'target_role' => $log->verified_role,
+                'target_role' => $targetRole,
                 'otp' => $otp,
                 'expires_at' => $expiresAt,
             ];
