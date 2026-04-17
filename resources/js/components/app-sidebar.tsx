@@ -9,6 +9,7 @@ import {
     Stethoscope,
     Pill,
     ShieldAlert,
+    ShieldCheck,
     Users,
     History,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
 import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
+import { index as adminDeepfakeVerifications } from '@/routes/admin/deepfake-verifications';
 import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
@@ -131,6 +133,11 @@ export function AppSidebar() {
             title: 'Deepfake Logs',
             href: adminDeepfakeLogs(),
             icon: ShieldAlert,
+        });
+        mainNavItems.push({
+            title: 'Deepfake Verification',
+            href: adminDeepfakeVerifications(),
+            icon: ShieldCheck,
         });
         mainNavItems.push({
             title: 'Deepfake Alerts',

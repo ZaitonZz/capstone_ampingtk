@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminDeepfakeAlertController;
 use App\Http\Controllers\AdminDeepfakeLogController;
+use App\Http\Controllers\AdminDeepfakeVerificationController;
 use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\AgentTestController;
@@ -333,6 +334,8 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
             ->name('admin.microcheck-logs.index');
         Route::get('admin/logs/deepfake', [AdminDeepfakeLogController::class, 'index'])
             ->name('admin.deepfake-logs.index');
+        Route::get('admin/logs/deepfake-verifications', [AdminDeepfakeVerificationController::class, 'index'])
+            ->name('admin.deepfake-verifications.index');
 
         Route::get('admin/alerts/deepfake', [AdminDeepfakeAlertController::class, 'index'])
             ->name('admin.deepfake-alerts.index');
