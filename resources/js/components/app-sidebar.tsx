@@ -27,6 +27,8 @@ import {
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
+import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
+import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
@@ -59,12 +61,12 @@ export function AppSidebar() {
     const dashboardHref = isPatient
         ? patientDashboard()
         : user.role === 'doctor'
-          ? doctorDashboard()
-          : user.role === 'admin'
-            ? adminDashboard()
-            : user.role === 'medicalstaff'
-              ? '/medicalstaff/dashboard'
-              : dashboard();
+            ? doctorDashboard()
+            : user.role === 'admin'
+                ? adminDashboard()
+                : user.role === 'medicalstaff'
+                    ? '/medicalstaff/dashboard'
+                    : dashboard();
 
     const mainNavItems: NavItem[] = [
         {
@@ -115,6 +117,16 @@ export function AppSidebar() {
             title: 'User Management',
             href: adminUsers(),
             icon: Users,
+        });
+        mainNavItems.push({
+            title: 'Microcheck Logs',
+            href: adminMicrocheckLogs(),
+            icon: ClipboardList,
+        });
+        mainNavItems.push({
+            title: 'Deepfake Logs',
+            href: adminDeepfakeLogs(),
+            icon: ShieldAlert,
         });
         mainNavItems.push({
             title: 'Deepfake Alerts',
