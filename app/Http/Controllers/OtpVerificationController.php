@@ -6,6 +6,7 @@ use App\Mail\OtpMail;
 use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -14,13 +15,14 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Inertia\Response;
 
 class OtpVerificationController extends Controller
 {
     /**
      * Show OTP verification page for pending email/password login.
      */
-    public function show(): \Illuminate\Http\RedirectResponse|\Inertia\Response
+    public function show(): RedirectResponse|Response
     {
         $pendingLoginToken = session('pending_login_token');
 
@@ -80,6 +82,8 @@ class OtpVerificationController extends Controller
 
         // Validate credentials
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            $this->logFailedLoginAttempt($request, $validated['email'], $user?->id, 'invalid_credentials');
+
             throw ValidationException::withMessages([
                 'email' => 'Invalid email or password.',
             ]);
@@ -176,7 +180,7 @@ class OtpVerificationController extends Controller
      * Ensure OTP is generated/sent for authenticated users.
      * Redirects to verification page.
      */
-    public function ensureOtp(Request $request): \Illuminate\Http\RedirectResponse
+    public function ensureOtp(Request $request): RedirectResponse
     {
         $user = $request->user();
 
