@@ -221,6 +221,80 @@ it('validates consultation OTP code using configured OTP length', function () {
         ->assertSessionHasErrors(['otp_code']);
 });
 
+it('assigned doctor can manually override paused identity verification', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_attempts' => 1,
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $escalation = DeepfakeEscalation::factory()->create([
+        'consultation_id' => $consultation->id,
+        'triggered_by_user_id' => $patientUser->id,
+        'triggered_role' => 'patient',
+        'type' => DeepfakeEscalation::TYPE_OTP_VERIFICATION,
+        'status' => DeepfakeEscalation::STATUS_OPEN,
+    ]);
+
+    $expiresAt = now()->addMinutes(5);
+
+    Cache::put("consultation:identity_verification:{$consultation->id}", [
+        'otp_hash' => Hash::make('123456'),
+        'target_user_id' => $patientUser->id,
+        'target_role' => 'patient',
+        'attempts' => 1,
+        'max_attempts' => 5,
+        'resend_count' => 0,
+        'max_resends' => 3,
+        'expires_at' => $expiresAt->toIso8601String(),
+        'resend_available_at' => now()->addSeconds(30)->toIso8601String(),
+    ], $expiresAt);
+
+    $this->actingAs($doctor)
+        ->post(route('consultations.identity-verification.override', $consultation))
+        ->assertRedirect();
+
+    expect($consultation->fresh()->status)->toBe('ongoing');
+    expect($consultation->fresh()->identity_verification_target_user_id)->toBeNull();
+    expect($consultation->fresh()->identity_verification_attempts)->toBe(0);
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
+    expect($escalation->fresh()->decision)->toBe('continue');
+    expect(Cache::get("consultation:identity_verification:{$consultation->id}"))->toBeNull();
+});
+
+it('non-doctor cannot manually override paused identity verification', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'identity_verification_target_user_id' => $patientUser->id,
+        'identity_verification_target_role' => 'patient',
+        'status' => 'paused',
+        'status_before_pause' => 'ongoing',
+        'identity_verification_started_at' => now(),
+        'identity_verification_expires_at' => now()->addMinutes(5),
+        'identity_verification_resend_available_at' => now()->addSeconds(30),
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $this->actingAs($patientUser)
+        ->post(route('consultations.identity-verification.override', $consultation))
+        ->assertForbidden();
+});
+
 it('admin can view the deepfake alerts page', function () {
     $admin = User::factory()->admin()->create();
     $consultation = Consultation::factory()->create();
