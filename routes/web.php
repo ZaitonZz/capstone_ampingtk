@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminActivityLogController;
 use App\Http\Controllers\AdminDeepfakeAlertController;
 use App\Http\Controllers\AdminDeepfakeLogController;
 use App\Http\Controllers\AdminMicrocheckLogController;
@@ -199,6 +200,9 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
             ->name('admin.users.store');
         Route::patch('admin/users/{user}', [AdminUserManagementController::class, 'update'])
             ->name('admin.users.update');
+
+        Route::get('admin/logs/activity', [AdminActivityLogController::class, 'index'])
+            ->name('admin.activity-logs.index');
     });
 
     // Medical staff-specific dashboard

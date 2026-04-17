@@ -10,6 +10,7 @@ import {
     Pill,
     ShieldAlert,
     Users,
+    History,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
 import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
 import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
@@ -58,15 +60,17 @@ export function AppSidebar() {
         user.role === 'admin' ||
         user.role === 'medicalstaff';
     const isAdmin = user.role === 'admin';
-    const dashboardHref = isPatient
-        ? patientDashboard()
-        : user.role === 'doctor'
-            ? doctorDashboard()
-            : user.role === 'admin'
-                ? adminDashboard()
-                : user.role === 'medicalstaff'
-                    ? '/medicalstaff/dashboard'
-                    : dashboard();
+    let dashboardHref = dashboard();
+
+    if (user.role === 'patient') {
+        dashboardHref = patientDashboard();
+    } else if (user.role === 'doctor') {
+        dashboardHref = doctorDashboard();
+    } else if (user.role === 'admin') {
+        dashboardHref = adminDashboard();
+    } else if (user.role === 'medicalstaff') {
+        dashboardHref = '/medicalstaff/dashboard';
+    }
 
     const mainNavItems: NavItem[] = [
         {
@@ -132,6 +136,11 @@ export function AppSidebar() {
             title: 'Deepfake Alerts',
             href: adminDeepfakeAlerts(),
             icon: ShieldAlert,
+        });
+        mainNavItems.push({
+            title: 'Activity Logs',
+            href: adminActivityLogs(),
+            icon: History,
         });
     }
 
