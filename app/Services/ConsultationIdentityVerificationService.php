@@ -332,28 +332,10 @@ class ConsultationIdentityVerificationService
                 return false;
             }
 
-            $statusBeforePause = $lockedConsultation->status_before_pause ?? 'ongoing';
-
-            if ($statusBeforePause === 'paused') {
-                $statusBeforePause = 'ongoing';
-            }
-
-            $lockedConsultation->forceFill([
-                'status' => $statusBeforePause,
-                'status_before_pause' => null,
-                'identity_verification_target_user_id' => null,
-                'identity_verification_target_role' => null,
-                'identity_verification_started_at' => null,
-                'identity_verification_expires_at' => null,
-                'identity_verification_attempts' => 0,
-                'identity_verification_resend_available_at' => null,
-            ])->save();
-
-            $this->resolveOpenEscalation(
-                consultationId: $lockedConsultation->id,
-                decision: 'continue',
-                notes: 'Identity verification succeeded. Consultation resumed.',
+            $this->resumeFromIdentityVerification(
+                consultation: $lockedConsultation,
                 resolvedBy: $actor->id,
+                escalationNotes: 'Identity verification succeeded. Consultation resumed.',
             );
 
             return true;
@@ -395,28 +377,10 @@ class ConsultationIdentityVerificationService
                 return false;
             }
 
-            $statusBeforePause = $lockedConsultation->status_before_pause ?? 'ongoing';
-
-            if ($statusBeforePause === 'paused') {
-                $statusBeforePause = 'ongoing';
-            }
-
-            $lockedConsultation->forceFill([
-                'status' => $statusBeforePause,
-                'status_before_pause' => null,
-                'identity_verification_target_user_id' => null,
-                'identity_verification_target_role' => null,
-                'identity_verification_started_at' => null,
-                'identity_verification_expires_at' => null,
-                'identity_verification_attempts' => 0,
-                'identity_verification_resend_available_at' => null,
-            ])->save();
-
-            $this->resolveOpenEscalation(
-                consultationId: $lockedConsultation->id,
-                decision: 'continue',
-                notes: 'Identity verification manually overridden by assigned doctor. Consultation resumed.',
+            $this->resumeFromIdentityVerification(
+                consultation: $lockedConsultation,
                 resolvedBy: $actor->id,
+                escalationNotes: 'Identity verification manually overridden by assigned doctor. Consultation resumed.',
             );
 
             return true;
@@ -522,6 +486,36 @@ class ConsultationIdentityVerificationService
             'resolved_at' => now(),
             'notes' => $notes,
         ]);
+    }
+
+    private function resumeFromIdentityVerification(
+        Consultation $consultation,
+        int $resolvedBy,
+        string $escalationNotes,
+    ): void {
+        $statusBeforePause = $consultation->status_before_pause ?? 'ongoing';
+
+        if ($statusBeforePause === 'paused') {
+            $statusBeforePause = 'ongoing';
+        }
+
+        $consultation->forceFill([
+            'status' => $statusBeforePause,
+            'status_before_pause' => null,
+            'identity_verification_target_user_id' => null,
+            'identity_verification_target_role' => null,
+            'identity_verification_started_at' => null,
+            'identity_verification_expires_at' => null,
+            'identity_verification_attempts' => 0,
+            'identity_verification_resend_available_at' => null,
+        ])->save();
+
+        $this->resolveOpenEscalation(
+            consultationId: $consultation->id,
+            decision: 'continue',
+            notes: $escalationNotes,
+            resolvedBy: $resolvedBy,
+        );
     }
 
     private function ensureTargetActor(Consultation $consultation, User $actor): void
