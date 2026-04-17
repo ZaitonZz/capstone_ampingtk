@@ -215,6 +215,7 @@ export default function ConsultationLobbyPage({
     const [otpCode, setOtpCode] = useState('');
     const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
     const [isResendingOtp, setIsResendingOtp] = useState(false);
+    const [isApplyingOverride, setIsApplyingOverride] = useState(false);
 
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
@@ -230,6 +231,10 @@ export default function ConsultationLobbyPage({
         : 6;
     const expiresInSeconds = secondsUntil(verification?.expires_at);
     const resendInSeconds = secondsUntil(verification?.resend_available_at);
+    const canApplyDoctorOverride = Boolean(
+        verification?.override_url &&
+            page.props.auth?.user?.id === consultation.doctor_id,
+    );
 
     const connectEndpoint = useMemo(
         () =>
@@ -614,6 +619,24 @@ export default function ConsultationLobbyPage({
                 preserveScroll: true,
                 onStart: () => setIsResendingOtp(true),
                 onFinish: () => setIsResendingOtp(false),
+            },
+        );
+    }
+
+    function handleDoctorOverride(): void {
+        if (!verification?.override_url) {
+            toast.error('Manual override endpoint is unavailable.');
+
+            return;
+        }
+
+        router.post(
+            verification.override_url,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setIsApplyingOverride(true),
+                onFinish: () => setIsApplyingOverride(false),
             },
         );
     }
@@ -1035,11 +1058,28 @@ export default function ConsultationLobbyPage({
                                         </div>
                                     </>
                                 ) : (
-                                    <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
-                                        Consultation is paused while the{' '}
-                                        {verificationTargetRole} completes
-                                        identity verification.
-                                    </p>
+                                    <>
+                                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                                            Consultation is paused while the{' '}
+                                            {verificationTargetRole} completes
+                                            identity verification.
+                                        </p>
+
+                                        {canApplyDoctorOverride && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="mt-3 w-full"
+                                                disabled={isApplyingOverride}
+                                                onClick={handleDoctorOverride}
+                                            >
+                                                {isApplyingOverride
+                                                    ? 'Applying override...'
+                                                    : 'Manual Override (Doctor)'}
+                                            </Button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         )}
