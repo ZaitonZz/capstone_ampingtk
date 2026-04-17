@@ -51,6 +51,7 @@ class FaceMatchEscalationService
             ->where('consultation_id', $log->consultation_id)
             ->where('verified_role', $log->verified_role)
             ->where('user_id', $log->user_id)
+            ->whereNotNull('microcheck_id')
             ->orderByDesc('checked_at')
             ->orderByDesc('id')
             ->limit(100)
@@ -59,7 +60,7 @@ class FaceMatchEscalationService
         $streak = 0;
 
         foreach ($recentLogs as $recentLog) {
-            if ($recentLog->microcheck_id === null || $recentLog->matched || ! $recentLog->flagged) {
+            if ($recentLog->matched || ! $recentLog->flagged) {
                 break;
             }
 
