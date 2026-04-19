@@ -134,6 +134,7 @@ export interface ConsultationIdentityVerificationState {
     resend_available_at?: string | null;
     verify_url?: string;
     resend_url?: string;
+    override_url?: string | null;
 }
 
 export interface CalendarEvent {

@@ -407,6 +407,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('identity-verification.verify');
         Route::post('identity-verification/resend', [ConsultationIdentityVerificationController::class, 'resend'])
             ->name('identity-verification.resend');
+        Route::post('identity-verification/override', [ConsultationIdentityVerificationController::class, 'override'])
+            ->name('identity-verification.override');
     });
 });
 

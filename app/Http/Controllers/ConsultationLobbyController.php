@@ -25,6 +25,9 @@ class ConsultationLobbyController extends Controller
             ->first();
 
         $currentUser = auth()->user();
+        $isConsultationDoctor =
+            $currentUser !== null
+            && $consultation->doctor_id === $currentUser->id;
         $isVerificationTarget =
             $currentUser !== null
             && $consultation->identity_verification_target_user_id !== null
@@ -45,6 +48,9 @@ class ConsultationLobbyController extends Controller
                 'resend_available_at' => $consultation->identity_verification_resend_available_at,
                 'verify_url' => route('consultations.identity-verification.verify', $consultation),
                 'resend_url' => route('consultations.identity-verification.resend', $consultation),
+                'override_url' => $isConsultationDoctor
+                    ? route('consultations.identity-verification.override', $consultation)
+                    : null,
             ],
             'livekit' => [
                 'enabled' => (bool) config('services.livekit.enabled', false),

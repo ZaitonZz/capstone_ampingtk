@@ -67,4 +67,26 @@ class ConsultationIdentityVerificationController extends Controller
 
         return back()->with('error', $result['message']);
     }
+
+    public function override(Request $request, Consultation $consultation): RedirectResponse
+    {
+        $this->authorize('view', $consultation);
+
+        $user = $request->user();
+
+        if ($user === null) {
+            abort(403);
+        }
+
+        $result = $this->identityVerificationService->overrideForConsultation(
+            consultation: $consultation,
+            actor: $user,
+        );
+
+        if ($result['status'] === 'overridden') {
+            return back()->with('success', $result['message']);
+        }
+
+        return back()->with('error', $result['message']);
+    }
 }

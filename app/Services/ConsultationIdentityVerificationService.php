@@ -382,28 +382,10 @@ class ConsultationIdentityVerificationService
                 return false;
             }
 
-            $statusBeforePause = $lockedConsultation->status_before_pause ?? 'ongoing';
-
-            if ($statusBeforePause === 'paused') {
-                $statusBeforePause = 'ongoing';
-            }
-
-            $lockedConsultation->forceFill([
-                'status' => $statusBeforePause,
-                'status_before_pause' => null,
-                'identity_verification_target_user_id' => null,
-                'identity_verification_target_role' => null,
-                'identity_verification_started_at' => null,
-                'identity_verification_expires_at' => null,
-                'identity_verification_attempts' => 0,
-                'identity_verification_resend_available_at' => null,
-            ])->save();
-
-            $this->resolveOpenEscalation(
-                consultationId: $lockedConsultation->id,
-                decision: 'continue',
-                notes: 'Identity verification succeeded. Consultation resumed.',
+            $this->resumeFromIdentityVerification(
+                consultation: $lockedConsultation,
                 resolvedBy: $actor->id,
+                escalationNotes: 'Identity verification succeeded. Consultation resumed.',
             );
 
             return true;
@@ -421,6 +403,51 @@ class ConsultationIdentityVerificationService
         return [
             'status' => 'verified',
             'message' => 'Identity verified successfully. Consultation resumed.',
+        ];
+    }
+
+    public function overrideForConsultation(Consultation $consultation, User $actor): array
+    {
+        $this->ensureDoctorOverrideActor($consultation, $actor);
+
+        if ($consultation->status !== 'paused') {
+            return [
+                'status' => 'invalid_state',
+                'message' => 'Consultation is not waiting for identity verification.',
+            ];
+        }
+
+        $overrideApplied = DB::transaction(function () use ($consultation, $actor): bool {
+            $lockedConsultation = Consultation::query()
+                ->whereKey($consultation->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedConsultation === null || $lockedConsultation->status !== 'paused') {
+                return false;
+            }
+
+            $this->resumeFromIdentityVerification(
+                consultation: $lockedConsultation,
+                resolvedBy: $actor->id,
+                escalationNotes: 'Identity verification manually overridden by assigned doctor. Consultation resumed.',
+            );
+
+            return true;
+        }, attempts: 5);
+
+        if (! $overrideApplied) {
+            return [
+                'status' => 'invalid_state',
+                'message' => 'Consultation is not waiting for identity verification.',
+            ];
+        }
+
+        Cache::forget($this->cacheKey($consultation));
+
+        return [
+            'status' => 'overridden',
+            'message' => 'Manual override applied. Consultation resumed.',
         ];
     }
 
@@ -511,10 +538,47 @@ class ConsultationIdentityVerificationService
         ]);
     }
 
+    private function resumeFromIdentityVerification(
+        Consultation $consultation,
+        int $resolvedBy,
+        string $escalationNotes,
+    ): void {
+        $statusBeforePause = $consultation->status_before_pause ?? 'ongoing';
+
+        if ($statusBeforePause === 'paused') {
+            $statusBeforePause = 'ongoing';
+        }
+
+        $consultation->forceFill([
+            'status' => $statusBeforePause,
+            'status_before_pause' => null,
+            'identity_verification_target_user_id' => null,
+            'identity_verification_target_role' => null,
+            'identity_verification_started_at' => null,
+            'identity_verification_expires_at' => null,
+            'identity_verification_attempts' => 0,
+            'identity_verification_resend_available_at' => null,
+        ])->save();
+
+        $this->resolveOpenEscalation(
+            consultationId: $consultation->id,
+            decision: 'continue',
+            notes: $escalationNotes,
+            resolvedBy: $resolvedBy,
+        );
+    }
+
     private function ensureTargetActor(Consultation $consultation, User $actor): void
     {
         if ((int) $consultation->identity_verification_target_user_id !== $actor->id) {
             throw new AuthorizationException('Only the flagged participant can complete this identity verification.');
+        }
+    }
+
+    private function ensureDoctorOverrideActor(Consultation $consultation, User $actor): void
+    {
+        if (! $actor->isDoctor() || (int) $consultation->doctor_id !== $actor->id) {
+            throw new AuthorizationException('Only the assigned doctor can manually override identity verification.');
         }
     }
 
