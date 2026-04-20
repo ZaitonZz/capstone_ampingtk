@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\DeepfakeEscalation;
+use App\Models\DeepfakeScanLog;
 use App\Models\Patient;
 use App\Models\User;
 use App\Services\ConsultationIdentityVerificationService;
@@ -310,6 +311,18 @@ it('assigned doctor can enable manual override before consultation starts', func
     expect($freshConsultation->identity_verification_target_user_id)->toBeNull();
     expect(app(ConsultationIdentityVerificationService::class)
         ->isManualOverrideEnabled($freshConsultation))->toBeTrue();
+
+    app(ConsultationIdentityVerificationService::class)->beginForDeepfakeLog(
+        DeepfakeScanLog::factory()->make([
+            'consultation_id' => $freshConsultation->id,
+            'verified_role' => 'patient',
+            'user_id' => $patientUser->id,
+            'result' => 'fake',
+        ])
+    );
+
+    expect($freshConsultation->fresh()->status)->toBe('scheduled');
+    expect($freshConsultation->fresh()->identity_verification_target_user_id)->toBeNull();
 });
 
 it('non-doctor cannot manually override paused identity verification', function () {

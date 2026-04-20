@@ -431,14 +431,31 @@ class ConsultationIdentityVerificationService
                 ];
             }
 
-            if ($this->isManualOverrideEnabled($consultation)) {
+            $overrideEnabled = DB::transaction(function () use ($consultation): bool {
+                $lockedConsultation = Consultation::query()
+                    ->whereKey($consultation->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($lockedConsultation === null) {
+                    return false;
+                }
+
+                if ($this->isManualOverrideEnabled($lockedConsultation)) {
+                    return true;
+                }
+
+                $this->enableManualOverride($lockedConsultation);
+
+                return true;
+            }, attempts: 5);
+
+            if (! $overrideEnabled) {
                 return [
-                    'status' => 'overridden',
-                    'message' => 'Manual override is already enabled for this consultation.',
+                    'status' => 'invalid_state',
+                    'message' => 'Consultation is not eligible for manual override.',
                 ];
             }
-
-            $this->enableManualOverride($consultation);
 
             return [
                 'status' => 'overridden',
