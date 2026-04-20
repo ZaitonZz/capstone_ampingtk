@@ -4,11 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Services\ConsultationIdentityVerificationService;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ConsultationLobbyController extends Controller
 {
+    public function __construct(
+        private ConsultationIdentityVerificationService $identityVerificationService,
+    ) {}
+
     public function show(Consultation $consultation): Response
     {
         $this->authorize('view', $consultation);
@@ -53,6 +58,7 @@ class ConsultationLobbyController extends Controller
                 'resend_available_at' => $consultation->identity_verification_resend_available_at,
                 'verify_url' => route('consultations.identity-verification.verify', $consultation),
                 'resend_url' => route('consultations.identity-verification.resend', $consultation),
+                'manual_override_enabled' => $this->identityVerificationService->isManualOverrideEnabled($consultation),
                 'override_url' => $isConsultationDoctor
                     ? route('consultations.identity-verification.override', $consultation)
                     : null,
