@@ -108,7 +108,25 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Doctor-specific dashboard
     Route::middleware('doctor')->group(function () {
         Route::get('doctor/dashboard', function () {
-            return inertia('dashboard');
+            $doctor = auth()->user();
+
+            $todaysSchedule = Consultation::query()
+                ->with(['patient:id,first_name,last_name'])
+                ->where('doctor_id', $doctor?->id)
+                ->whereDate('scheduled_at', today())
+                ->orderBy('scheduled_at')
+                ->get()
+                ->map(fn (Consultation $consultation) => [
+                    'id' => $consultation->id,
+                    'patient_name' => $consultation->patient?->full_name ?? 'Unknown Patient',
+                    'scheduled_at' => $consultation->scheduled_at?->toIso8601String(),
+                    'status' => $consultation->status,
+                    'type' => $consultation->type,
+                ]);
+
+            return inertia('doctor/dashboard', [
+                'todays_schedule' => $todaysSchedule,
+            ]);
         })->name('doctor.dashboard');
     });
 

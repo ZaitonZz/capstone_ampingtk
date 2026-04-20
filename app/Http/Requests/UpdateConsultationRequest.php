@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateConsultationRequest extends FormRequest
 {
@@ -14,6 +15,10 @@ class UpdateConsultationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'doctor_id' => [
+                'sometimes',
+                Rule::exists('users', 'id')->where(fn ($q) => $q->where('role', 'doctor')),
+            ],
             'type' => ['sometimes', 'in:in_person,teleconsultation'],
             'status' => ['sometimes', 'in:pending,scheduled,ongoing,paused,completed,cancelled,no_show'],
             'chief_complaint' => ['nullable', 'string'],

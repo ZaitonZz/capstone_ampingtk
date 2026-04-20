@@ -9,9 +9,13 @@ use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,8 +25,10 @@ class ConsultationController extends Controller
     {
         $this->authorize('viewAny', Consultation::class);
 
+        $isDoctor = $request->user()->isDoctor();
+
         $consultations = Consultation::query()
-            ->with(['patient', 'doctor', 'latestMicrocheck'])
+            ->with(['patient', 'doctor', 'preferredDoctor', 'latestMicrocheck'])
             ->withMin([
                 'microchecks as next_microcheck_due_at' => fn ($q) => $q->where('status', 'pending'),
             ], 'scheduled_at')
@@ -45,6 +51,14 @@ class ConsultationController extends Controller
         return Inertia::render('consultations/index', [
             'consultations' => $consultations,
             'filters' => $request->only(['search', 'status', 'type', 'patient_id', 'doctor_id']),
+            'doctor_daily_schedule' => $isDoctor
+                ? Consultation::query()
+                    ->with(['patient:id,first_name,last_name', 'doctor:id,name'])
+                    ->where('doctor_id', $request->user()->id)
+                    ->whereDate('scheduled_at', today())
+                    ->orderBy('scheduled_at')
+                    ->get(['id', 'patient_id', 'doctor_id', 'type', 'status', 'scheduled_at', 'chief_complaint'])
+                : [],
         ]);
     }
 
@@ -52,9 +66,13 @@ class ConsultationController extends Controller
     {
         $this->authorize('create', Consultation::class);
 
+        $referenceAt = $request->filled('scheduled_at')
+            ? Carbon::parse((string) $request->query('scheduled_at'))
+            : now();
+
         return Inertia::render('consultations/create', [
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
-            'doctors' => User::query()->where('role', 'doctor')->with('doctorProfile')->orderBy('name')->get(['id', 'name']),
+            'doctors' => $this->onDutyDoctorQuery($referenceAt)->get(['id', 'name']),
             'scheduled_at' => $request->query('scheduled_at', ''),
         ]);
     }
@@ -64,6 +82,15 @@ class ConsultationController extends Controller
         $this->authorize('create', Consultation::class);
 
         $data = $request->validated();
+        $scheduleAt = filled($data['scheduled_at'] ?? null)
+            ? Carbon::parse((string) $data['scheduled_at'])
+            : now();
+
+        if (! $this->doctorIsOnDutyForSchedule((int) $data['doctor_id'], $scheduleAt)) {
+            throw ValidationException::withMessages([
+                'doctor_id' => 'Selected doctor is not on duty for the requested schedule.',
+            ]);
+        }
 
         if (($data['type'] ?? 'in_person') === 'teleconsultation') {
             $data['session_token'] = Str::uuid()->toString();
@@ -89,6 +116,7 @@ class ConsultationController extends Controller
         $consultation->load([
             'patient',
             'doctor.doctorProfile',
+            'preferredDoctor.doctorProfile',
             'note',
             'vitalSigns',
             'prescriptions',
@@ -112,10 +140,12 @@ class ConsultationController extends Controller
     {
         $this->authorize('update', $consultation);
 
+        $referenceAt = $consultation->scheduled_at ?? now();
+
         return Inertia::render('consultations/edit', [
-            'consultation' => $consultation->load(['patient', 'doctor']),
+            'consultation' => $consultation->load(['patient', 'doctor', 'preferredDoctor']),
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
-            'doctors' => User::query()->where('role', 'doctor')->with('doctorProfile')->orderBy('name')->get(['id', 'name']),
+            'doctors' => $this->onDutyDoctorQuery($referenceAt)->get(['id', 'name']),
         ]);
     }
 
@@ -123,7 +153,19 @@ class ConsultationController extends Controller
     {
         $this->authorize('update', $consultation);
 
-        $consultation->update($request->validated());
+        $data = $request->validated();
+        $selectedDoctorId = (int) ($data['doctor_id'] ?? $consultation->doctor_id);
+        $scheduleAt = filled($data['scheduled_at'] ?? null)
+            ? Carbon::parse((string) $data['scheduled_at'])
+            : ($consultation->scheduled_at ?? now());
+
+        if (! $this->doctorIsOnDutyForSchedule($selectedDoctorId, $scheduleAt)) {
+            throw ValidationException::withMessages([
+                'doctor_id' => 'Selected doctor is not on duty for the requested schedule.',
+            ]);
+        }
+
+        $consultation->update($data);
 
         return redirect()->route('consultations.show', $consultation)
             ->with('success', 'Consultation updated.');
@@ -142,6 +184,8 @@ class ConsultationController extends Controller
     public function calendar(Request $request): Response
     {
         $this->authorize('viewAny', Consultation::class);
+
+        $referenceAt = now();
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
@@ -167,7 +211,7 @@ class ConsultationController extends Controller
 
         return Inertia::render('consultations/calendar', [
             'events' => $consultations,
-            'doctors' => User::query()->where('role', 'doctor')->orderBy('name')->get(['id', 'name']),
+            'doctors' => $this->onDutyDoctorQuery($referenceAt)->get(['id', 'name']),
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
         ]);
     }
@@ -187,6 +231,14 @@ class ConsultationController extends Controller
     {
         $this->authorize('update', $consultation);
 
+        $scheduleAt = Carbon::parse((string) $request->validated('scheduled_at'));
+
+        if (! $this->doctorIsOnDutyForSchedule((int) $consultation->doctor_id, $scheduleAt)) {
+            throw ValidationException::withMessages([
+                'scheduled_at' => 'The assigned doctor is not on duty for this schedule. Please reassign first.',
+            ]);
+        }
+
         abort_unless(
             in_array($consultation->status, ['pending', 'scheduled'], true),
             422,
@@ -194,7 +246,7 @@ class ConsultationController extends Controller
         );
 
         $consultation->update([
-            'scheduled_at' => $request->validated('scheduled_at'),
+            'scheduled_at' => $scheduleAt,
         ]);
 
         return back()->with('success', 'Consultation schedule updated.');
@@ -216,5 +268,37 @@ class ConsultationController extends Controller
         ]);
 
         return back()->with('success', 'Consultation cancelled.');
+    }
+
+    private function onDutyDoctorQuery(CarbonInterface $referenceAt): Builder
+    {
+        $dayStart = $referenceAt->copy()->startOfDay();
+        $dayEnd = $referenceAt->copy()->endOfDay();
+        $weekStart = $referenceAt->copy()->startOfWeek();
+        $weekEnd = $referenceAt->copy()->endOfWeek();
+        $activeDutyStatuses = ['pending', 'scheduled', 'ongoing', 'paused'];
+
+        return User::query()
+            ->where('role', 'doctor')
+            ->with('doctorProfile')
+            ->withExists([
+                'consultations as on_duty_today' => fn ($q) => $q
+                    ->whereIn('status', $activeDutyStatuses)
+                    ->whereBetween('scheduled_at', [$dayStart, $dayEnd]),
+                'consultations as on_duty_this_week' => fn ($q) => $q
+                    ->whereIn('status', $activeDutyStatuses)
+                    ->whereBetween('scheduled_at', [$weekStart, $weekEnd]),
+            ])
+            ->whereHas('consultations', fn ($q) => $q
+                ->whereIn('status', $activeDutyStatuses)
+                ->whereBetween('scheduled_at', [$weekStart, $weekEnd]))
+            ->orderBy('name');
+    }
+
+    private function doctorIsOnDutyForSchedule(int $doctorId, CarbonInterface $scheduleAt): bool
+    {
+        return $this->onDutyDoctorQuery($scheduleAt)
+            ->whereKey($doctorId)
+            ->exists();
     }
 }

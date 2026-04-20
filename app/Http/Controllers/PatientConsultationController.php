@@ -102,6 +102,13 @@ class PatientConsultationController extends Controller
 
         $data['patient_id'] = $patient->id;
         $data['status'] = 'pending';
+        $data['preferred_doctor_id'] = $data['preferred_doctor_id'] ?? null;
+
+        // Keep assignment flexible for medical staff by storing preference separately.
+        $data['doctor_id'] = $data['preferred_doctor_id']
+            ?? User::query()->where('role', 'doctor')->orderBy('name')->value('id');
+
+        abort_unless($data['doctor_id'] !== null, 422, 'No doctor is available to receive this request yet.');
 
         if ($data['type'] === 'teleconsultation') {
             $data['session_token'] = Str::uuid()->toString();
