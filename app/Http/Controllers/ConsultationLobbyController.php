@@ -59,7 +59,7 @@ class ConsultationLobbyController extends Controller
                 'verify_url' => route('consultations.identity-verification.verify', $consultation),
                 'resend_url' => route('consultations.identity-verification.resend', $consultation),
                 'manual_override_enabled' => $this->identityVerificationService->isManualOverrideEnabled($consultation),
-                'override_url' => $isConsultationDoctor
+                'override_url' => $isConsultationDoctor && in_array($consultation->status, ['pending', 'scheduled'], true)
                     ? route('consultations.identity-verification.override', $consultation)
                     : null,
             ],

@@ -423,78 +423,42 @@ class ConsultationIdentityVerificationService
     {
         $this->ensureDoctorOverrideActor($consultation, $actor);
 
-        if ($consultation->status !== 'paused') {
-            if (! in_array($consultation->status, ['pending', 'scheduled', 'ongoing'], true)) {
-                return [
-                    'status' => 'invalid_state',
-                    'message' => 'Consultation is not eligible for manual override.',
-                ];
-            }
-
-            $overrideEnabled = DB::transaction(function () use ($consultation): bool {
-                $lockedConsultation = Consultation::query()
-                    ->whereKey($consultation->id)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($lockedConsultation === null) {
-                    return false;
-                }
-
-                if ($this->isManualOverrideEnabled($lockedConsultation)) {
-                    return true;
-                }
-
-                $this->enableManualOverride($lockedConsultation);
-
-                return true;
-            }, attempts: 5);
-
-            if (! $overrideEnabled) {
-                return [
-                    'status' => 'invalid_state',
-                    'message' => 'Consultation is not eligible for manual override.',
-                ];
-            }
-
+        if (! in_array($consultation->status, ['pending', 'scheduled'], true)) {
             return [
-                'status' => 'overridden',
-                'message' => 'Manual override enabled. Deepfake verification checks will be bypassed for this consultation.',
+                'status' => 'invalid_state',
+                'message' => 'Consultation is not eligible for manual override before it starts.',
             ];
         }
 
-        $overrideApplied = DB::transaction(function () use ($consultation, $actor): bool {
+        $overrideEnabled = DB::transaction(function () use ($consultation): bool {
             $lockedConsultation = Consultation::query()
                 ->whereKey($consultation->id)
                 ->lockForUpdate()
                 ->first();
 
-            if ($lockedConsultation === null || $lockedConsultation->status !== 'paused') {
+            if ($lockedConsultation === null) {
                 return false;
             }
 
-            $this->resumeFromIdentityVerification(
-                consultation: $lockedConsultation,
-                resolvedBy: $actor->id,
-                escalationNotes: 'Identity verification manually overridden by assigned doctor. Consultation resumed.',
-            );
+            if ($this->isManualOverrideEnabled($lockedConsultation)) {
+                return true;
+            }
+
+            $this->enableManualOverride($lockedConsultation);
 
             return true;
         }, attempts: 5);
 
-        if (! $overrideApplied) {
+        if (! $overrideEnabled) {
             return [
                 'status' => 'invalid_state',
-                'message' => 'Consultation is not waiting for identity verification.',
+                'message' => 'Consultation is not eligible for manual override before it starts.',
             ];
         }
 
-        Cache::forget($this->cacheKey($consultation));
-        $this->enableManualOverride($consultation);
-
         return [
             'status' => 'overridden',
-            'message' => 'Manual override applied. Consultation resumed.',
+            'message' => 'Manual override enabled. Deepfake verification checks will be bypassed for this consultation.',
         ];
     }
 

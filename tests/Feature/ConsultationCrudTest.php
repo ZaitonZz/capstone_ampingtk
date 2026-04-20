@@ -236,7 +236,7 @@ it('validates consultation OTP code using configured OTP length', function () {
         ->assertSessionHasErrors(['otp_code']);
 });
 
-it('assigned doctor can manually override paused identity verification', function () {
+it('assigned doctor cannot manually override paused identity verification', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
 
@@ -280,14 +280,14 @@ it('assigned doctor can manually override paused identity verification', functio
         ->post(route('consultations.identity-verification.override', $consultation))
         ->assertRedirect();
 
-    expect($consultation->fresh()->status)->toBe('ongoing');
-    expect($consultation->fresh()->identity_verification_target_user_id)->toBeNull();
-    expect($consultation->fresh()->identity_verification_attempts)->toBe(0);
-    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
-    expect($escalation->fresh()->decision)->toBe('continue');
-    expect(Cache::get("consultation:identity_verification:{$consultation->id}"))->toBeNull();
+    expect($consultation->fresh()->status)->toBe('paused');
+    expect($consultation->fresh()->identity_verification_target_user_id)->toBe($patientUser->id);
+    expect($consultation->fresh()->identity_verification_attempts)->toBe(1);
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_OPEN);
+    expect($escalation->fresh()->decision)->toBeNull();
+    expect(Cache::get("consultation:identity_verification:{$consultation->id}"))->not->toBeNull();
     expect(app(ConsultationIdentityVerificationService::class)
-        ->isManualOverrideEnabled($consultation->fresh()))->toBeTrue();
+        ->isManualOverrideEnabled($consultation->fresh()))->toBeFalse();
 });
 
 it('assigned doctor can enable manual override before consultation starts', function () {
