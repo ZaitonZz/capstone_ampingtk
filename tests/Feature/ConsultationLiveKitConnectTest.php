@@ -109,3 +109,13 @@ it('allows admin audit connect without explicit consent', function () {
             'role' => 'admin_audit',
         ]);
 });
+
+it('forbids medical staff from connecting to a consultation session', function () {
+    $doctor = User::factory()->doctor()->create();
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    $this->actingAs($medicalStaff)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertForbidden();
+});

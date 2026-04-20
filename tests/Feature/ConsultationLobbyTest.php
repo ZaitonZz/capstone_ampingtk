@@ -113,6 +113,19 @@ it('allows the consultation patient to view the teleconsultation lobby', functio
         );
 });
 
+it('forbids medical staff from viewing the teleconsultation lobby', function () {
+    $doctor = User::factory()->doctor()->create();
+    $medicalStaff = User::factory()->medicalStaff()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertForbidden();
+});
+
 it('includes configured OTP length in lobby verification payload', function () {
     config()->set('auth_otp.otp.length', 8);
 

@@ -10,10 +10,11 @@ use Illuminate\Support\Facades\Hash;
 // ── Calendar page ─────────────────────────────────────────────────────────────
 
 it('renders the calendar page for medical staff', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     Consultation::factory(2)->create(['doctor_id' => $doctor->id]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->get(route('consultations.calendar'))
         ->assertOk()
         ->assertInertia(
@@ -36,16 +37,26 @@ it('admin sees all consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 3));
 });
 
-it('doctor sees only their own consultations on the calendar', function () {
+it('doctor sees only their own consultations for today on the calendar', function () {
     $doctor = User::factory()->doctor()->create();
     $other = User::factory()->doctor()->create();
-    Consultation::factory(2)->create(['doctor_id' => $doctor->id]);
-    Consultation::factory(2)->create(['doctor_id' => $other->id]);
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'scheduled_at' => now(),
+    ]);
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'scheduled_at' => now()->addDay(),
+    ]);
+    Consultation::factory()->create([
+        'doctor_id' => $other->id,
+        'scheduled_at' => now(),
+    ]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.calendar'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('events', 2));
+        ->assertInertia(fn ($page) => $page->has('events', 1));
 });
 
 it('medical staff can access consultations index', function () {
@@ -65,13 +76,14 @@ it('medical staff can access consultations index', function () {
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 it('approves a pending consultation and transitions it to scheduled', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertRedirect();
 
@@ -79,13 +91,14 @@ it('approves a pending consultation and transitions it to scheduled', function (
 });
 
 it('cannot approve a consultation that is not pending', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'scheduled',
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertStatus(422);
 });
