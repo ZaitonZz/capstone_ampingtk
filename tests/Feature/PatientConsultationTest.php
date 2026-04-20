@@ -99,3 +99,23 @@ it('prevents a patient from viewing another patient\'s consultation', function (
         ->get(route('patient.consultations.show', $otherConsultation))
         ->assertForbidden();
 });
+
+it('stores patient preferred doctor request on appointment submission', function () {
+    $user = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $user->id]);
+    $preferredDoctor = User::factory()->doctor()->create();
+
+    $this->actingAsVerified($user)
+        ->post(route('patient.consultations.request'), [
+            'preferred_doctor_id' => $preferredDoctor->id,
+            'type' => 'teleconsultation',
+            'chief_complaint' => 'Requested preferred doctor',
+            'scheduled_at' => now()->addDays(2)->toDateTimeString(),
+        ])
+        ->assertRedirect();
+
+    $consultation = Consultation::where('patient_id', $patient->id)->latest('id')->first();
+
+    expect($consultation)->not->toBeNull();
+    expect($consultation->preferred_doctor_id)->toBe($preferredDoctor->id);
+});

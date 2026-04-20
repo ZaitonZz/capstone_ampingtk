@@ -72,10 +72,17 @@ it('renders the show page with all related data', function () {
 });
 
 it('creates an in-person consultation and redirects', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
-    $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
+    $patient = Patient::factory()->create(['registered_by' => $medicalStaff->id]);
 
-    $this->actingAs($doctor)
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addHours(2),
+    ]);
+
+    $this->actingAs($medicalStaff)
         ->post(route('consultations.store'), [
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
@@ -89,10 +96,17 @@ it('creates an in-person consultation and redirects', function () {
 });
 
 it('creates a teleconsultation and generates a session_token', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
-    $patient = Patient::factory()->create(['registered_by' => $doctor->id]);
+    $patient = Patient::factory()->create(['registered_by' => $medicalStaff->id]);
 
-    $this->actingAs($doctor)
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addHours(3),
+    ]);
+
+    $this->actingAs($medicalStaff)
         ->post(route('consultations.store'), [
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
@@ -108,10 +122,11 @@ it('creates a teleconsultation and generates a session_token', function () {
 });
 
 it('updates consultation status and redirects', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->patch(route('consultations.update', $consultation), ['status' => 'completed'])
         ->assertRedirect(route('consultations.show', $consultation));
 
@@ -119,13 +134,51 @@ it('updates consultation status and redirects', function () {
 });
 
 it('soft-deletes a consultation and redirects to index', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->delete(route('consultations.destroy', $consultation))
         ->assertRedirect(route('consultations.index'));
 
     expect(Consultation::find($consultation->id))->toBeNull();
     expect(Consultation::withTrashed()->find($consultation->id))->not->toBeNull();
+});
+
+it('doctor cannot create consultations', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+
+    $this->actingAs($doctor)
+        ->post(route('consultations.store'), [
+            'patient_id' => $patient->id,
+            'doctor_id' => $doctor->id,
+            'type' => 'in_person',
+            'scheduled_at' => now()->addDay()->toDateTimeString(),
+        ])
+        ->assertForbidden();
+});
+
+it('doctor cannot edit consultation scheduling', function () {
+    $doctor = User::factory()->doctor()->create();
+    $otherDoctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'scheduled_at' => now()->addDay(),
+    ]);
+
+    // Seed duty for target doctor so failure reason is authorization, not duty validation.
+    Consultation::factory()->create([
+        'doctor_id' => $otherDoctor->id,
+        'scheduled_at' => now()->addDay(),
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($doctor)
+        ->patch(route('consultations.update', $consultation), [
+            'doctor_id' => $otherDoctor->id,
+            'scheduled_at' => now()->addDays(2)->toDateTimeString(),
+        ])
+        ->assertForbidden();
 });

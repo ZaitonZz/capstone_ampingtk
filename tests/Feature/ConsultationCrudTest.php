@@ -62,16 +62,60 @@ it('medical staff can access consultations index', function () {
         ->assertInertia(fn ($page) => $page->has('consultations.data', 2));
 });
 
+it('medical staff create form only shows doctors on duty', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $onDutyDoctor = User::factory()->doctor()->create();
+    $offDutyDoctor = User::factory()->doctor()->create();
+
+    Consultation::factory()->create([
+        'doctor_id' => $onDutyDoctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addHour(),
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.create'))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/create')
+                ->has('doctors', 1)
+                ->where('doctors.0.id', $onDutyDoctor->id)
+        );
+
+    expect($offDutyDoctor->id)->not->toBe($onDutyDoctor->id);
+});
+
+it('medical staff can view patient preferred doctor request during scheduling', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $assignedDoctor = User::factory()->doctor()->create();
+    $preferredDoctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $assignedDoctor->id,
+        'preferred_doctor_id' => $preferredDoctor->id,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consultation.preferred_doctor.id', $preferredDoctor->id)
+        );
+});
+
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 it('approves a pending consultation and transitions it to scheduled', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertRedirect();
 
@@ -79,13 +123,14 @@ it('approves a pending consultation and transitions it to scheduled', function (
 });
 
 it('cannot approve a consultation that is not pending', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'scheduled',
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertStatus(422);
 });
@@ -355,7 +400,7 @@ it('patient can submit an appointment request which creates a pending consultati
 
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
-            'doctor_id' => $doctor->id,
+            'preferred_doctor_id' => $doctor->id,
             'type' => 'in_person',
             'chief_complaint' => 'Routine check-up',
             'scheduled_at' => now()->addDays(3)->toDateTimeString(),
@@ -366,6 +411,7 @@ it('patient can submit an appointment request which creates a pending consultati
     expect($consultation)->not->toBeNull();
     expect($consultation->status)->toBe('pending');
     expect($consultation->doctor_id)->toBe($doctor->id);
+    expect($consultation->preferred_doctor_id)->toBe($doctor->id);
 });
 
 it('patient appointment request requires a future scheduled_at', function () {
@@ -375,7 +421,7 @@ it('patient appointment request requires a future scheduled_at', function () {
 
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
-            'doctor_id' => $doctor->id,
+            'preferred_doctor_id' => $doctor->id,
             'type' => 'in_person',
             'scheduled_at' => now()->subDay()->toDateTimeString(),
         ])
