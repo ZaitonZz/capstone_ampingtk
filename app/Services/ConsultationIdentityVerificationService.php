@@ -21,7 +21,16 @@ class ConsultationIdentityVerificationService
 {
     private const CACHE_PREFIX = 'consultation:identity_verification:';
 
+    private const MANUAL_OVERRIDE_CACHE_PREFIX = 'consultation:identity_verification:manual_override:';
+
+    private const MANUAL_OVERRIDE_TTL_SECONDS = 43200;
+
     public function __construct(private LiveKitService $liveKitService) {}
+
+    public function isManualOverrideEnabled(Consultation $consultation): bool
+    {
+        return (bool) Cache::get($this->manualOverrideCacheKey($consultation), false);
+    }
 
     public function beginForDeepfakeLog(DeepfakeScanLog $log): void
     {
@@ -111,6 +120,10 @@ class ConsultationIdentityVerificationService
             }
 
             if (! in_array($consultation->status, ['pending', 'scheduled', 'ongoing', 'paused'], true)) {
+                return null;
+            }
+
+            if ($this->isManualOverrideEnabled($consultation)) {
                 return null;
             }
 
@@ -411,9 +424,25 @@ class ConsultationIdentityVerificationService
         $this->ensureDoctorOverrideActor($consultation, $actor);
 
         if ($consultation->status !== 'paused') {
+            if (! in_array($consultation->status, ['pending', 'scheduled', 'ongoing'], true)) {
+                return [
+                    'status' => 'invalid_state',
+                    'message' => 'Consultation is not eligible for manual override.',
+                ];
+            }
+
+            if ($this->isManualOverrideEnabled($consultation)) {
+                return [
+                    'status' => 'overridden',
+                    'message' => 'Manual override is already enabled for this consultation.',
+                ];
+            }
+
+            $this->enableManualOverride($consultation);
+
             return [
-                'status' => 'invalid_state',
-                'message' => 'Consultation is not waiting for identity verification.',
+                'status' => 'overridden',
+                'message' => 'Manual override enabled. Deepfake verification checks will be bypassed for this consultation.',
             ];
         }
 
@@ -444,6 +473,7 @@ class ConsultationIdentityVerificationService
         }
 
         Cache::forget($this->cacheKey($consultation));
+        $this->enableManualOverride($consultation);
 
         return [
             'status' => 'overridden',
@@ -639,5 +669,19 @@ class ConsultationIdentityVerificationService
     private function cacheKey(Consultation $consultation): string
     {
         return self::CACHE_PREFIX.$consultation->id;
+    }
+
+    private function manualOverrideCacheKey(Consultation $consultation): string
+    {
+        return self::MANUAL_OVERRIDE_CACHE_PREFIX.$consultation->id;
+    }
+
+    private function enableManualOverride(Consultation $consultation): void
+    {
+        Cache::put(
+            $this->manualOverrideCacheKey($consultation),
+            true,
+            now()->addSeconds(self::MANUAL_OVERRIDE_TTL_SECONDS),
+        );
     }
 }
