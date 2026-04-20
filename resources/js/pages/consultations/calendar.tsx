@@ -3,7 +3,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { List, X } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -76,11 +76,25 @@ interface Props {
     patients: PatientSummary[];
 }
 
+function dutyLabel(doctor: DoctorSummary): string {
+    if (doctor.on_duty_today) {
+        return 'On Duty Today';
+    }
+
+    if (doctor.on_duty_this_week) {
+        return 'On Duty This Week';
+    }
+
+    return 'Off Duty';
+}
+
 export default function ConsultationsCalendar({
     events,
     doctors,
     patients,
 }: Props) {
+    const role = usePage().props.auth.user.role as string;
+    const canManageSchedules = role === 'medicalstaff';
     const [selected, setSelected] = useState<SelectedEvent | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -187,9 +201,11 @@ export default function ConsultationsCalendar({
                                 All Consultations
                             </Link>
                         </Button>
-                        <Button onClick={() => openCreateModal()}>
-                            + New Consultation
-                        </Button>
+                        {canManageSchedules && (
+                            <Button onClick={() => openCreateModal()}>
+                                + New Consultation
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -225,7 +241,7 @@ export default function ConsultationsCalendar({
                             right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
                         events={calendarEvents}
-                        selectable
+                        selectable={canManageSchedules}
                         select={handleDateSelect}
                         eventClick={handleEventClick}
                         height="auto"
@@ -306,16 +322,18 @@ export default function ConsultationsCalendar({
                                     View Details
                                 </Link>
                             </Button>
-                            <Button size="sm" variant="outline" asChild>
-                                <Link
-                                    href={ConsultationController.edit.url(
-                                        selected.id,
-                                    )}
-                                >
-                                    Edit
-                                </Link>
-                            </Button>
-                            {selected.status === 'pending' && (
+                            {canManageSchedules && (
+                                <Button size="sm" variant="outline" asChild>
+                                    <Link
+                                        href={ConsultationController.edit.url(
+                                            selected.id,
+                                        )}
+                                    >
+                                        Edit
+                                    </Link>
+                                </Button>
+                            )}
+                            {canManageSchedules && selected.status === 'pending' && (
                                 <Button
                                     size="sm"
                                     variant="outline"
@@ -331,7 +349,7 @@ export default function ConsultationsCalendar({
             )}
 
             {/* New Consultation modal */}
-            {isCreateOpen && (
+            {canManageSchedules && isCreateOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div
                         className="absolute inset-0 bg-black/50"
@@ -384,7 +402,9 @@ export default function ConsultationsCalendar({
 
                             {/* Doctor */}
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="modal_doctor_id">Doctor</Label>
+                                <Label htmlFor="modal_doctor_id">
+                                    Select Doctor on Duty
+                                </Label>
                                 <select
                                     id="modal_doctor_id"
                                     value={data.doctor_id}
@@ -393,16 +413,24 @@ export default function ConsultationsCalendar({
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="">Select doctor…</option>
+                                    <option value="">
+                                        Select doctor on duty…
+                                    </option>
                                     {doctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
                                             {d.doctor_profile?.specialty
                                                 ? ` — ${d.doctor_profile.specialty}`
                                                 : ''}
+                                            {` (${dutyLabel(d)})`}
                                         </option>
                                     ))}
                                 </select>
+                                {doctors.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">
+                                        No doctors are currently on duty in this schedule window.
+                                    </p>
+                                )}
                                 {errors.doctor_id && (
                                     <p className="text-sm text-destructive">
                                         {errors.doctor_id}
@@ -420,8 +448,8 @@ export default function ConsultationsCalendar({
                                         setData(
                                             'type',
                                             e.target.value as
-                                                | 'in_person'
-                                                | 'teleconsultation',
+                                            | 'in_person'
+                                            | 'teleconsultation',
                                         )
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"

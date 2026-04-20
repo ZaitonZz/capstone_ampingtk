@@ -96,7 +96,7 @@ export default function PatientConsultationCalendar({
     }));
 
     const { data, setData, post, processing, errors, reset } = useForm({
-        doctor_id: '',
+        preferred_doctor_id: '',
         type: 'in_person' as 'in_person' | 'teleconsultation',
         chief_complaint: '',
         scheduled_at: '',
@@ -271,16 +271,21 @@ export default function PatientConsultationCalendar({
                         >
                             {/* Doctor */}
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="doctor_id">Doctor</Label>
+                                <Label htmlFor="preferred_doctor_id">
+                                    Preferred Doctor (Optional)
+                                </Label>
                                 <select
-                                    id="doctor_id"
-                                    value={data.doctor_id}
+                                    id="preferred_doctor_id"
+                                    value={data.preferred_doctor_id}
                                     onChange={(e) =>
-                                        setData('doctor_id', e.target.value)
+                                        setData(
+                                            'preferred_doctor_id',
+                                            e.target.value,
+                                        )
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="">Select doctor…</option>
+                                    <option value="">No preference</option>
                                     {doctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
@@ -290,9 +295,9 @@ export default function PatientConsultationCalendar({
                                         </option>
                                     ))}
                                 </select>
-                                {errors.doctor_id && (
+                                {errors.preferred_doctor_id && (
                                     <p className="text-sm text-destructive">
-                                        {errors.doctor_id}
+                                        {errors.preferred_doctor_id}
                                     </p>
                                 )}
                             </div>
@@ -309,8 +314,8 @@ export default function PatientConsultationCalendar({
                                         setData(
                                             'type',
                                             e.target.value as
-                                                | 'in_person'
-                                                | 'teleconsultation',
+                                            | 'in_person'
+                                            | 'teleconsultation',
                                         )
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"

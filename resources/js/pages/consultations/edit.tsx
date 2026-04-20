@@ -8,15 +8,25 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
-    PatientSummary,
     DoctorSummary,
     ConsultationStatus,
 } from '@/types/consultation';
 
 interface Props {
     consultation: Consultation;
-    patients: PatientSummary[];
     doctors: DoctorSummary[];
+}
+
+function dutyLabel(doctor: DoctorSummary): string {
+    if (doctor.on_duty_today) {
+        return 'On Duty Today';
+    }
+
+    if (doctor.on_duty_this_week) {
+        return 'On Duty This Week';
+    }
+
+    return 'Off Duty';
 }
 
 function toDatetimeLocal(iso: string | null): string {
@@ -36,7 +46,7 @@ function toDatetimeLocal(iso: string | null): string {
     );
 }
 
-export default function ConsultationEdit({ consultation }: Props) {
+export default function ConsultationEdit({ consultation, doctors }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
         {
@@ -50,6 +60,7 @@ export default function ConsultationEdit({ consultation }: Props) {
     ];
 
     const { data, setData, patch, processing, errors } = useForm({
+        doctor_id: String(consultation.doctor_id),
         type: consultation.type,
         status: consultation.status as ConsultationStatus,
         chief_complaint: consultation.chief_complaint ?? '',
@@ -78,8 +89,41 @@ export default function ConsultationEdit({ consultation }: Props) {
                     &middot; Doctor:{' '}
                     <strong>{consultation.doctor?.name}</strong>
                 </p>
+                {consultation.preferred_doctor && (
+                    <p className="mb-6 text-sm text-muted-foreground">
+                        Patient preferred doctor request:{' '}
+                        <strong>{consultation.preferred_doctor.name}</strong>
+                    </p>
+                )}
 
                 <form onSubmit={submit} className="flex flex-col gap-5">
+                    {/* Doctor */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="doctor_id">Select Doctor on Duty</Label>
+                        <select
+                            id="doctor_id"
+                            value={data.doctor_id}
+                            onChange={(e) => setData('doctor_id', e.target.value)}
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                        >
+                            <option value="">Select doctor on duty…</option>
+                            {doctors.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                    {d.name}
+                                    {d.doctor_profile?.specialty
+                                        ? ` — ${d.doctor_profile.specialty}`
+                                        : ''}
+                                    {` (${dutyLabel(d)})`}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.doctor_id && (
+                            <p className="text-sm text-destructive">
+                                {errors.doctor_id}
+                            </p>
+                        )}
+                    </div>
+
                     {/* Type */}
                     <div className="flex flex-col gap-1.5">
                         <Label htmlFor="type">Type</Label>
@@ -90,8 +134,8 @@ export default function ConsultationEdit({ consultation }: Props) {
                                 setData(
                                     'type',
                                     e.target.value as
-                                        | 'in_person'
-                                        | 'teleconsultation',
+                                    | 'in_person'
+                                    | 'teleconsultation',
                                 )
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
@@ -117,7 +161,7 @@ export default function ConsultationEdit({ consultation }: Props) {
                                     status: next,
                                     cancellation_reason:
                                         next === 'cancelled' ||
-                                        next === 'no_show'
+                                            next === 'no_show'
                                             ? prev.cancellation_reason
                                             : '',
                                 }));
@@ -200,24 +244,24 @@ export default function ConsultationEdit({ consultation }: Props) {
                     {/* Cancellation Reason */}
                     {(data.status === 'cancelled' ||
                         data.status === 'no_show') && (
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="cancellation_reason">
-                                Cancellation Reason
-                            </Label>
-                            <textarea
-                                id="cancellation_reason"
-                                value={data.cancellation_reason}
-                                onChange={(e) =>
-                                    setData(
-                                        'cancellation_reason',
-                                        e.target.value,
-                                    )
-                                }
-                                rows={2}
-                                className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                            />
-                        </div>
-                    )}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cancellation_reason">
+                                    Cancellation Reason
+                                </Label>
+                                <textarea
+                                    id="cancellation_reason"
+                                    value={data.cancellation_reason}
+                                    onChange={(e) =>
+                                        setData(
+                                            'cancellation_reason',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                />
+                            </div>
+                        )}
 
                     <div className="flex gap-3">
                         <Button type="submit" disabled={processing}>

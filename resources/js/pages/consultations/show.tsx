@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -62,6 +62,8 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function ConsultationShow({ consultation }: Props) {
+    const role = usePage().props.auth.user.role as string;
+    const canManageSchedules = role === 'medicalstaff';
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
     const escalationTimeline = consultation.deepfake_escalations ?? [];
@@ -120,7 +122,7 @@ export default function ConsultationShow({ consultation }: Props) {
                         <Badge variant={STATUS_VARIANT[consultation.status]}>
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
-                        {consultation.status === 'pending' && (
+                        {canManageSchedules && consultation.status === 'pending' && (
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -153,24 +155,28 @@ export default function ConsultationShow({ consultation }: Props) {
                                 </Link>
                             </Button>
                         )}
-                        <Button size="sm" variant="outline" asChild>
-                            <Link
-                                href={ConsultationController.edit.url(
-                                    consultation.id,
-                                )}
+                        {canManageSchedules && (
+                            <Button size="sm" variant="outline" asChild>
+                                <Link
+                                    href={ConsultationController.edit.url(
+                                        consultation.id,
+                                    )}
+                                >
+                                    <Edit className="mr-1 h-4 w-4" />
+                                    Edit
+                                </Link>
+                            </Button>
+                        )}
+                        {canManageSchedules && (
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={handleDelete}
                             >
-                                <Edit className="mr-1 h-4 w-4" />
-                                Edit
-                            </Link>
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={handleDelete}
-                        >
-                            <Trash2 className="mr-1 h-4 w-4" />
-                            Delete
-                        </Button>
+                                <Trash2 className="mr-1 h-4 w-4" />
+                                Delete
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -189,8 +195,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.scheduled_at
                                 ? new Date(
-                                      consultation.scheduled_at,
-                                  ).toLocaleString()
+                                    consultation.scheduled_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -199,8 +205,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.started_at
                                 ? new Date(
-                                      consultation.started_at,
-                                  ).toLocaleString()
+                                    consultation.started_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -209,8 +215,8 @@ export default function ConsultationShow({ consultation }: Props) {
                         value={
                             consultation.ended_at
                                 ? new Date(
-                                      consultation.ended_at,
-                                  ).toLocaleString()
+                                    consultation.ended_at,
+                                ).toLocaleString()
                                 : null
                         }
                     />
@@ -228,9 +234,13 @@ export default function ConsultationShow({ consultation }: Props) {
                             consultation.deepfake_verified == null
                                 ? null
                                 : consultation.deepfake_verified
-                                  ? 'Yes'
-                                  : 'No'
+                                    ? 'Yes'
+                                    : 'No'
                         }
+                    />
+                    <Field
+                        label="Preferred Doctor Request"
+                        value={consultation.preferred_doctor?.name ?? null}
                     />
                     {consultation.cancellation_reason && (
                         <div className="col-span-full flex flex-col gap-0.5">
@@ -313,7 +323,7 @@ export default function ConsultationShow({ consultation }: Props) {
                                                 <Badge
                                                     variant={
                                                         MICROCHECK_VARIANT[
-                                                            check.status
+                                                        check.status
                                                         ]
                                                     }
                                                 >
@@ -334,8 +344,8 @@ export default function ConsultationShow({ consultation }: Props) {
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {check.completed_at
                                                     ? new Date(
-                                                          check.completed_at,
-                                                      ).toLocaleString()
+                                                        check.completed_at,
+                                                    ).toLocaleString()
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
@@ -391,8 +401,8 @@ export default function ConsultationShow({ consultation }: Props) {
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {log.scanned_at
                                                     ? new Date(
-                                                          log.scanned_at,
-                                                      ).toLocaleString()
+                                                        log.scanned_at,
+                                                    ).toLocaleString()
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2">
@@ -402,8 +412,8 @@ export default function ConsultationShow({ consultation }: Props) {
                                                             ? 'destructive'
                                                             : log.result ===
                                                                 'real'
-                                                              ? 'secondary'
-                                                              : 'outline'
+                                                                ? 'secondary'
+                                                                : 'outline'
                                                     }
                                                 >
                                                     {log.result}

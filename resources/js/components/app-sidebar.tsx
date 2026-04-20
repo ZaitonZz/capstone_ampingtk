@@ -57,7 +57,8 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
-    const isMedicalStaff =
+    const canManageSchedules = user.role === 'medicalstaff';
+    const canAccessConsultations =
         user.role === 'doctor' ||
         user.role === 'admin' ||
         user.role === 'medicalstaff';
@@ -82,12 +83,15 @@ export function AppSidebar() {
         },
     ];
 
-    if (isMedicalStaff) {
+    if (canManageSchedules) {
         mainNavItems.push({
             title: 'Patient List',
             href: patientsList(),
             icon: ClipboardList,
         });
+    }
+
+    if (canAccessConsultations) {
         mainNavItems.push({
             title: 'Consultations',
             href: consultations(),

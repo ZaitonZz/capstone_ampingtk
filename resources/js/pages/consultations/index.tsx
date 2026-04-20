@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CalendarDays, Plus, Check } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
@@ -60,6 +60,7 @@ interface Filters {
 interface Props {
     consultations: PaginatedConsultations;
     filters: Filters;
+    doctor_daily_schedule?: Consultation[];
 }
 
 function formatMicrocheckCell(consultation: Consultation) {
@@ -101,7 +102,14 @@ function formatMicrocheckCell(consultation: Consultation) {
     );
 }
 
-export default function ConsultationsIndex({ consultations, filters }: Props) {
+export default function ConsultationsIndex({
+    consultations,
+    filters,
+    doctor_daily_schedule = [],
+}: Props) {
+    const role = usePage().props.auth.user.role as string;
+    const canManageSchedules = role === 'medicalstaff';
+    const isDoctor = role === 'doctor';
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [type, setType] = useState(filters.type ?? '');
@@ -138,14 +146,50 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                 Open Calendar
                             </Link>
                         </Button>
-                        <Button asChild>
-                            <Link href={ConsultationController.create.url()}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                New Consultation
-                            </Link>
-                        </Button>
+                        {canManageSchedules && (
+                            <Button asChild>
+                                <Link href={ConsultationController.create.url()}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New Consultation
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
+
+                {isDoctor && (
+                    <div className="rounded-xl border bg-muted/20 p-4">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            Today&apos;s Schedule
+                        </h2>
+                        {doctor_daily_schedule.length === 0 ? (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                                No consultations assigned today.
+                            </p>
+                        ) : (
+                            <ul className="mt-2 space-y-2 text-sm">
+                                {doctor_daily_schedule.map((item) => (
+                                    <li
+                                        key={item.id}
+                                        className="flex items-center justify-between rounded-md border bg-background px-3 py-2"
+                                    >
+                                        <span>
+                                            {item.patient?.full_name ??
+                                                'Unknown Patient'}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            {item.scheduled_at
+                                                ? new Date(
+                                                    item.scheduled_at,
+                                                ).toLocaleTimeString()
+                                                : 'Time TBD'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
 
                 {/* Filters */}
                 <form onSubmit={applyFilters} className="flex flex-wrap gap-3">
@@ -201,6 +245,9 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                     Scheduled
                                 </th>
                                 <th className="px-4 py-3 font-medium">
+                                    Preferred Doctor
+                                </th>
+                                <th className="px-4 py-3 font-medium">
                                     Chief Complaint
                                 </th>
                                 <th className="px-4 py-3 font-medium">
@@ -215,7 +262,7 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                             {consultations.data.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={7}
+                                        colSpan={8}
                                         className="px-4 py-8 text-center text-muted-foreground"
                                     >
                                         No consultations found.
@@ -242,9 +289,12 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                     <td className="px-4 py-3 text-muted-foreground">
                                         {c.scheduled_at
                                             ? new Date(
-                                                  c.scheduled_at,
-                                              ).toLocaleString()
+                                                c.scheduled_at,
+                                            ).toLocaleString()
                                             : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-muted-foreground">
+                                        {c.preferred_doctor?.name ?? '—'}
                                     </td>
                                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
                                         {c.chief_complaint ?? '—'}
@@ -267,32 +317,35 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                                     View
                                                 </Link>
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={ConsultationController.edit.url(
-                                                        c.id,
-                                                    )}
-                                                >
-                                                    Edit
-                                                </Link>
-                                            </Button>
-                                            {c.status === 'pending' && (
+                                            {canManageSchedules && (
                                                 <Button
-                                                    variant="outline"
+                                                    variant="ghost"
                                                     size="sm"
-                                                    onClick={() =>
-                                                        handleApprove(c.id)
-                                                    }
-                                                    className="text-green-600 hover:text-green-700"
+                                                    asChild
                                                 >
-                                                    <Check className="mr-1 h-3 w-3" />
-                                                    Approve
+                                                    <Link
+                                                        href={ConsultationController.edit.url(
+                                                            c.id,
+                                                        )}
+                                                    >
+                                                        Edit
+                                                    </Link>
                                                 </Button>
                                             )}
+                                            {canManageSchedules &&
+                                                c.status === 'pending' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleApprove(c.id)
+                                                        }
+                                                        className="text-green-600 hover:text-green-700"
+                                                    >
+                                                        <Check className="mr-1 h-3 w-3" />
+                                                        Approve
+                                                    </Button>
+                                                )}
                                         </div>
                                     </td>
                                 </tr>

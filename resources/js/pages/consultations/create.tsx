@@ -20,6 +20,18 @@ interface Props {
     scheduled_at?: string;
 }
 
+function dutyLabel(doctor: DoctorSummary): string {
+    if (doctor.on_duty_today) {
+        return 'On Duty Today';
+    }
+
+    if (doctor.on_duty_this_week) {
+        return 'On Duty This Week';
+    }
+
+    return 'Off Duty';
+}
+
 export default function ConsultationCreate({
     patients,
     doctors,
@@ -81,7 +93,7 @@ export default function ConsultationCreate({
 
                     {/* Doctor */}
                     <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="doctor_id">Doctor</Label>
+                        <Label htmlFor="doctor_id">Select Doctor on Duty</Label>
                         <select
                             id="doctor_id"
                             value={data.doctor_id}
@@ -90,16 +102,22 @@ export default function ConsultationCreate({
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                         >
-                            <option value="">Select doctor…</option>
+                            <option value="">Select doctor on duty…</option>
                             {doctors.map((d) => (
                                 <option key={d.id} value={d.id}>
                                     {d.name}
                                     {d.doctor_profile?.specialty
                                         ? ` — ${d.doctor_profile.specialty}`
                                         : ''}
+                                    {` (${dutyLabel(d)})`}
                                 </option>
                             ))}
                         </select>
+                        {doctors.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                No doctors are currently on duty in this schedule window.
+                            </p>
+                        )}
                         {errors.doctor_id && (
                             <p className="text-sm text-destructive">
                                 {errors.doctor_id}
@@ -117,8 +135,8 @@ export default function ConsultationCreate({
                                 setData(
                                     'type',
                                     e.target.value as
-                                        | 'in_person'
-                                        | 'teleconsultation',
+                                    | 'in_person'
+                                    | 'teleconsultation',
                                 )
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
