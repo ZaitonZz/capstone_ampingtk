@@ -18,6 +18,8 @@ export interface PatientSummary {
 export interface DoctorSummary {
     id: number;
     name: string;
+    on_duty_today?: boolean;
+    on_duty_this_week?: boolean;
     doctor_profile?: {
         specialty?: string;
     };
@@ -87,6 +89,7 @@ export interface Consultation {
     id: number;
     patient_id: number;
     doctor_id: number;
+    preferred_doctor_id: number | null;
     type: ConsultationType;
     status: ConsultationStatus;
     status_before_pause: ConsultationStatus | null;
@@ -116,6 +119,7 @@ export interface Consultation {
     duration_minutes: number | null;
     patient?: PatientSummary;
     doctor?: DoctorSummary;
+    preferred_doctor?: DoctorSummary;
     microchecks?: ConsultationMicrocheck[];
     deepfake_scan_logs?: DeepfakeScanLog[];
     deepfake_escalations?: ConsultationDeepfakeEscalation[];

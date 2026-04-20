@@ -16,6 +16,7 @@ class Consultation extends Model
     protected $fillable = [
         'patient_id',
         'doctor_id',
+        'preferred_doctor_id',
         'type',
         'status',
         'status_before_pause',
@@ -85,6 +86,11 @@ class Consultation extends Model
     public function doctor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'doctor_id');
+    }
+
+    public function preferredDoctor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'preferred_doctor_id');
     }
 
     public function note(): HasOne

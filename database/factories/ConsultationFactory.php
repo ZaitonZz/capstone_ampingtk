@@ -16,6 +16,7 @@ class ConsultationFactory extends Factory
         return [
             'patient_id' => Patient::factory(),
             'doctor_id' => User::factory()->doctor(),
+            'preferred_doctor_id' => null,
             'type' => 'in_person',
             'status' => 'scheduled',
             'chief_complaint' => fake()->sentence(),
