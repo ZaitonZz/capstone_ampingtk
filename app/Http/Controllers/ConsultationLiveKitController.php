@@ -32,6 +32,10 @@ class ConsultationLiveKitController extends Controller
             abort(403);
         }
 
+        if ($user->isMedicalStaff()) {
+            abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
+        }
+
         if (in_array($consultation->status, ['cancelled', 'completed', 'no_show'], true)) {
             return response()->json([
                 'message' => 'This consultation is no longer active.',
