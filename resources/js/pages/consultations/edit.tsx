@@ -1,4 +1,5 @@
 import { Head, useForm, Link } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ function toDatetimeLocal(iso: string | null): string {
     );
 }
 
-export default function ConsultationEdit({ consultation }: Props) {
+export default function ConsultationEdit({ consultation, doctors }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
         {
@@ -49,7 +50,11 @@ export default function ConsultationEdit({ consultation }: Props) {
         },
     ];
 
+    const [availableDoctors, setAvailableDoctors] =
+        useState<DoctorSummary[]>(doctors);
+
     const { data, setData, patch, processing, errors } = useForm({
+        doctor_id: String(consultation.doctor_id),
         type: consultation.type,
         status: consultation.status as ConsultationStatus,
         chief_complaint: consultation.chief_complaint ?? '',
@@ -59,6 +64,51 @@ export default function ConsultationEdit({ consultation }: Props) {
         cancellation_reason: consultation.cancellation_reason ?? '',
         deepfake_verified: consultation.deepfake_verified ?? null,
     });
+
+    useEffect(() => {
+        if (!data.scheduled_at) {
+            setAvailableDoctors([]);
+            setData('doctor_id', '');
+
+            return;
+        }
+
+        const controller = new AbortController();
+
+        fetch(
+            `/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
+            {
+                method: 'GET',
+                headers: { Accept: 'application/json' },
+                signal: controller.signal,
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = (await response.json()) as {
+                    doctors?: DoctorSummary[];
+                };
+                const nextDoctors = payload.doctors ?? [];
+                setAvailableDoctors(nextDoctors);
+
+                if (
+                    data.doctor_id &&
+                    !nextDoctors.some(
+                        (doctor) => String(doctor.id) === data.doctor_id,
+                    )
+                ) {
+                    setData('doctor_id', '');
+                }
+            })
+            .catch(() => {
+                setAvailableDoctors([]);
+            });
+
+        return () => controller.abort();
+    }, [data.scheduled_at, data.doctor_id, setData]);
 
     function submit(e: FormEvent) {
         e.preventDefault();
@@ -80,6 +130,44 @@ export default function ConsultationEdit({ consultation }: Props) {
                 </p>
 
                 <form onSubmit={submit} className="flex flex-col gap-5">
+                    {/* Doctor */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="doctor_id">Doctor</Label>
+                        <select
+                            id="doctor_id"
+                            value={data.doctor_id}
+                            onChange={(e) =>
+                                setData('doctor_id', e.target.value)
+                            }
+                            className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                            disabled={!data.scheduled_at}
+                        >
+                            <option value="">
+                                {data.scheduled_at
+                                    ? 'Select doctor on duty...'
+                                    : 'Select schedule first...'}
+                            </option>
+                            {availableDoctors.map((doctor) => (
+                                <option key={doctor.id} value={doctor.id}>
+                                    {doctor.name}
+                                    {doctor.doctor_profile?.specialty
+                                        ? ` — ${doctor.doctor_profile.specialty}`
+                                        : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {data.scheduled_at && availableDoctors.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                No doctors are on duty for the selected schedule.
+                            </p>
+                        )}
+                        {errors.doctor_id && (
+                            <p className="text-sm text-destructive">
+                                {errors.doctor_id}
+                            </p>
+                        )}
+                    </div>
+
                     {/* Type */}
                     <div className="flex flex-col gap-1.5">
                         <Label htmlFor="type">Type</Label>
@@ -90,8 +178,8 @@ export default function ConsultationEdit({ consultation }: Props) {
                                 setData(
                                     'type',
                                     e.target.value as
-                                        | 'in_person'
-                                        | 'teleconsultation',
+                                    | 'in_person'
+                                    | 'teleconsultation',
                                 )
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
@@ -117,7 +205,7 @@ export default function ConsultationEdit({ consultation }: Props) {
                                     status: next,
                                     cancellation_reason:
                                         next === 'cancelled' ||
-                                        next === 'no_show'
+                                            next === 'no_show'
                                             ? prev.cancellation_reason
                                             : '',
                                 }));
@@ -200,24 +288,24 @@ export default function ConsultationEdit({ consultation }: Props) {
                     {/* Cancellation Reason */}
                     {(data.status === 'cancelled' ||
                         data.status === 'no_show') && (
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="cancellation_reason">
-                                Cancellation Reason
-                            </Label>
-                            <textarea
-                                id="cancellation_reason"
-                                value={data.cancellation_reason}
-                                onChange={(e) =>
-                                    setData(
-                                        'cancellation_reason',
-                                        e.target.value,
-                                    )
-                                }
-                                rows={2}
-                                className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                            />
-                        </div>
-                    )}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cancellation_reason">
+                                    Cancellation Reason
+                                </Label>
+                                <textarea
+                                    id="cancellation_reason"
+                                    value={data.cancellation_reason}
+                                    onChange={(e) =>
+                                        setData(
+                                            'cancellation_reason',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                />
+                            </div>
+                        )}
 
                     <div className="flex gap-3">
                         <Button type="submit" disabled={processing}>

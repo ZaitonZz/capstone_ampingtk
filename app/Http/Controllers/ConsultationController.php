@@ -10,7 +10,9 @@ use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -60,10 +62,15 @@ class ConsultationController extends Controller
     {
         $this->authorize('create', Consultation::class);
 
+        $scheduledAt = (string) $request->query('scheduled_at', '');
+        $availableDoctors = $scheduledAt !== ''
+            ? app(DoctorDutyAvailabilityService::class)->availableDoctors($scheduledAt)
+            : collect();
+
         return Inertia::render('consultations/create', [
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
-            'doctors' => User::query()->where('role', 'doctor')->with('doctorProfile')->orderBy('name')->get(['id', 'name']),
-            'scheduled_at' => $request->query('scheduled_at', ''),
+            'doctors' => $availableDoctors,
+            'scheduled_at' => $scheduledAt,
         ]);
     }
 
@@ -131,10 +138,15 @@ class ConsultationController extends Controller
     {
         $this->authorize('update', $consultation);
 
+        $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
+        $availableDoctors = $scheduledAt !== null
+            ? app(DoctorDutyAvailabilityService::class)->availableDoctors($scheduledAt)
+            : collect();
+
         return Inertia::render('consultations/edit', [
             'consultation' => $consultation->load(['patient', 'doctor']),
             'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
-            'doctors' => User::query()->where('role', 'doctor')->with('doctorProfile')->orderBy('name')->get(['id', 'name']),
+            'doctors' => $availableDoctors,
         ]);
     }
 
@@ -193,13 +205,36 @@ class ConsultationController extends Controller
         return Inertia::render('consultations/calendar', [
             'events' => $consultations,
             'doctors' => $canManageSchedule
-                ? User::query()->where('role', 'doctor')->orderBy('name')->get(['id', 'name'])
+                ? []
                 : [],
             'patients' => $canManageSchedule
                 ? Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
                 : [],
             'can_manage_schedule' => $canManageSchedule,
             'is_doctor_daily_view' => $isDoctor,
+        ]);
+    }
+
+    public function availableDoctors(Request $request, DoctorDutyAvailabilityService $availabilityService): JsonResponse
+    {
+        $this->authorize('create', Consultation::class);
+
+        $validated = $request->validate([
+            'scheduled_at' => ['required', 'date'],
+        ]);
+
+        $doctors = $availabilityService->availableDoctors($validated['scheduled_at'])
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'doctors' => $doctors,
         ]);
     }
 

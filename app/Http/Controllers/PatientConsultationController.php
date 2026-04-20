@@ -4,9 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\RequestAppointmentRequest;
 use App\Models\Consultation;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -84,11 +85,28 @@ class PatientConsultationController extends Controller
 
         return Inertia::render('patient/consultations/calendar', [
             'events' => $consultations,
-            'doctors' => User::query()
-                ->where('role', 'doctor')
-                ->with(['doctorProfile' => fn ($q) => $q->select('user_id', 'specialty')])
-                ->orderBy('name')
-                ->get(['id', 'name']),
+            'doctors' => [],
+        ]);
+    }
+
+    public function availableDoctors(Request $request, DoctorDutyAvailabilityService $availabilityService): JsonResponse
+    {
+        $validated = $request->validate([
+            'scheduled_at' => ['required', 'date'],
+        ]);
+
+        $doctors = $availabilityService->availableDoctors($validated['scheduled_at'])
+            ->map(fn ($doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'doctors' => $doctors,
         ]);
     }
 

@@ -1,4 +1,5 @@
 import { Head, useForm, Link } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -25,6 +26,9 @@ export default function ConsultationCreate({
     doctors,
     scheduled_at = '',
 }: Props) {
+    const [availableDoctors, setAvailableDoctors] =
+        useState<DoctorSummary[]>(doctors);
+
     const { data, setData, post, processing, errors } = useForm({
         patient_id: '',
         doctor_id: '',
@@ -33,6 +37,51 @@ export default function ConsultationCreate({
         chief_complaint: '',
         scheduled_at,
     });
+
+    useEffect(() => {
+        if (!data.scheduled_at) {
+            setAvailableDoctors([]);
+            setData('doctor_id', '');
+
+            return;
+        }
+
+        const controller = new AbortController();
+
+        fetch(
+            `/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
+            {
+                method: 'GET',
+                headers: { Accept: 'application/json' },
+                signal: controller.signal,
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = (await response.json()) as {
+                    doctors?: DoctorSummary[];
+                };
+                const nextDoctors = payload.doctors ?? [];
+                setAvailableDoctors(nextDoctors);
+
+                if (
+                    data.doctor_id &&
+                    !nextDoctors.some(
+                        (doctor) => String(doctor.id) === data.doctor_id,
+                    )
+                ) {
+                    setData('doctor_id', '');
+                }
+            })
+            .catch(() => {
+                setAvailableDoctors([]);
+            });
+
+        return () => controller.abort();
+    }, [data.scheduled_at, data.doctor_id, setData]);
 
     function submit(e: FormEvent) {
         e.preventDefault();
@@ -89,9 +138,14 @@ export default function ConsultationCreate({
                                 setData('doctor_id', e.target.value)
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                            disabled={!data.scheduled_at}
                         >
-                            <option value="">Select doctor…</option>
-                            {doctors.map((d) => (
+                            <option value="">
+                                {data.scheduled_at
+                                    ? 'Select doctor on duty...'
+                                    : 'Select schedule first...'}
+                            </option>
+                            {availableDoctors.map((d) => (
                                 <option key={d.id} value={d.id}>
                                     {d.name}
                                     {d.doctor_profile?.specialty
@@ -100,6 +154,11 @@ export default function ConsultationCreate({
                                 </option>
                             ))}
                         </select>
+                        {data.scheduled_at && availableDoctors.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                No doctors are on duty for the selected schedule.
+                            </p>
+                        )}
                         {errors.doctor_id && (
                             <p className="text-sm text-destructive">
                                 {errors.doctor_id}
