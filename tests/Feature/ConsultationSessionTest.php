@@ -101,6 +101,19 @@ it('allows consenting consultation patient to view session page', function () {
         ->assertInertia(fn ($page) => $page->component('consultations/session'));
 });
 
+it('forbids medical staff from viewing session page', function () {
+    $doctor = User::factory()->doctor()->create();
+    $medicalStaff = User::factory()->medicalStaff()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.session.show', $consultation))
+        ->assertForbidden();
+});
+
 it('includes configured OTP length in session verification payload', function () {
     config()->set('auth_otp.otp.length', 8);
 

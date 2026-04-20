@@ -27,20 +27,20 @@ class DeepfakeScanLogController extends Controller
         return response()->json($logs);
     }
 
-    public function show(Consultation $consultation, DeepfakeScanLog $log): JsonResponse
+    public function show(Consultation $consultation, DeepfakeScanLog $deepfakeScanLog): JsonResponse
     {
         $this->authorize('view', $consultation);
 
-        abort_if($log->consultation_id !== $consultation->id, 404);
+        abort_if($deepfakeScanLog->consultation_id !== $consultation->id, 404);
 
-        $log->load('reviewer');
+        $deepfakeScanLog->load('reviewer');
 
-        return response()->json($log);
+        return response()->json($deepfakeScanLog);
     }
 
     public function store(StoreDeepfakeScanLogRequest $request, Consultation $consultation): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         $log = $consultation->deepfakeScanLogs()->create($request->validated());
 
@@ -53,18 +53,18 @@ class DeepfakeScanLogController extends Controller
     }
 
     /** Reviewer marks a scan log (flag/unflag + notes) */
-    public function update(ReviewDeepfakeScanLogRequest $request, Consultation $consultation, DeepfakeScanLog $log): JsonResponse
+    public function update(ReviewDeepfakeScanLogRequest $request, Consultation $consultation, DeepfakeScanLog $deepfakeScanLog): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
-        abort_if($log->consultation_id !== $consultation->id, 404);
+        abort_if($deepfakeScanLog->consultation_id !== $consultation->id, 404);
 
-        $log->update([
+        $deepfakeScanLog->update([
             ...$request->validated(),
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
 
-        return response()->json($log->fresh('reviewer'));
+        return response()->json($deepfakeScanLog->fresh('reviewer'));
     }
 }

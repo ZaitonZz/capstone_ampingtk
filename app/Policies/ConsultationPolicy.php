@@ -7,6 +7,11 @@ use App\Models\User;
 
 class ConsultationPolicy
 {
+    public function manage(User $user, Consultation $consultation): bool
+    {
+        return (int) $consultation->doctor_id === (int) $user->id;
+    }
+
     /**
      * Admins see all consultations; doctors see only their own.
      * The index query is also scoped in ConsultationController@index.
@@ -27,16 +32,16 @@ class ConsultationPolicy
 
     public function create(User $user): bool
     {
-        return $user->isClinicalStaff();
+        return $user->isMedicalStaff();
     }
 
     public function update(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin() || $user->isMedicalStaff() || $consultation->doctor_id === $user->id;
+        return $user->isMedicalStaff();
     }
 
     public function delete(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin() || $user->isMedicalStaff() || $consultation->doctor_id === $user->id;
+        return $user->isMedicalStaff();
     }
 }

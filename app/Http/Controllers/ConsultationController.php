@@ -21,6 +21,10 @@ class ConsultationController extends Controller
     {
         $this->authorize('viewAny', Consultation::class);
 
+        $user = $request->user();
+        $isDoctor = $user->isDoctor();
+        $canManageSchedule = $user->isMedicalStaff();
+
         $consultations = Consultation::query()
             ->with(['patient', 'doctor', 'latestMicrocheck'])
             ->withMin([
@@ -30,8 +34,10 @@ class ConsultationController extends Controller
                 'microchecks as avg_microcheck_latency_ms' => fn ($q) => $q->where('status', 'completed'),
             ], 'latency_ms')
             ->when(
-                ! $request->user()->isAdmin() && ! $request->user()->isMedicalStaff(),
-                fn ($q) => $q->where('doctor_id', $request->user()->id)
+                $isDoctor,
+                fn ($q) => $q
+                    ->where('doctor_id', $user->id)
+                    ->whereDate('scheduled_at', today())
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -45,6 +51,8 @@ class ConsultationController extends Controller
         return Inertia::render('consultations/index', [
             'consultations' => $consultations,
             'filters' => $request->only(['search', 'status', 'type', 'patient_id', 'doctor_id']),
+            'can_manage_schedule' => $canManageSchedule,
+            'is_doctor_daily_view' => $isDoctor,
         ]);
     }
 
@@ -86,6 +94,13 @@ class ConsultationController extends Controller
     {
         $this->authorize('view', $consultation);
 
+        $user = request()->user();
+        $canManageSchedule = $user?->isMedicalStaff() ?? false;
+        $canJoinSession = $consultation->type === 'teleconsultation'
+            && $user !== null
+            && ! $user->isMedicalStaff()
+            && ($user->isAdmin() || $consultation->doctor_id === $user->id);
+
         $consultation->load([
             'patient',
             'doctor.doctorProfile',
@@ -105,6 +120,10 @@ class ConsultationController extends Controller
 
         return Inertia::render('consultations/show', [
             'consultation' => $consultation,
+            'permissions' => [
+                'can_manage_schedule' => $canManageSchedule,
+                'can_join_session' => $canJoinSession,
+            ],
         ]);
     }
 
@@ -143,11 +162,17 @@ class ConsultationController extends Controller
     {
         $this->authorize('viewAny', Consultation::class);
 
+        $user = $request->user();
+        $isDoctor = $user->isDoctor();
+        $canManageSchedule = $user->isMedicalStaff();
+
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
             ->when(
-                ! $request->user()->isAdmin() && ! $request->user()->isMedicalStaff(),
-                fn ($q) => $q->where('doctor_id', $request->user()->id)
+                $isDoctor,
+                fn ($q) => $q
+                    ->where('doctor_id', $user->id)
+                    ->whereDate('scheduled_at', today())
             )
             ->whereNotNull('scheduled_at')
             ->get()
@@ -167,8 +192,14 @@ class ConsultationController extends Controller
 
         return Inertia::render('consultations/calendar', [
             'events' => $consultations,
-            'doctors' => User::query()->where('role', 'doctor')->orderBy('name')->get(['id', 'name']),
-            'patients' => Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name']),
+            'doctors' => $canManageSchedule
+                ? User::query()->where('role', 'doctor')->orderBy('name')->get(['id', 'name'])
+                : [],
+            'patients' => $canManageSchedule
+                ? Patient::query()->orderBy('last_name')->get(['id', 'first_name', 'last_name'])
+                : [],
+            'can_manage_schedule' => $canManageSchedule,
+            'is_doctor_daily_view' => $isDoctor,
         ]);
     }
 

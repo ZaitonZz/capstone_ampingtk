@@ -23,7 +23,7 @@ class VitalSignController extends Controller
 
     public function store(StoreVitalSignRequest $request, Consultation $consultation): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         // Upsert — one set of vitals per consultation
         $vitals = $consultation->vitalSigns()->updateOrCreate(

@@ -13,6 +13,12 @@ class ConsultationLobbyController extends Controller
     {
         $this->authorize('view', $consultation);
 
+        $currentUser = auth()->user();
+
+        if ($currentUser?->isMedicalStaff()) {
+            abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
+        }
+
         if ($consultation->type !== 'teleconsultation') {
             abort(404);
         }
@@ -21,10 +27,9 @@ class ConsultationLobbyController extends Controller
 
         $consent = ConsultationConsent::query()
             ->where('consultation_id', $consultation->id)
-            ->where('user_id', auth()->user()?->id)
+            ->where('user_id', $currentUser?->id)
             ->first();
 
-        $currentUser = auth()->user();
         $isConsultationDoctor =
             $currentUser !== null
             && $consultation->doctor_id === $currentUser->id;

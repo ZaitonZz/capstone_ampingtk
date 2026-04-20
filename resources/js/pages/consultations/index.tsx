@@ -60,6 +60,8 @@ interface Filters {
 interface Props {
     consultations: PaginatedConsultations;
     filters: Filters;
+    can_manage_schedule: boolean;
+    is_doctor_daily_view: boolean;
 }
 
 function formatMicrocheckCell(consultation: Consultation) {
@@ -101,7 +103,12 @@ function formatMicrocheckCell(consultation: Consultation) {
     );
 }
 
-export default function ConsultationsIndex({ consultations, filters }: Props) {
+export default function ConsultationsIndex({
+    consultations,
+    filters,
+    can_manage_schedule,
+    is_doctor_daily_view,
+}: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [type, setType] = useState(filters.type ?? '');
@@ -128,9 +135,15 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
             <Head title="Consultations" />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h1 className="text-2xl font-semibold">Consultations</h1>
+                    <div>
+                        <h1 className="text-2xl font-semibold">Consultations</h1>
+                        {is_doctor_daily_view && (
+                            <p className="text-sm text-muted-foreground">
+                                Showing your assigned schedule for today.
+                            </p>
+                        )}
+                    </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
                             <Link href={ConsultationController.calendar.url()}>
@@ -138,19 +151,20 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                 Open Calendar
                             </Link>
                         </Button>
-                        <Button asChild>
-                            <Link href={ConsultationController.create.url()}>
-                                <Plus className="mr-2 h-4 w-4" />
-                                New Consultation
-                            </Link>
-                        </Button>
+                        {can_manage_schedule && (
+                            <Button asChild>
+                                <Link href={ConsultationController.create.url()}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New Consultation
+                                </Link>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
-                {/* Filters */}
                 <form onSubmit={applyFilters} className="flex flex-wrap gap-3">
                     <Input
-                        placeholder="Search patient…"
+                        placeholder="Search patient..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-52"
@@ -161,13 +175,13 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All statuses</option>
-                        {(
-                            Object.keys(STATUS_LABELS) as ConsultationStatus[]
-                        ).map((s) => (
-                            <option key={s} value={s}>
-                                {STATUS_LABELS[s]}
-                            </option>
-                        ))}
+                        {(Object.keys(STATUS_LABELS) as ConsultationStatus[]).map(
+                            (s) => (
+                                <option key={s} value={s}>
+                                    {STATUS_LABELS[s]}
+                                </option>
+                            ),
+                        )}
                     </select>
                     <select
                         value={type}
@@ -176,39 +190,24 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                     >
                         <option value="">All types</option>
                         <option value="in_person">In Person</option>
-                        <option value="teleconsultation">
-                            Teleconsultation
-                        </option>
+                        <option value="teleconsultation">Teleconsultation</option>
                     </select>
                     <Button type="submit" variant="secondary" size="sm">
                         Filter
                     </Button>
                 </form>
 
-                {/* Table */}
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead className="border-b bg-muted/50 text-left">
                             <tr>
-                                <th className="px-4 py-3 font-medium">
-                                    Patient
-                                </th>
+                                <th className="px-4 py-3 font-medium">Patient</th>
                                 <th className="px-4 py-3 font-medium">Type</th>
-                                <th className="px-4 py-3 font-medium">
-                                    Status
-                                </th>
-                                <th className="px-4 py-3 font-medium">
-                                    Scheduled
-                                </th>
-                                <th className="px-4 py-3 font-medium">
-                                    Chief Complaint
-                                </th>
-                                <th className="px-4 py-3 font-medium">
-                                    Microcheck
-                                </th>
-                                <th className="px-4 py-3 font-medium">
-                                    Actions
-                                </th>
+                                <th className="px-4 py-3 font-medium">Status</th>
+                                <th className="px-4 py-3 font-medium">Scheduled</th>
+                                <th className="px-4 py-3 font-medium">Chief Complaint</th>
+                                <th className="px-4 py-3 font-medium">Microcheck</th>
+                                <th className="px-4 py-3 font-medium">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -225,7 +224,7 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                             {consultations.data.map((c) => (
                                 <tr key={c.id} className="hover:bg-muted/30">
                                     <td className="px-4 py-3 font-medium">
-                                        {c.patient?.full_name ?? '—'}
+                                        {c.patient?.full_name ?? '-'}
                                     </td>
                                     <td className="px-4 py-3 capitalize">
                                         {c.type === 'in_person'
@@ -233,32 +232,24 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                             : 'Teleconsultation'}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <Badge
-                                            variant={STATUS_VARIANT[c.status]}
-                                        >
+                                        <Badge variant={STATUS_VARIANT[c.status]}>
                                             {STATUS_LABELS[c.status]}
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">
                                         {c.scheduled_at
-                                            ? new Date(
-                                                  c.scheduled_at,
-                                              ).toLocaleString()
-                                            : '—'}
+                                            ? new Date(c.scheduled_at).toLocaleString()
+                                            : '-'}
                                     </td>
                                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
-                                        {c.chief_complaint ?? '—'}
+                                        {c.chief_complaint ?? '-'}
                                     </td>
                                     <td className="px-4 py-3">
                                         {formatMicrocheckCell(c)}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                            >
+                                            <Button variant="ghost" size="sm" asChild>
                                                 <Link
                                                     href={ConsultationController.show.url(
                                                         c.id,
@@ -267,32 +258,31 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                                     View
                                                 </Link>
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={ConsultationController.edit.url(
-                                                        c.id,
-                                                    )}
-                                                >
-                                                    Edit
-                                                </Link>
-                                            </Button>
-                                            {c.status === 'pending' && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleApprove(c.id)
-                                                    }
-                                                    className="text-green-600 hover:text-green-700"
-                                                >
-                                                    <Check className="mr-1 h-3 w-3" />
-                                                    Approve
+                                            {can_manage_schedule && (
+                                                <Button variant="ghost" size="sm" asChild>
+                                                    <Link
+                                                        href={ConsultationController.edit.url(
+                                                            c.id,
+                                                        )}
+                                                    >
+                                                        Edit
+                                                    </Link>
                                                 </Button>
                                             )}
+                                            {can_manage_schedule &&
+                                                c.status === 'pending' && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleApprove(c.id)
+                                                        }
+                                                        className="text-green-600 hover:text-green-700"
+                                                    >
+                                                        <Check className="mr-1 h-3 w-3" />
+                                                        Approve
+                                                    </Button>
+                                                )}
                                         </div>
                                     </td>
                                 </tr>
@@ -301,7 +291,6 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                     </table>
                 </div>
 
-                {/* Pagination */}
                 {consultations.last_page > 1 && (
                     <div className="flex items-center justify-center gap-1">
                         {consultations.links.map((link, i) => (
@@ -312,11 +301,7 @@ export default function ConsultationsIndex({ consultations, filters }: Props) {
                                 disabled={!link.url}
                                 onClick={() =>
                                     link.url &&
-                                    router.get(
-                                        link.url,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
+                                    router.get(link.url, {}, { preserveScroll: true })
                                 }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />

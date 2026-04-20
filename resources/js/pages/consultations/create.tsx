@@ -29,7 +29,7 @@ export default function ConsultationCreate({
         patient_id: '',
         doctor_id: '',
         type: 'in_person' as 'in_person' | 'teleconsultation',
-        status: 'scheduled',
+        status: 'pending',
         chief_complaint: '',
         scheduled_at,
     });
@@ -117,8 +117,8 @@ export default function ConsultationCreate({
                                 setData(
                                     'type',
                                     e.target.value as
-                                        | 'in_person'
-                                        | 'teleconsultation',
+                                    | 'in_person'
+                                    | 'teleconsultation',
                                 )
                             }
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"

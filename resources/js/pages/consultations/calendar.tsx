@@ -74,12 +74,16 @@ interface Props {
     events: CalendarEvent[];
     doctors: DoctorSummary[];
     patients: PatientSummary[];
+    can_manage_schedule: boolean;
+    is_doctor_daily_view: boolean;
 }
 
 export default function ConsultationsCalendar({
     events,
     doctors,
     patients,
+    can_manage_schedule,
+    is_doctor_daily_view,
 }: Props) {
     const [selected, setSelected] = useState<SelectedEvent | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,7 +93,7 @@ export default function ConsultationsCalendar({
         patient_id: '',
         doctor_id: '',
         type: 'in_person' as 'in_person' | 'teleconsultation',
-        status: 'scheduled',
+        status: 'pending',
         chief_complaint: '',
         scheduled_at: '',
     });
@@ -179,7 +183,14 @@ export default function ConsultationsCalendar({
             <div className="flex flex-col gap-4 p-4 md:p-6">
                 {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h1 className="text-2xl font-semibold">Calendar</h1>
+                    <div>
+                        <h1 className="text-2xl font-semibold">Calendar</h1>
+                        {is_doctor_daily_view && (
+                            <p className="text-sm text-muted-foreground">
+                                Showing your assigned schedule for today.
+                            </p>
+                        )}
+                    </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
                             <Link href={ConsultationController.index.url()}>
@@ -187,9 +198,11 @@ export default function ConsultationsCalendar({
                                 All Consultations
                             </Link>
                         </Button>
-                        <Button onClick={() => openCreateModal()}>
-                            + New Consultation
-                        </Button>
+                        {can_manage_schedule && (
+                            <Button onClick={() => openCreateModal()}>
+                                + New Consultation
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -218,14 +231,16 @@ export default function ConsultationsCalendar({
                             timeGridPlugin,
                             interactionPlugin,
                         ]}
-                        initialView="timeGridWeek"
+                        initialView={
+                            is_doctor_daily_view ? 'timeGridDay' : 'timeGridWeek'
+                        }
                         headerToolbar={{
                             left: 'prev,next today',
                             center: 'title',
                             right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
                         events={calendarEvents}
-                        selectable
+                        selectable={can_manage_schedule}
                         select={handleDateSelect}
                         eventClick={handleEventClick}
                         height="auto"
@@ -306,32 +321,35 @@ export default function ConsultationsCalendar({
                                     View Details
                                 </Link>
                             </Button>
-                            <Button size="sm" variant="outline" asChild>
-                                <Link
-                                    href={ConsultationController.edit.url(
-                                        selected.id,
-                                    )}
-                                >
-                                    Edit
-                                </Link>
-                            </Button>
-                            {selected.status === 'pending' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-green-600 hover:text-green-700"
-                                    onClick={() => handleApprove(selected.id)}
-                                >
-                                    Approve
+                            {can_manage_schedule && (
+                                <Button size="sm" variant="outline" asChild>
+                                    <Link
+                                        href={ConsultationController.edit.url(
+                                            selected.id,
+                                        )}
+                                    >
+                                        Edit
+                                    </Link>
                                 </Button>
                             )}
+                            {can_manage_schedule &&
+                                selected.status === 'pending' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-green-600 hover:text-green-700"
+                                        onClick={() => handleApprove(selected.id)}
+                                    >
+                                        Approve
+                                    </Button>
+                                )}
                         </div>
                     </div>
                 </div>
             )}
 
             {/* New Consultation modal */}
-            {isCreateOpen && (
+            {can_manage_schedule && isCreateOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div
                         className="absolute inset-0 bg-black/50"
@@ -420,8 +438,8 @@ export default function ConsultationsCalendar({
                                         setData(
                                             'type',
                                             e.target.value as
-                                                | 'in_person'
-                                                | 'teleconsultation',
+                                            | 'in_person'
+                                            | 'teleconsultation',
                                         )
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"

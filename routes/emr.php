@@ -37,7 +37,7 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     Route::patch('consultations/{consultation}/cancel', [ConsultationController::class, 'cancel'])->name('consultations.cancel');
     Route::resource('consultations', ConsultationController::class);
 
-    Route::prefix('consultations/{consultation}')->name('consultations.')->group(function () {
+    Route::prefix('consultations/{consultation}')->name('consultations.')->scopeBindings()->group(function () {
         Route::middleware('doctor.or.admin')->group(function () {
             // SOAP Notes (one per consultation, upsert via store)
             Route::get('note', [PatientNoteController::class, 'show'])->name('note.show');
@@ -50,14 +50,15 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
 
             // Prescriptions (many per consultation)
             Route::apiResource('prescriptions', PrescriptionController::class)
+                ->scoped()
                 ->only(['index', 'store', 'update', 'destroy']);
         });
 
         // Deepfake Scan Logs
         Route::get('deepfake-scans', [DeepfakeScanLogController::class, 'index'])->name('deepfake-scans.index');
         Route::post('deepfake-scans', [DeepfakeScanLogController::class, 'store'])->name('deepfake-scans.store');
-        Route::get('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'show'])->name('deepfake-scans.show');
-        Route::patch('deepfake-scans/{log}', [DeepfakeScanLogController::class, 'update'])->name('deepfake-scans.update');
+        Route::get('deepfake-scans/{deepfakeScanLog}', [DeepfakeScanLogController::class, 'show'])->name('deepfake-scans.show');
+        Route::patch('deepfake-scans/{deepfakeScanLog}', [DeepfakeScanLogController::class, 'update'])->name('deepfake-scans.update');
     });
 
     // ── Doctor Profile (Doctor/Admin only) ───────────────────────────────────

@@ -13,13 +13,18 @@ class ConsultationSessionController extends Controller
     {
         $this->authorize('view', $consultation);
 
+        $user = auth()->user();
+
+        if ($user?->isMedicalStaff()) {
+            abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
+        }
+
         if ($consultation->type !== 'teleconsultation') {
             abort(404);
         }
 
         $consultation->load(['patient', 'doctor']);
 
-        $user = auth()->user();
         $isConsultationDoctor = $user !== null && $consultation->doctor_id === $user->id;
         $isConsultationPatient = $user !== null && $consultation->patient()->where('user_id', $user->id)->exists();
         $isAdminAudit = $user?->isAdmin() && ! $isConsultationDoctor && ! $isConsultationPatient;
