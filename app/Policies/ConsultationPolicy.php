@@ -37,9 +37,7 @@ class ConsultationPolicy
 
     public function update(User $user, Consultation $consultation): bool
     {
-        return $user->isAdmin()
-            || $user->isMedicalStaff()
-            || $consultation->doctor_id === $user->id;
+        return $user->isMedicalStaff();
     }
 
     public function delete(User $user, Consultation $consultation): bool
