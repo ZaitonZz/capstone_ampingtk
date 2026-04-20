@@ -89,6 +89,11 @@ export function AppSidebar() {
             icon: ClipboardList,
         });
         mainNavItems.push({
+            title: 'Doctor Duty Calendar',
+            href: '/doctor-duty-schedules',
+            icon: CalendarDays,
+        });
+        mainNavItems.push({
             title: 'Consultations',
             href: consultations(),
             icon: ContactRound,
