@@ -231,6 +231,8 @@ export default function ConsultationLobbyPage({
         : 6;
     const expiresInSeconds = secondsUntil(verification?.expires_at);
     const resendInSeconds = secondsUntil(verification?.resend_available_at);
+    const isManualOverrideEnabled =
+        verification?.manual_override_enabled === true;
     const canApplyDoctorOverride = Boolean(
         verification?.override_url &&
             page.props.auth?.user?.id === consultation.doctor_id,
@@ -1064,21 +1066,6 @@ export default function ConsultationLobbyPage({
                                             {verificationTargetRole} completes
                                             identity verification.
                                         </p>
-
-                                        {canApplyDoctorOverride && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="mt-3 w-full"
-                                                disabled={isApplyingOverride}
-                                                onClick={handleDoctorOverride}
-                                            >
-                                                {isApplyingOverride
-                                                    ? 'Applying override...'
-                                                    : 'Manual Override (Doctor)'}
-                                            </Button>
-                                        )}
                                     </>
                                 )}
                             </div>
@@ -1133,6 +1120,36 @@ export default function ConsultationLobbyPage({
                                     Joining is disabled until identity
                                     verification is completed.
                                 </p>
+                            )}
+
+                            {canApplyDoctorOverride && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant={
+                                            isManualOverrideEnabled
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                        size="sm"
+                                        className="w-full"
+                                        disabled={
+                                            isApplyingOverride ||
+                                            isManualOverrideEnabled
+                                        }
+                                        onClick={handleDoctorOverride}
+                                    >
+                                        {isApplyingOverride
+                                            ? 'Applying override...'
+                                            : isManualOverrideEnabled
+                                              ? 'Manual Override Enabled'
+                                              : 'Enable Manual Override'}
+                                    </Button>
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        Doctors can bypass deepfake identity
+                                        checks before the consultation starts.
+                                    </p>
+                                </>
                             )}
 
                             <Button
