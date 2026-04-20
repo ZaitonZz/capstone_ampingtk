@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter, History } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

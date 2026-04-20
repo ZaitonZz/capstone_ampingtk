@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

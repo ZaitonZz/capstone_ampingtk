@@ -230,30 +230,32 @@ export default function ConsultationsIndex({
                 </form>
 
                 {/* Table */}
-                <div className="overflow-x-auto rounded-xl border">
-                    <table className="w-full text-sm">
+                <div className="rounded-xl border">
+                    <table className="w-full table-fixed text-sm">
                         <thead className="border-b bg-muted/50 text-left">
                             <tr>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-28 px-4 py-3 font-medium">
                                     Patient
                                 </th>
-                                <th className="px-4 py-3 font-medium">Type</th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-24 px-4 py-3 font-medium">
+                                    Type
+                                </th>
+                                <th className="w-24 px-4 py-3 font-medium">
                                     Status
                                 </th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-28 px-4 py-3 font-medium">
                                     Scheduled
                                 </th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-28 px-4 py-3 font-medium">
                                     Preferred Doctor
                                 </th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-[28%] px-4 py-3 font-medium">
                                     Chief Complaint
                                 </th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-28 px-4 py-3 font-medium">
                                     Microcheck
                                 </th>
-                                <th className="px-4 py-3 font-medium">
+                                <th className="w-40 px-4 py-3 font-medium">
                                     Actions
                                 </th>
                             </tr>
@@ -271,39 +273,39 @@ export default function ConsultationsIndex({
                             )}
                             {consultations.data.map((c) => (
                                 <tr key={c.id} className="hover:bg-muted/30">
-                                    <td className="px-4 py-3 font-medium">
+                                    <td className="break-words px-4 py-3 font-medium align-top">
                                         {c.patient?.full_name ?? '—'}
                                     </td>
-                                    <td className="px-4 py-3 capitalize">
+                                    <td className="break-words px-4 py-3 capitalize align-top">
                                         {c.type === 'in_person'
                                             ? 'In Person'
                                             : 'Teleconsultation'}
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3 align-top">
                                         <Badge
                                             variant={STATUS_VARIANT[c.status]}
                                         >
                                             {STATUS_LABELS[c.status]}
                                         </Badge>
                                     </td>
-                                    <td className="px-4 py-3 text-muted-foreground">
+                                    <td className="break-words px-4 py-3 text-muted-foreground align-top">
                                         {c.scheduled_at
                                             ? new Date(
                                                 c.scheduled_at,
                                             ).toLocaleString()
                                             : '—'}
                                     </td>
-                                    <td className="px-4 py-3 text-muted-foreground">
+                                    <td className="break-words px-4 py-3 text-muted-foreground align-top">
                                         {c.preferred_doctor?.name ?? '—'}
                                     </td>
-                                    <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
+                                    <td className="break-words px-4 py-3 text-muted-foreground align-top">
                                         {c.chief_complaint ?? '—'}
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3 align-top">
                                         {formatMicrocheckCell(c)}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-4 py-3 align-top">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
