@@ -19,7 +19,7 @@ class PrescriptionController extends Controller
 
     public function store(StorePrescriptionRequest $request, Consultation $consultation): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         $prescription = $consultation->prescriptions()->create([
             ...$request->validated(),
@@ -32,7 +32,7 @@ class PrescriptionController extends Controller
 
     public function update(UpdatePrescriptionRequest $request, Consultation $consultation, Prescription $prescription): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         abort_if($prescription->consultation_id !== $consultation->id, 404);
 
@@ -43,7 +43,7 @@ class PrescriptionController extends Controller
 
     public function destroy(Consultation $consultation, Prescription $prescription): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         abort_if($prescription->consultation_id !== $consultation->id, 404);
 

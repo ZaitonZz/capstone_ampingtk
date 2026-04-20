@@ -24,7 +24,7 @@ class PatientNoteController extends Controller
 
     public function store(StorePatientNoteRequest $request, Consultation $consultation): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         // Upsert — one SOAP note per consultation
         $note = $consultation->note()->updateOrCreate(
@@ -43,7 +43,7 @@ class PatientNoteController extends Controller
 
     public function update(UpdatePatientNoteRequest $request, Consultation $consultation): JsonResponse
     {
-        $this->authorize('update', $consultation);
+        $this->authorize('manage', $consultation);
 
         abort_unless($consultation->note, 404);
 
