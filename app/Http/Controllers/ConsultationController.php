@@ -39,7 +39,7 @@ class ConsultationController extends Controller
             )
             ->when(
                 $isDoctor && !$request->status,
-                fn ($q) => $q->where('status', 'scheduled')
+                fn ($q) => $q->where('status', 'scheduled')->whereNotNull('scheduled_at')
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
