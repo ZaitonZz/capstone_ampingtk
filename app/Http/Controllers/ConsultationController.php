@@ -23,6 +23,7 @@ class ConsultationController extends Controller
 
         $user = $request->user();
         $isDoctor = $user->isDoctor();
+        $isDoctorDailyView = false;
         $canManageSchedule = $user->isMedicalStaff();
 
         $consultations = Consultation::query()
@@ -35,9 +36,7 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                fn ($q) => $q
-                    ->where('doctor_id', $user->id)
-                    ->whereDate('scheduled_at', today())
+                fn ($q) => $q->where('doctor_id', $user->id)
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -52,7 +51,7 @@ class ConsultationController extends Controller
             'consultations' => $consultations,
             'filters' => $request->only(['search', 'status', 'type', 'patient_id', 'doctor_id']),
             'can_manage_schedule' => $canManageSchedule,
-            'is_doctor_daily_view' => $isDoctor,
+            'is_doctor_daily_view' => $isDoctorDailyView,
         ]);
     }
 
