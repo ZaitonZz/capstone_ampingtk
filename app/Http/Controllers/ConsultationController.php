@@ -35,9 +35,11 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                fn ($q) => $q
-                    ->where('doctor_id', $user->id)
-                    ->whereDate('scheduled_at', today())
+                fn ($q) => $q->where('doctor_id', $user->id)
+            )
+            ->when(
+                $isDoctor && !$request->status,
+                fn ($q) => $q->where('status', 'scheduled')
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -172,7 +174,7 @@ class ConsultationController extends Controller
                 $isDoctor,
                 fn ($q) => $q
                     ->where('doctor_id', $user->id)
-                    ->whereDate('scheduled_at', today())
+                    ->where('status', 'scheduled')
             )
             ->whereNotNull('scheduled_at')
             ->get()
