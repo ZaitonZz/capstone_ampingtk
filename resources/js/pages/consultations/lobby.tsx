@@ -714,7 +714,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative flex aspect-video max-h-[550px] w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
+                            <div className="relative flex aspect-video max-h-137.5 w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -1146,8 +1146,9 @@ export default function ConsultationLobbyPage({
                                               : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
-                                        Doctors can bypass deepfake identity
-                                        checks before the consultation starts.
+                                        Doctors can enable manual override
+                                        while the consultation is pending or
+                                        scheduled.
                                     </p>
                                 </>
                             )}
