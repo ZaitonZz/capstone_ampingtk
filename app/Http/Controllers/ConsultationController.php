@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -168,6 +169,17 @@ class ConsultationController extends Controller
         $isDoctor = $user->isDoctor();
         $canManageSchedule = $user->isMedicalStaff();
 
+        $rangeStart = $request->query('start');
+        $rangeEnd = $request->query('end');
+
+        $calendarRangeStart = $rangeStart && $rangeEnd
+            ? Carbon::parse($rangeStart)
+            : now()->startOfMonth()->subWeek();
+
+        $calendarRangeEnd = $rangeStart && $rangeEnd
+            ? Carbon::parse($rangeEnd)
+            : now()->endOfMonth()->addWeek();
+
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
             ->when(
@@ -177,6 +189,7 @@ class ConsultationController extends Controller
                     ->where('status', 'scheduled')
             )
             ->whereNotNull('scheduled_at')
+            ->whereBetween('scheduled_at', [$calendarRangeStart, $calendarRangeEnd])
             ->get()
             ->map(fn (Consultation $c) => [
                 'id' => $c->id,
