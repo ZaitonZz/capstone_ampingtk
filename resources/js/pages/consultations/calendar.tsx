@@ -93,7 +93,7 @@ export default function ConsultationsCalendar({
         patient_id: '',
         doctor_id: '',
         type: 'in_person' as 'in_person' | 'teleconsultation',
-        status: 'scheduled',
+        status: 'pending',
         chief_complaint: '',
         scheduled_at: '',
     });
