@@ -82,6 +82,7 @@ class ConsultationController extends Controller
         $this->authorize('create', Consultation::class);
 
         $data = $request->validated();
+        $data['status'] = $data['status'] ?? 'pending';
         $scheduleAt = filled($data['scheduled_at'] ?? null)
             ? Carbon::parse((string) $data['scheduled_at'])
             : now();
@@ -281,6 +282,9 @@ class ConsultationController extends Controller
         return User::query()
             ->where('role', 'doctor')
             ->with('doctorProfile')
+            ->whereHas('consultations', fn ($q) => $q
+                ->whereIn('status', $activeDutyStatuses)
+                ->whereBetween('scheduled_at', [$weekStart, $weekEnd]))
             ->withExists([
                 'consultations as on_duty_today' => fn ($q) => $q
                     ->whereIn('status', $activeDutyStatuses)
