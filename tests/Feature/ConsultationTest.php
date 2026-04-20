@@ -12,10 +12,17 @@ it('renders all assigned consultations on the index for a doctor', function () {
     $doctor = User::factory()->doctor()->create();
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
         'scheduled_at' => now(),
     ]);
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addDay(),
+    ]);
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
         'scheduled_at' => now()->addDay(),
     ]);
 

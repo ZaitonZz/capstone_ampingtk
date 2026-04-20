@@ -39,26 +39,34 @@ it('admin sees all consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 3));
 });
 
-it('doctor sees only their own consultations for today on the calendar', function () {
+it('doctor sees only their own scheduled consultations on the calendar', function () {
     $doctor = User::factory()->doctor()->create();
     $other = User::factory()->doctor()->create();
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
         'scheduled_at' => now(),
     ]);
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addDay(),
+    ]);
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
         'scheduled_at' => now()->addDay(),
     ]);
     Consultation::factory()->create([
         'doctor_id' => $other->id,
+        'status' => 'scheduled',
         'scheduled_at' => now(),
     ]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.calendar'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('events', 1));
+        ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
 it('medical staff can access consultations index', function () {
