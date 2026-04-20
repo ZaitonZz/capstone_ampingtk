@@ -4,6 +4,7 @@ use App\Models\Consultation;
 use App\Models\ConsultationConsent;
 use App\Models\Patient;
 use App\Models\User;
+use App\Services\ConsultationIdentityVerificationService;
 
 // ── Guard: guests ─────────────────────────────────────────────────────────────
 
@@ -139,5 +140,30 @@ it('includes configured OTP length in lobby verification payload', function () {
             fn ($page) => $page
                 ->component('consultations/lobby')
                 ->where('verification.otp_length', 8),
+        );
+});
+
+it('shows manual override enabled state for assigned doctor in lobby payload', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+    ]);
+
+    $this->actingAs($doctor)
+        ->post(route('consultations.identity-verification.override', $consultation))
+        ->assertRedirect();
+
+    $service = app(ConsultationIdentityVerificationService::class);
+
+    expect($service->isManualOverrideEnabled($consultation->fresh()))->toBeTrue();
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/lobby')
+                ->where('verification.manual_override_enabled', true),
         );
 });
