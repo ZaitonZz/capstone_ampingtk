@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\DeepfakeScanLogController;
+use App\Http\Controllers\DoctorDutyRequestController;
+use App\Http\Controllers\DoctorDutyScheduleController;
 use App\Http\Controllers\DoctorPhotoController;
 use App\Http\Controllers\DoctorProfileController;
 use App\Http\Controllers\PatientController;
@@ -32,10 +34,18 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     // Extra named routes MUST be declared before Route::resource to prevent
     // 'calendar' and 'approve' being swallowed by the {consultation} wildcard.
     Route::get('consultations/calendar', [ConsultationController::class, 'calendar'])->name('consultations.calendar');
+    Route::get('consultations/available-doctors', [ConsultationController::class, 'availableDoctors'])->name('consultations.available-doctors');
     Route::patch('consultations/{consultation}/approve', [ConsultationController::class, 'approve'])->name('consultations.approve');
     Route::patch('consultations/{consultation}/reschedule', [ConsultationController::class, 'reschedule'])->name('consultations.reschedule');
     Route::patch('consultations/{consultation}/cancel', [ConsultationController::class, 'cancel'])->name('consultations.cancel');
     Route::resource('consultations', ConsultationController::class);
+
+    Route::get('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'index'])->name('doctor-duty-schedules.index');
+    Route::post('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'store'])->name('doctor-duty-schedules.store');
+    Route::patch('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'update'])->name('doctor-duty-schedules.update');
+    Route::delete('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'destroy'])->name('doctor-duty-schedules.destroy');
+    Route::post('doctor-duty-requests', [DoctorDutyRequestController::class, 'store'])->name('doctor-duty-requests.store');
+    Route::patch('doctor-duty-requests/{doctorDutyRequest}/review', [DoctorDutyRequestController::class, 'review'])->name('doctor-duty-requests.review');
 
     Route::prefix('consultations/{consultation}')->name('consultations.')->scopeBindings()->group(function () {
         Route::middleware('doctor.or.admin')->group(function () {

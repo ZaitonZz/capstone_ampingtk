@@ -470,6 +470,8 @@ Route::middleware(['auth', 'verified', 'require-otp', 'patient'])->group(functio
         ->name('patient.consultations.index');
     Route::get('patient/consultations/calendar', [PatientConsultationController::class, 'calendar'])
         ->name('patient.consultations.calendar');
+    Route::get('patient/consultations/available-doctors', [PatientConsultationController::class, 'availableDoctors'])
+        ->name('patient.consultations.available-doctors');
     Route::post('patient/consultations/request', [PatientConsultationController::class, 'store'])
         ->name('patient.consultations.request');
     Route::get('patient/consultations/{consultation}', [PatientConsultationController::class, 'show'])
