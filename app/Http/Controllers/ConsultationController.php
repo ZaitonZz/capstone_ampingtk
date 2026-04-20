@@ -289,9 +289,6 @@ class ConsultationController extends Controller
                     ->whereIn('status', $activeDutyStatuses)
                     ->whereBetween('scheduled_at', [$weekStart, $weekEnd]),
             ])
-            ->whereHas('consultations', fn ($q) => $q
-                ->whereIn('status', $activeDutyStatuses)
-                ->whereBetween('scheduled_at', [$weekStart, $weekEnd]))
             ->orderBy('name');
     }
 
