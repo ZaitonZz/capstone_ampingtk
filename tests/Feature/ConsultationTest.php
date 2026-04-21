@@ -32,7 +32,7 @@ it('renders all assigned consultations on the index for a doctor', function () {
         ->assertInertia(
             fn ($page) => $page
                 ->component('consultations/index')
-                ->has('consultations.data', 2)
+                ->has('consultations.data', 3)
         );
 });
 
