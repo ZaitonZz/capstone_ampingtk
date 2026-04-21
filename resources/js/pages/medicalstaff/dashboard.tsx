@@ -5,8 +5,12 @@ import {
     ContactRound,
     UserRoundCog,
 } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -71,6 +75,8 @@ function toDatetimeLocal(iso: string | null): string {
 export default function MedicalStaffDashboardPage() {
     const { metrics, pending_consultations, recent_registrations } =
         usePage<PageProps>().props;
+    const [rescheduleDrafts, setRescheduleDrafts] = useState<Record<number, string>>({});
+    const [cancelReasonDrafts, setCancelReasonDrafts] = useState<Record<number, string>>({});
 
     function approveConsultation(consultationId: number) {
         router.patch(
@@ -83,35 +89,52 @@ export default function MedicalStaffDashboardPage() {
     }
 
     function rescheduleConsultation(consultation: PendingConsultation) {
-        const suggestedDate = toDatetimeLocal(consultation.scheduled_at);
-
-        const input = window.prompt(
-            'Enter new schedule (YYYY-MM-DDTHH:mm)',
-            suggestedDate,
-        );
+        const input =
+            rescheduleDrafts[consultation.id] ??
+            toDatetimeLocal(consultation.scheduled_at);
 
         if (!input) {
+            toast.error('Enter a new schedule first.');
             return;
         }
 
         router.patch(
             consultation.reschedule_url,
             { scheduled_at: input },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Consultation rescheduled.');
+                    setRescheduleDrafts((current) => ({
+                        ...current,
+                        [consultation.id]: '',
+                    }));
+                },
+            },
         );
     }
 
     function cancelConsultation(consultation: PendingConsultation) {
-        const reason = window.prompt('Cancellation reason');
+        const reason = cancelReasonDrafts[consultation.id] ?? '';
 
-        if (!reason) {
+        if (!reason.trim()) {
+            toast.error('Add a cancellation reason first.');
             return;
         }
 
         router.patch(
             consultation.cancel_url,
             { cancellation_reason: reason },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Consultation cancelled.');
+                    setCancelReasonDrafts((current) => ({
+                        ...current,
+                        [consultation.id]: '',
+                    }));
+                },
+            },
         );
     }
 
@@ -120,8 +143,8 @@ export default function MedicalStaffDashboardPage() {
             <Head title="Medical Staff Dashboard" />
 
             <div className="space-y-6 p-4 md:p-6">
-                <section className="rounded-2xl border bg-card p-5 shadow-sm">
-                    <h1 className="text-2xl font-semibold tracking-tight">
+                <section className="rounded-2xl border bg-gradient-to-r from-cyan-50 via-background to-emerald-50 p-5 shadow-sm">
+                    <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
                         Medical Staff Dashboard
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -262,55 +285,104 @@ export default function MedicalStaffDashboardPage() {
                                         {' · '}
                                         {consultation.scheduled_at
                                             ? new Date(
-                                                  consultation.scheduled_at,
-                                              ).toLocaleString()
+                                                consultation.scheduled_at,
+                                            ).toLocaleString()
                                             : 'No schedule yet'}
                                     </p>
 
-                                    <div className="mt-3 flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                approveConsultation(
-                                                    consultation.id,
-                                                )
-                                            }
-                                        >
-                                            Approve
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                rescheduleConsultation(
-                                                    consultation,
-                                                )
-                                            }
-                                        >
-                                            Reschedule
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                cancelConsultation(consultation)
-                                            }
-                                        >
-                                            Cancel
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            asChild
-                                        >
-                                            <Link
-                                                href={ConsultationController.show.url(
-                                                    consultation.id,
-                                                )}
+                                    <div className="mt-3 grid gap-3">
+                                        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                                            <div className="grid gap-1">
+                                                <Label
+                                                    htmlFor={`reschedule-${consultation.id}`}
+                                                    className="text-xs text-muted-foreground"
+                                                >
+                                                    New Schedule
+                                                </Label>
+                                                <Input
+                                                    id={`reschedule-${consultation.id}`}
+                                                    type="datetime-local"
+                                                    value={
+                                                        rescheduleDrafts[consultation.id] ??
+                                                        toDatetimeLocal(consultation.scheduled_at)
+                                                    }
+                                                    onChange={(e) =>
+                                                        setRescheduleDrafts((current) => ({
+                                                            ...current,
+                                                            [consultation.id]: e.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    rescheduleConsultation(
+                                                        consultation,
+                                                    )
+                                                }
                                             >
-                                                View
-                                            </Link>
-                                        </Button>
+                                                Reschedule
+                                            </Button>
+                                        </div>
+
+                                        <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                                            <div className="grid gap-1">
+                                                <Label
+                                                    htmlFor={`cancel-${consultation.id}`}
+                                                    className="text-xs text-muted-foreground"
+                                                >
+                                                    Cancellation Reason
+                                                </Label>
+                                                <Input
+                                                    id={`cancel-${consultation.id}`}
+                                                    placeholder="Enter reason"
+                                                    value={cancelReasonDrafts[consultation.id] ?? ''}
+                                                    onChange={(e) =>
+                                                        setCancelReasonDrafts((current) => ({
+                                                            ...current,
+                                                            [consultation.id]: e.target.value,
+                                                        }))
+                                                    }
+                                                />
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    cancelConsultation(consultation)
+                                                }
+                                            >
+                                                Cancel
+                                            </Button>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    approveConsultation(
+                                                        consultation.id,
+                                                    )
+                                                }
+                                            >
+                                                Approve
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={ConsultationController.show.url(
+                                                        consultation.id,
+                                                    )}
+                                                >
+                                                    View
+                                                </Link>
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -342,8 +414,8 @@ export default function MedicalStaffDashboardPage() {
                                         Registered:{' '}
                                         {patient.registered_at
                                             ? new Date(
-                                                  patient.registered_at,
-                                              ).toLocaleString()
+                                                patient.registered_at,
+                                            ).toLocaleString()
                                             : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">

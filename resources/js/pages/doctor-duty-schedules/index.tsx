@@ -310,13 +310,19 @@ export default function DoctorDutySchedulesIndex({
     function handleDutyRequestSubmit(e: FormEvent) {
         e.preventDefault();
 
-        dutyRequestForm.post('/doctor-duty-requests', {
-            onSuccess: () => {
-                dutyRequestForm.reset();
-                dutyRequestForm.setData('request_type', 'on_leave');
-                toast.success('Duty request submitted.');
-            },
-        });
+        dutyRequestForm
+            .transform((data) => ({
+                ...data,
+                end_date: data.end_date || data.start_date,
+            }))
+            .post('/doctor-duty-requests', {
+                onSuccess: () => {
+                    dutyRequestForm.reset();
+                    dutyRequestForm.setData('request_type', 'on_leave');
+                    dutyRequestForm.transform((data) => data);
+                    toast.success('Duty request submitted.');
+                },
+            });
     }
 
     function reviewDutyRequest(requestId: number, decision: 'approved' | 'rejected') {
@@ -365,15 +371,19 @@ export default function DoctorDutySchedulesIndex({
                     <FullCalendar
                         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                         initialView="timeGridWeek"
+                        allDaySlot={false}
                         headerToolbar={{
                             left: 'prev,next today',
                             center: 'title',
                             right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
+                        slotMinTime="06:00:00"
+                        slotMaxTime="20:00:00"
+                        slotDuration="01:00:00"
                         events={calendarEvents}
                         eventClick={handleEventClick}
                         dateClick={handleDateClick}
-                        height="auto"
+                        height={460}
                     />
                     {can_manage_schedule && createForm.data.schedule_mode === 'multiple_dates' && (
                         <p className="mt-3 text-sm text-muted-foreground">
@@ -383,10 +393,13 @@ export default function DoctorDutySchedulesIndex({
                 </div>
 
                 {can_submit_duty_requests && (
-                    <div className="rounded-xl border bg-background p-4">
+                    <div className="rounded-xl border bg-gradient-to-r from-sky-50 via-background to-cyan-50 p-4">
                         <h2 className="mb-4 text-lg font-semibold">
                             Request Leave / Absence
                         </h2>
+                        <p className="mb-4 text-xs text-muted-foreground">
+                            Quick request: choose type, set start date, and submit. End date defaults to start date when left blank.
+                        </p>
 
                         <form onSubmit={handleDutyRequestSubmit} className="grid gap-4 sm:grid-cols-2">
                             <div className="flex flex-col gap-1.5">
