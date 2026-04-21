@@ -26,6 +26,7 @@ use App\Models\ActivityLog;
 use App\Models\Consultation;
 use App\Models\ConsultationFaceVerificationLog;
 use App\Models\DeepfakeScanLog;
+use App\Models\DoctorDutyRequest;
 use App\Models\Patient;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -384,14 +385,35 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                 'has_account' => $patient->user_id !== null,
             ]);
 
+        $dutyRequests = DoctorDutyRequest::query()
+            ->with(['doctor:id,name', 'reviewer:id,name'])
+            ->latest('created_at')
+            ->limit(12)
+            ->get()
+            ->map(fn (DoctorDutyRequest $request) => [
+                'id' => $request->id,
+                'doctor_name' => $request->doctor?->name ?? 'Unknown Doctor',
+                'request_type' => $request->request_type,
+                'start_date' => $request->start_date?->toDateString(),
+                'end_date' => $request->end_date?->toDateString(),
+                'remarks' => $request->remarks,
+                'status' => $request->status,
+                'reviewed_by' => $request->reviewer?->name,
+                'reviewed_at' => $request->reviewed_at?->toIso8601String(),
+                'reviewer_notes' => $request->reviewer_notes,
+                'created_at' => $request->created_at?->toIso8601String(),
+            ]);
+
         return inertia('medicalstaff/dashboard', [
             'metrics' => [
                 'pending_consultations' => Consultation::query()->where('status', 'pending')->count(),
                 'todays_consultations' => Consultation::query()->whereDate('scheduled_at', today())->count(),
                 'patients_without_account' => Patient::query()->whereNull('user_id')->count(),
+                'pending_duty_requests' => DoctorDutyRequest::query()->where('status', DoctorDutyRequest::STATUS_PENDING)->count(),
             ],
             'pending_consultations' => $pendingConsultations,
             'recent_registrations' => $recentRegistrations,
+            'duty_requests' => $dutyRequests,
         ]);
     })->name('medicalstaff.dashboard');
 });
