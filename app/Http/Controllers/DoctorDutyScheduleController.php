@@ -24,8 +24,18 @@ class DoctorDutyScheduleController extends Controller
         $user = $request->user();
         $canManage = $user->isAdmin() || $user->isMedicalStaff();
 
-        $start = Carbon::parse($request->query('start', now()->startOfWeek()->toDateString()))->startOfDay();
-        $end = Carbon::parse($request->query('end', now()->endOfWeek()->toDateString()))->endOfDay();
+        $startParam = $request->query('start');
+        $endParam = $request->query('end');
+
+        // FullCalendar page currently loads events in one request without dynamic refetch.
+        // Use a broader default window so recurring schedules remain visible after save.
+        $start = filled($startParam)
+            ? Carbon::parse((string) $startParam)->startOfDay()
+            : now()->startOfMonth()->subMonth()->startOfDay();
+
+        $end = filled($endParam)
+            ? Carbon::parse((string) $endParam)->endOfDay()
+            : now()->endOfMonth()->addMonths(12)->endOfDay();
 
         $schedules = DoctorDutySchedule::query()
             ->with('doctor:id,name')

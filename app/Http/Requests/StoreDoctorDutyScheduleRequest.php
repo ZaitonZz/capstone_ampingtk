@@ -10,6 +10,27 @@ use Illuminate\Validation\Validator;
 
 class StoreDoctorDutyScheduleRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $mode = (string) $this->input('schedule_mode', DoctorDutyScheduleService::MODE_SINGLE);
+
+        if ($mode !== DoctorDutyScheduleService::MODE_MULTIPLE_DATES) {
+            $this->merge(['duty_dates' => null]);
+        }
+
+        if ($mode !== DoctorDutyScheduleService::MODE_RECURRING_WEEKLY) {
+            $this->merge([
+                'recurring_start_date' => null,
+                'recurring_end_date' => null,
+                'recurring_weekdays' => null,
+            ]);
+        }
+
+        if ($mode !== DoctorDutyScheduleService::MODE_SINGLE) {
+            $this->merge(['duty_date' => null]);
+        }
+    }
+
     public function authorize(): bool
     {
         $user = $this->user();
