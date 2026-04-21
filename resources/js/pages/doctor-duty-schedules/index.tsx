@@ -1,6 +1,7 @@
-import type { DateClickArg, EventClickArg } from '@fullcalendar/core';
+import type { EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import type { DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -122,14 +123,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Doctor Duty Calendar', href: '/doctor-duty-schedules' },
 ];
 
-function toDateInputValue(date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-}
-
 export default function DoctorDutySchedulesIndex({
     schedules,
     events,
@@ -171,7 +164,7 @@ export default function DoctorDutySchedulesIndex({
 
     const dutyRequestForm = useForm({
         request_type: 'on_leave' as DutyRequestType,
-        start_date: toDateInputValue(),
+        start_date: '',
         end_date: '',
         remarks: '',
     });
@@ -180,6 +173,7 @@ export default function DoctorDutySchedulesIndex({
         () =>
             events.map((event) => ({
                 ...event,
+                id: String(event.id),
                 backgroundColor: STATUS_COLORS[event.extendedProps.status],
                 borderColor: STATUS_COLORS[event.extendedProps.status],
                 textColor: '#ffffff',
@@ -341,20 +335,17 @@ export default function DoctorDutySchedulesIndex({
     function handleDutyRequestSubmit(e: FormEvent) {
         e.preventDefault();
 
-        dutyRequestForm
-            .transform((data) => ({
-                ...data,
-                end_date: data.end_date || data.start_date,
-            }))
-            .post('/doctor-duty-requests', {
-                onSuccess: () => {
-                    dutyRequestForm.reset();
-                    dutyRequestForm.setData('start_date', toDateInputValue());
-                    dutyRequestForm.setData('request_type', 'on_leave');
-                    dutyRequestForm.transform((data) => data);
-                    toast.success('Duty request submitted.');
-                },
-            });
+        dutyRequestForm.post('/doctor-duty-requests', {
+            preserveScroll: true,
+            onSuccess: () => {
+                dutyRequestForm.reset();
+                dutyRequestForm.setData('request_type', 'on_leave');
+                toast.success('Duty request submitted.');
+            },
+            onError: () => {
+                toast.error('Unable to submit request. Check the highlighted fields.');
+            },
+        });
     }
 
     function reviewDutyRequest(requestId: number, decision: 'approved' | 'rejected') {

@@ -169,6 +169,20 @@ export default function MedicalStaffDashboardPage() {
         );
     }
 
+    function reviewDutyRequest(requestId: number, decision: 'approved' | 'rejected') {
+        router.patch(
+            `/doctor-duty-requests/${requestId}/review`,
+            {
+                decision,
+                reviewer_notes: '',
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success(`Request ${decision}.`),
+            },
+        );
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medical Staff Dashboard" />
@@ -267,14 +281,29 @@ export default function MedicalStaffDashboardPage() {
                                         </p>
                                     )}
 
-                                    <div className="mt-3 flex flex-wrap gap-2">
-                                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-                                            Approve
-                                        </Button>
-                                        <Button size="sm" variant="outline">
-                                            Reject
-                                        </Button>
-                                    </div>
+                                    {request.status === 'pending' ? (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            <Button
+                                                size="sm"
+                                                className="bg-emerald-600 hover:bg-emerald-700"
+                                                onClick={() => reviewDutyRequest(request.id, 'approved')}
+                                            >
+                                                Approve
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => reviewDutyRequest(request.id, 'rejected')}
+                                            >
+                                                Reject
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <p className="mt-3 text-xs text-muted-foreground">
+                                            Reviewed by {request.reviewed_by ?? 'N/A'}
+                                            {request.reviewed_at ? ` on ${new Date(request.reviewed_at).toLocaleString()}` : ''}
+                                        </p>
+                                    )}
                                 </div>
                             ))}
                         </div>

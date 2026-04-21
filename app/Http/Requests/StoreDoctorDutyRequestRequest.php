@@ -8,6 +8,20 @@ use Illuminate\Validation\Rule;
 
 class StoreDoctorDutyRequestRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $startDate = $this->input('start_date');
+
+        if (blank($startDate)) {
+            $startDate = now()->toDateString();
+        }
+
+        $this->merge([
+            'start_date' => $startDate,
+            'end_date' => $this->filled('end_date') ? $this->input('end_date') : $startDate,
+        ]);
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->isDoctor() ?? false;
