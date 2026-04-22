@@ -741,6 +741,7 @@ export default function ConsultationLobbyPage({
                                                 playsInline
                                                 muted
                                                 className="h-full w-full object-cover"
+                                                style={{ transform: 'scaleX(-1)' }}
                                             />
                                         )}
                                     </>

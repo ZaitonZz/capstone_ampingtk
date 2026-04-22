@@ -422,6 +422,7 @@ export default function PatientCreate() {
                                     muted
                                     onLoadedData={() => setIsVideoReady(true)}
                                     className="h-full min-h-96 w-full rounded-md border border-input bg-black object-cover"
+                                    style={{ transform: 'scaleX(-1)' }}
                                 />
                                 {!isVideoReady && (
                                     <p className="text-sm text-muted-foreground">Starting camera…</p>
