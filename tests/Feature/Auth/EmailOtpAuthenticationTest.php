@@ -289,6 +289,8 @@ describe('Email OTP Authentication', function () {
         });
 
         it('masks email correctly in response', function () {
+            config(['auth_otp.enabled' => true]);
+
             $user = User::factory()->create([
                 'email' => 'johndoe@example.com',
                 'password' => Hash::make('password'),
@@ -302,8 +304,7 @@ describe('Email OTP Authentication', function () {
             $response->assertOk();
             $maskedEmail = $response->json('masked_email');
 
-            // Should show first letter and mask the rest
-            expect($maskedEmail)->toContain('j******@example.com');
+            expect($maskedEmail)->toBe('j******@example.com');
         });
 
         it('enforces rate limiting on login start', function () {

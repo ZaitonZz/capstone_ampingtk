@@ -24,6 +24,7 @@ class ConsultationController extends Controller
 
         $user = $request->user();
         $isDoctor = $user->isDoctor();
+        $isDoctorDailyView = false;
         $canManageSchedule = $user->isMedicalStaff();
 
         $consultations = Consultation::query()
@@ -38,10 +39,6 @@ class ConsultationController extends Controller
                 $isDoctor,
                 fn ($q) => $q->where('doctor_id', $user->id)
             )
-            ->when(
-                $isDoctor && !$request->status,
-                fn ($q) => $q->where('status', 'scheduled')->whereNotNull('scheduled_at')
-            )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
             ->when($request->status, fn ($q, $s) => $q->where('status', $s))
@@ -55,7 +52,7 @@ class ConsultationController extends Controller
             'consultations' => $consultations,
             'filters' => $request->only(['search', 'status', 'type', 'patient_id', 'doctor_id']),
             'can_manage_schedule' => $canManageSchedule,
-            'is_doctor_daily_view' => $isDoctor,
+            'is_doctor_daily_view' => $isDoctorDailyView,
         ]);
     }
 

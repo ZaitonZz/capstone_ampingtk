@@ -231,6 +231,8 @@ export default function ConsultationLobbyPage({
         : 6;
     const expiresInSeconds = secondsUntil(verification?.expires_at);
     const resendInSeconds = secondsUntil(verification?.resend_available_at);
+    const isManualOverrideEnabled =
+        verification?.manual_override_enabled === true;
     const canApplyDoctorOverride = Boolean(
         verification?.override_url &&
             page.props.auth?.user?.id === consultation.doctor_id,
@@ -712,7 +714,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             {/* Dark video preview */}
-                            <div className="relative flex aspect-video max-h-[550px] w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
+                            <div className="relative flex aspect-video max-h-137.5 w-full items-center justify-center overflow-hidden rounded-xl bg-linear-to-b from-zinc-800 to-zinc-950 ring-1 ring-white/5">
                                 {/* Corner label */}
                                 <span className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-medium text-white/60 backdrop-blur-sm">
                                     <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
@@ -1064,21 +1066,6 @@ export default function ConsultationLobbyPage({
                                             {verificationTargetRole} completes
                                             identity verification.
                                         </p>
-
-                                        {canApplyDoctorOverride && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="mt-3 w-full"
-                                                disabled={isApplyingOverride}
-                                                onClick={handleDoctorOverride}
-                                            >
-                                                {isApplyingOverride
-                                                    ? 'Applying override...'
-                                                    : 'Manual Override (Doctor)'}
-                                            </Button>
-                                        )}
                                     </>
                                 )}
                             </div>
@@ -1133,6 +1120,37 @@ export default function ConsultationLobbyPage({
                                     Joining is disabled until identity
                                     verification is completed.
                                 </p>
+                            )}
+
+                            {canApplyDoctorOverride && (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant={
+                                            isManualOverrideEnabled
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                        size="sm"
+                                        className="w-full"
+                                        disabled={
+                                            isApplyingOverride ||
+                                            isManualOverrideEnabled
+                                        }
+                                        onClick={handleDoctorOverride}
+                                    >
+                                        {isApplyingOverride
+                                            ? 'Applying override...'
+                                            : isManualOverrideEnabled
+                                              ? 'Manual Override Enabled'
+                                              : 'Enable Manual Override'}
+                                    </Button>
+                                    <p className="text-center text-xs text-muted-foreground">
+                                        Doctors can enable manual override
+                                        while the consultation is pending or
+                                        scheduled.
+                                    </p>
+                                </>
                             )}
 
                             <Button

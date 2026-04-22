@@ -8,7 +8,7 @@ it('redirects guests to login', function () {
     $this->get(route('consultations.index'))->assertRedirect(route('login'));
 });
 
-it('renders only scheduled consultations for a doctor on the index', function () {
+it('renders all assigned consultations on the index for a doctor', function () {
     $doctor = User::factory()->doctor()->create();
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
@@ -32,7 +32,7 @@ it('renders only scheduled consultations for a doctor on the index', function ()
         ->assertInertia(
             fn ($page) => $page
                 ->component('consultations/index')
-                ->has('consultations.data', 2)
+                ->has('consultations.data', 3)
         );
 });
 
