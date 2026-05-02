@@ -269,6 +269,15 @@ export default function DoctorDutySchedulesIndex({
             status: schedule.status,
             remarks: schedule.remarks ?? '',
         });
+        toast.success('Schedule loaded for editing');
+        
+        // Scroll to the edit form
+        setTimeout(() => {
+            const editSection = document.querySelector('[data-edit-form="duty-schedule"]');
+            if (editSection) {
+                editSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
     }
 
     function handleEditSubmit(e: FormEvent) {
@@ -820,10 +829,10 @@ export default function DoctorDutySchedulesIndex({
                             </div>
                         </form>
 
-                        <div className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+                        <div className={`rounded-2xl border bg-card p-4 shadow-sm md:p-5 transition-all ${selectedSchedule ? 'border-emerald-300 bg-emerald-50/30 shadow-md' : ''}`} data-edit-form="duty-schedule">
                             <h2 className="mb-1 text-lg font-semibold">Edit Duty Schedule</h2>
                             <p className="mb-4 text-xs text-muted-foreground">
-                                Select any event in the calendar or row in the table to edit details here.
+                                {selectedSchedule ? `Editing: ${selectedSchedule.doctor_name} on ${selectedSchedule.duty_date}` : 'Select any event in the calendar or row in the table to edit details here.'}
                             </p>
 
                             {selectedSchedule ? (
