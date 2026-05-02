@@ -6,7 +6,7 @@ import FullCalendar from '@fullcalendar/react';
 import { Head } from '@inertiajs/react';
 import { useForm } from '@inertiajs/react';
 import { X, CalendarPlus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +69,7 @@ interface SelectedEvent {
 
 interface Props {
     events: CalendarEvent[];
-    doctors: DoctorSummary[];
+    doctors: DoctorSummary[]; // backend-provided full list of doctors
 }
 
 export default function PatientConsultationCalendar({
@@ -80,8 +80,6 @@ export default function PatientConsultationCalendar({
     const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(
         null,
     );
-    const [availableDoctors, setAvailableDoctors] =
-        useState<DoctorSummary[]>(doctors);
 
     const calendarEvents = events.map((e) => ({
         id: String(e.id),
@@ -96,64 +94,14 @@ export default function PatientConsultationCalendar({
 
     const { data, setData, post, processing, errors, reset } = useForm({
         doctor_id: '',
-        type: 'in_person' as 'in_person' | 'teleconsultation',
+        type: 'teleconsultation' as 'in_person' | 'teleconsultation',
         chief_complaint: '',
         scheduled_at: '',
     });
 
     function handleScheduledAtChange(nextScheduledAt: string) {
-        setData((current) => ({
-            ...current,
-            scheduled_at: nextScheduledAt,
-            doctor_id: nextScheduledAt ? current.doctor_id : '',
-        }));
-
-        if (!nextScheduledAt) {
-            setAvailableDoctors([]);
-        }
+        setData('scheduled_at', nextScheduledAt);
     }
-
-    useEffect(() => {
-        if (!data.scheduled_at) {
-            return;
-        }
-
-        const controller = new AbortController();
-
-        fetch(
-            `/patient/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
-            {
-                method: 'GET',
-                headers: { Accept: 'application/json' },
-                signal: controller.signal,
-            },
-        )
-            .then(async (response) => {
-                if (!response.ok) {
-                    return;
-                }
-
-                const payload = (await response.json()) as {
-                    doctors?: DoctorSummary[];
-                };
-                const nextDoctors = payload.doctors ?? [];
-                setAvailableDoctors(nextDoctors);
-
-                if (
-                    data.doctor_id &&
-                    !nextDoctors.some(
-                        (doctor) => String(doctor.id) === data.doctor_id,
-                    )
-                ) {
-                    setData('doctor_id', '');
-                }
-            })
-            .catch(() => {
-                setAvailableDoctors([]);
-            });
-
-        return () => controller.abort();
-    }, [data.scheduled_at, data.doctor_id, setData]);
 
     function openRequestModal(date?: string) {
         handleScheduledAtChange(date ?? '');
@@ -196,7 +144,6 @@ export default function PatientConsultationCalendar({
             <Head title="My Appointments" />
 
             <div className="flex flex-col gap-4 p-4 md:p-6">
-                {/* Header */}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="text-2xl font-semibold">My Appointments</h1>
                     <Button onClick={() => openRequestModal()}>
@@ -205,16 +152,13 @@ export default function PatientConsultationCalendar({
                     </Button>
                 </div>
 
-                {/* Legend */}
                 <div className="flex flex-wrap gap-3 text-sm">
                     {(Object.keys(STATUS_COLORS) as ConsultationStatus[]).map(
                         (s) => (
                             <span key={s} className="flex items-center gap-1.5">
                                 <span
                                     className="inline-block h-3 w-3 rounded-sm"
-                                    style={{
-                                        backgroundColor: STATUS_COLORS[s],
-                                    }}
+                                    style={{ backgroundColor: STATUS_COLORS[s] }}
                                 />
                                 {STATUS_LABELS[s]}
                             </span>
@@ -222,7 +166,6 @@ export default function PatientConsultationCalendar({
                     )}
                 </div>
 
-                {/* Calendar */}
                 <div className="rounded-xl border bg-background p-4">
                     <FullCalendar
                         plugins={[dayGridPlugin, interactionPlugin]}
@@ -241,7 +184,6 @@ export default function PatientConsultationCalendar({
                 </div>
             </div>
 
-            {/* Event detail panel */}
             {selectedEvent && (
                 <div className="fixed right-6 bottom-6 z-40 w-72 rounded-xl border bg-background p-4 shadow-lg">
                     <div className="mb-2 flex items-start justify-between">
@@ -255,17 +197,12 @@ export default function PatientConsultationCalendar({
                     </div>
                     <div className="flex flex-col gap-2 text-sm">
                         <div>
-                            <span className="text-muted-foreground">
-                                Doctor:{' '}
-                            </span>
+                            <span className="text-muted-foreground">Doctor:{' '}</span>
                             {selectedEvent.title}
-                            {selectedEvent.specialty &&
-                                ` (${selectedEvent.specialty})`}
+                            {selectedEvent.specialty && ` (${selectedEvent.specialty})`}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">
-                                Status:
-                            </span>
+                            <span className="text-muted-foreground">Status:</span>
                             <Badge
                                 variant="outline"
                                 className={STATUS_BADGE_CLASSES[selectedEvent.status]}
@@ -274,24 +211,16 @@ export default function PatientConsultationCalendar({
                             </Badge>
                         </div>
                         <div>
-                            <span className="text-muted-foreground">
-                                Type:{' '}
-                            </span>
-                            {selectedEvent.type === 'in_person'
-                                ? 'In Person'
-                                : 'Teleconsultation'}
+                            <span className="text-muted-foreground">Type:{' '}</span>
+                            Teleconsultation
                         </div>
                         <div>
-                            <span className="text-muted-foreground">
-                                Date:{' '}
-                            </span>
+                            <span className="text-muted-foreground">Date:{' '}</span>
                             {new Date(selectedEvent.start).toLocaleString()}
                         </div>
                         {selectedEvent.chief_complaint && (
                             <div>
-                                <span className="text-muted-foreground">
-                                    Complaint:{' '}
-                                </span>
+                                <span className="text-muted-foreground">Complaint:{' '}</span>
                                 {selectedEvent.chief_complaint}
                             </div>
                         )}
@@ -299,7 +228,6 @@ export default function PatientConsultationCalendar({
                 </div>
             )}
 
-            {/* Request appointment modal */}
             {isRequestModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div
@@ -308,9 +236,7 @@ export default function PatientConsultationCalendar({
                     />
                     <div className="relative z-10 w-full max-w-md rounded-xl border bg-background p-6 shadow-lg">
                         <div className="mb-5 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold">
-                                Request an Appointment
-                            </h2>
+                            <h2 className="text-lg font-semibold">Request an Appointment</h2>
                             <button
                                 onClick={() => setIsRequestModalOpen(false)}
                                 className="text-muted-foreground hover:text-foreground"
@@ -319,136 +245,58 @@ export default function PatientConsultationCalendar({
                             </button>
                         </div>
 
-                        <form
-                            onSubmit={submitRequest}
-                            className="flex flex-col gap-4"
-                        >
-                            {/* Doctor */}
+                        <form onSubmit={submitRequest} className="flex flex-col gap-4">
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="doctor_id">Doctor</Label>
+                                <Label htmlFor="doctor_id">Preferred Doctor</Label>
                                 <select
                                     id="doctor_id"
                                     value={data.doctor_id}
-                                    onChange={(e) =>
-                                        setData('doctor_id', e.target.value)
-                                    }
+                                    onChange={(e) => setData('doctor_id', e.target.value)}
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                    disabled={!data.scheduled_at}
                                 >
-                                    <option value="">
-                                        {data.scheduled_at
-                                            ? 'Select preferred doctor on duty...'
-                                            : 'Select schedule first...'}
-                                    </option>
-                                    {availableDoctors.map((d) => (
+                                    <option value="">Select a preferred doctor...</option>
+                                    {doctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
-                                            {d.doctor_profile?.specialty
-                                                ? ` — ${d.doctor_profile.specialty}`
-                                                : ''}
+                                            {d.doctor_profile?.specialty ? ` — ${d.doctor_profile.specialty}` : ''}
                                         </option>
                                     ))}
                                 </select>
-                                {data.scheduled_at &&
-                                    availableDoctors.length === 0 && (
-                                        <p className="text-sm text-muted-foreground">
-                                            No doctors are on duty for the
-                                            selected schedule.
-                                        </p>
-                                    )}
-                                {errors.doctor_id && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.doctor_id}
-                                    </p>
-                                )}
+                                {errors.doctor_id && <p className="text-sm text-destructive">{errors.doctor_id}</p>}
                             </div>
 
-                            {/* Type */}
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="req_type">
-                                    Consultation Type
-                                </Label>
-                                <select
-                                    id="req_type"
-                                    value={data.type}
-                                    onChange={(e) =>
-                                        setData(
-                                            'type',
-                                            e.target.value as
-                                            | 'in_person'
-                                            | 'teleconsultation',
-                                        )
-                                    }
-                                    className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                >
-                                    <option value="in_person">In Person</option>
-                                    <option value="teleconsultation">
-                                        Teleconsultation
-                                    </option>
-                                </select>
-                            </div>
-
-                            {/* Preferred Date */}
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="scheduled_at">
-                                    Preferred Date & Time
-                                </Label>
+                                <Label htmlFor="scheduled_at">Preferred Date &amp; Time</Label>
                                 <Input
                                     id="scheduled_at"
                                     type="datetime-local"
                                     value={data.scheduled_at}
                                     onChange={(e) => handleScheduledAtChange(e.target.value)}
                                 />
-                                {errors.scheduled_at && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.scheduled_at}
-                                    </p>
-                                )}
+                                {errors.scheduled_at && <p className="text-sm text-destructive">{errors.scheduled_at}</p>}
                             </div>
 
-                            {/* Complaint */}
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="req_complaint">
-                                    Chief Complaint{' '}
-                                    <span className="text-muted-foreground">
-                                        (optional)
-                                    </span>
+                                    Chief Complaint <span className="text-muted-foreground">(optional)</span>
                                 </Label>
                                 <textarea
                                     id="req_complaint"
                                     value={data.chief_complaint}
-                                    onChange={(e) =>
-                                        setData(
-                                            'chief_complaint',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => setData('chief_complaint', e.target.value)}
                                     rows={3}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                                     placeholder="Briefly describe your concern..."
                                 />
                             </div>
 
-                            <p className="text-xs text-muted-foreground">
-                                Your request will be reviewed by the medical
-                                staff and confirmed shortly.
-                            </p>
+                            <p className="text-xs text-muted-foreground">Your request will be reviewed by the medical staff and confirmed shortly.</p>
 
                             <div className="flex gap-3">
-                                <Button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="flex-1"
-                                >
-                                    {processing
-                                        ? 'Submitting..'
-                                        : 'Submit Request'}
+                                <Button type="submit" disabled={processing} className="flex-1">
+                                    {processing ? 'Submitting..' : 'Submit Request'}
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => setIsRequestModalOpen(false)}
-                                >
+                                <Button type="button" variant="ghost" onClick={() => setIsRequestModalOpen(false)}>
                                     Cancel
                                 </Button>
                             </div>

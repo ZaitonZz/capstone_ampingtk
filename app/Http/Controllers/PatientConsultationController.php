@@ -11,6 +11,7 @@ use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Models\User;
 
 class PatientConsultationController extends Controller
 {
@@ -83,9 +84,23 @@ class PatientConsultationController extends Controller
                 ],
             ]);
 
+        // Get all doctors for patient to select preferred doctor
+        $allDoctors = User::query()
+            ->where('role', 'doctor')
+            ->with('doctorProfile')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ]);
+
         return Inertia::render('patient/consultations/calendar', [
             'events' => $consultations,
-            'doctors' => [],
+            'doctors' => $allDoctors,
         ]);
     }
 
