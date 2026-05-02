@@ -16,7 +16,7 @@ class ConsultationFactory extends Factory
         return [
             'patient_id' => Patient::factory(),
             'doctor_id' => User::factory()->doctor(),
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
             'status' => 'scheduled',
             'chief_complaint' => fake()->sentence(),
             'scheduled_at' => now()->addDay(),
