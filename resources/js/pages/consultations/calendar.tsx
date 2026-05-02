@@ -64,6 +64,7 @@ interface SelectedEvent {
     type: string;
     chief_complaint: string | null;
     doctor_name: string | null;
+    doctor_available_for_approval?: boolean;
     start: string;
 }
 
@@ -387,14 +388,23 @@ export default function ConsultationsCalendar({
                             )}
                             {can_manage_schedule &&
                                 selected.status === 'pending' && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-green-600 hover:text-green-700"
-                                        onClick={() => handleApprove(selected.id)}
-                                    >
-                                        Approve
-                                    </Button>
+                                    selected.doctor_available_for_approval ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-green-600 hover:text-green-700"
+                                            onClick={() => handleApprove(selected.id)}
+                                        >
+                                            Approve
+                                        </Button>
+                                    ) : (
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-200 bg-amber-50 text-amber-700"
+                                        >
+                                            Preferred doctor is not on duty
+                                        </Badge>
+                                    )
                                 )}
                         </div>
                     </div>

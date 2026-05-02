@@ -259,7 +259,22 @@ export default function ConsultationsIndex({
                                                 </Link>
                                             </Button>
                                             {can_manage_schedule && (
-                                                <Button variant="ghost" size="sm" asChild>
+                                                <Button
+                                                    variant={
+                                                        c.status === 'pending' &&
+                                                            !c.doctor_available_for_approval
+                                                            ? 'default'
+                                                            : 'ghost'
+                                                    }
+                                                    size="sm"
+                                                    asChild
+                                                    className={
+                                                        c.status === 'pending' &&
+                                                            !c.doctor_available_for_approval
+                                                            ? 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600 hover:text-white'
+                                                            : undefined
+                                                    }
+                                                >
                                                     <Link
                                                         href={ConsultationController.edit.url(
                                                             c.id,
@@ -271,17 +286,26 @@ export default function ConsultationsIndex({
                                             )}
                                             {can_manage_schedule &&
                                                 c.status === 'pending' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handleApprove(c.id)
-                                                        }
-                                                        className="text-green-600 hover:text-green-700"
-                                                    >
-                                                        <Check className="mr-1 h-3 w-3" />
-                                                        Approve
-                                                    </Button>
+                                                    c.doctor_available_for_approval ? (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                handleApprove(c.id)
+                                                            }
+                                                            className="text-green-600 hover:text-green-700"
+                                                        >
+                                                            <Check className="mr-1 h-3 w-3" />
+                                                            Approve
+                                                        </Button>
+                                                    ) : (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-amber-200 bg-amber-50 text-amber-700"
+                                                        >
+                                                            Preferred doctor is not on duty
+                                                        </Badge>
+                                                    )
                                                 )}
                                         </div>
                                     </td>

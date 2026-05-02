@@ -53,6 +53,11 @@ interface Props {
 }
 
 interface PageProps {
+    consultation: Consultation;
+    permissions: {
+        can_manage_schedule: boolean;
+        can_join_session: boolean;
+    };
     errors?: Record<string, string>;
     flash?: {
         success?: string | null;
@@ -151,15 +156,24 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         </Badge>
                         {permissions.can_manage_schedule &&
                             consultation.status === 'pending' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleApprove}
-                                    className="text-green-600 hover:text-green-700"
-                                >
-                                    <CheckCircle className="mr-1 h-4 w-4" />
-                                    Approve
-                                </Button>
+                                consultation.doctor_available_for_approval ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleApprove}
+                                        className="text-green-600 hover:text-green-700"
+                                    >
+                                        <CheckCircle className="mr-1 h-4 w-4" />
+                                        Approve
+                                    </Button>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-amber-200 bg-amber-50 text-amber-700"
+                                    >
+                                        Preferred doctor is not on duty
+                                    </Badge>
+                                )
                             )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
@@ -185,7 +199,22 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                 </Button>
                             )}
                         {permissions.can_manage_schedule && (
-                            <Button size="sm" variant="outline" asChild>
+                            <Button
+                                size="sm"
+                                variant={
+                                    consultation.status === 'pending' &&
+                                        !consultation.doctor_available_for_approval
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                asChild
+                                className={
+                                    consultation.status === 'pending' &&
+                                        !consultation.doctor_available_for_approval
+                                        ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600 hover:text-white'
+                                        : undefined
+                                }
+                            >
                                 <Link
                                     href={ConsultationController.edit.url(
                                         consultation.id,
