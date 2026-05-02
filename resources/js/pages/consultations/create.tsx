@@ -32,7 +32,7 @@ export default function ConsultationCreate({
     const { data, setData, post, processing, errors } = useForm({
         patient_id: '',
         doctor_id: '',
-        type: 'in_person' as 'in_person' | 'teleconsultation',
+        type: 'teleconsultation' as 'teleconsultation',
         status: 'pending',
         chief_complaint: '',
         scheduled_at,
@@ -172,20 +172,10 @@ export default function ConsultationCreate({
                         <select
                             id="type"
                             value={data.type}
-                            onChange={(e) =>
-                                setData(
-                                    'type',
-                                    e.target.value as
-                                    | 'in_person'
-                                    | 'teleconsultation',
-                                )
-                            }
+                            onChange={(e) => setData('type', e.target.value as 'teleconsultation')}
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                         >
-                            <option value="in_person">In Person</option>
-                            <option value="teleconsultation">
-                                Teleconsultation
-                            </option>
+                            <option value="teleconsultation">Teleconsultation</option>
                         </select>
                         {errors.type && (
                             <p className="text-sm text-destructive">

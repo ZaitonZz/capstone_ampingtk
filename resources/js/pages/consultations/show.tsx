@@ -1,5 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
+import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
@@ -51,6 +52,14 @@ interface Props {
     };
 }
 
+interface PageProps {
+    errors?: Record<string, string>;
+    flash?: {
+        success?: string | null;
+        error?: string | null;
+    };
+}
+
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="flex flex-col gap-0.5">
@@ -63,6 +72,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function ConsultationShow({ consultation, permissions }: Props) {
+    const page = usePage<PageProps>();
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
     const escalationTimeline = consultation.deepfake_escalations ?? [];
@@ -82,7 +92,15 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
     }
 
     function handleApprove() {
-        router.patch(ConsultationController.approve.url(consultation.id));
+        router.patch(ConsultationController.approve.url(consultation.id), {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Appointment approved and scheduled.');
+            },
+            onError: () => {
+                toast.error('Approval failed.');
+            },
+        });
     }
 
     function formatEscalationType(
@@ -107,6 +125,13 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
             <div className="mx-auto max-w-3xl p-4 md:p-6">
                 {/* Header */}
+                {(page.props.flash?.error || page.props.errors?.doctor_id || page.props.errors?.scheduled_at) && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {page.props.flash?.error ??
+                            page.props.errors?.doctor_id ??
+                            page.props.errors?.scheduled_at}
+                    </div>
+                )}
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-semibold">
@@ -186,14 +211,7 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
-                    <Field
-                        label="Type"
-                        value={
-                            consultation.type === 'in_person'
-                                ? 'In Person'
-                                : 'Teleconsultation'
-                        }
-                    />
+                    <Field label="Type" value={'Teleconsultation'} />
                     <Field
                         label="Scheduled"
                         value={

@@ -91,7 +91,7 @@ export default function ConsultationsCalendar({
     const { data, setData, post, processing, errors, reset } = useForm({
         patient_id: '',
         doctor_id: '',
-        type: 'in_person' as 'in_person' | 'teleconsultation',
+        type: 'teleconsultation' as 'teleconsultation',
         status: 'pending',
         chief_complaint: '',
         scheduled_at: '',
@@ -346,9 +346,7 @@ export default function ConsultationsCalendar({
                                 <span className="text-muted-foreground">
                                     Type:{' '}
                                 </span>
-                                {selected.type === 'in_person'
-                                    ? 'In Person'
-                                    : 'Teleconsultation'}
+                                Teleconsultation
                             </div>
                             <div>
                                 <span className="text-muted-foreground">
@@ -501,17 +499,9 @@ export default function ConsultationsCalendar({
                                 <select
                                     id="modal_type"
                                     value={data.type}
-                                    onChange={(e) =>
-                                        setData(
-                                            'type',
-                                            e.target.value as
-                                            | 'in_person'
-                                            | 'teleconsultation',
-                                        )
-                                    }
+                                    onChange={(e) => setData('type', e.target.value as 'teleconsultation')}
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="in_person">In Person</option>
                                     <option value="teleconsultation">
                                         Teleconsultation
                                     </option>
