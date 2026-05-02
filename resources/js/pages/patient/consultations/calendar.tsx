@@ -38,17 +38,14 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     no_show: 'No Show',
 };
 
-const STATUS_VARIANT: Record<
-    ConsultationStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    scheduled: 'default',
-    ongoing: 'secondary',
-    paused: 'outline',
-    completed: 'secondary',
-    cancelled: 'destructive',
-    no_show: 'destructive',
+const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
+    ongoing: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    paused: 'border-orange-200 bg-orange-50 text-orange-700',
+    completed: 'border-slate-300 bg-slate-100 text-slate-700',
+    cancelled: 'border-rose-200 bg-rose-50 text-rose-700',
+    no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
 const STATUS_COLORS: Record<ConsultationStatus, string> = {
@@ -104,11 +101,20 @@ export default function PatientConsultationCalendar({
         scheduled_at: '',
     });
 
+    function handleScheduledAtChange(nextScheduledAt: string) {
+        setData((current) => ({
+            ...current,
+            scheduled_at: nextScheduledAt,
+            doctor_id: nextScheduledAt ? current.doctor_id : '',
+        }));
+
+        if (!nextScheduledAt) {
+            setAvailableDoctors([]);
+        }
+    }
+
     useEffect(() => {
         if (!data.scheduled_at) {
-            setAvailableDoctors([]);
-            setData('doctor_id', '');
-
             return;
         }
 
@@ -150,7 +156,7 @@ export default function PatientConsultationCalendar({
     }, [data.scheduled_at, data.doctor_id, setData]);
 
     function openRequestModal(date?: string) {
-        setData('scheduled_at', date ?? '');
+        handleScheduledAtChange(date ?? '');
         setIsRequestModalOpen(true);
     }
 
@@ -261,7 +267,8 @@ export default function PatientConsultationCalendar({
                                 Status:
                             </span>
                             <Badge
-                                variant={STATUS_VARIANT[selectedEvent.status]}
+                                variant="outline"
+                                className={STATUS_BADGE_CLASSES[selectedEvent.status]}
                             >
                                 {STATUS_LABELS[selectedEvent.status]}
                             </Badge>
@@ -390,9 +397,7 @@ export default function PatientConsultationCalendar({
                                     id="scheduled_at"
                                     type="datetime-local"
                                     value={data.scheduled_at}
-                                    onChange={(e) =>
-                                        setData('scheduled_at', e.target.value)
-                                    }
+                                    onChange={(e) => handleScheduledAtChange(e.target.value)}
                                 />
                                 {errors.scheduled_at && (
                                     <p className="text-sm text-destructive">
