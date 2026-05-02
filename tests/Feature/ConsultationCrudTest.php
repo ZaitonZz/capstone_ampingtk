@@ -2,8 +2,10 @@
 
 use App\Models\Consultation;
 use App\Models\DeepfakeEscalation;
+use App\Models\DeepfakeScanLog;
 use App\Models\Patient;
 use App\Models\User;
+use App\Services\ConsultationIdentityVerificationService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 
@@ -37,26 +39,34 @@ it('admin sees all consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 3));
 });
 
-it('doctor sees only their own consultations for today on the calendar', function () {
+it('doctor sees only their own scheduled consultations on the calendar', function () {
     $doctor = User::factory()->doctor()->create();
     $other = User::factory()->doctor()->create();
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
         'scheduled_at' => now(),
     ]);
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+        'scheduled_at' => now()->addDay(),
+    ]);
+    Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
         'scheduled_at' => now()->addDay(),
     ]);
     Consultation::factory()->create([
         'doctor_id' => $other->id,
+        'status' => 'scheduled',
         'scheduled_at' => now(),
     ]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.calendar'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('events', 1));
+        ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
 it('medical staff can access consultations index', function () {
@@ -234,7 +244,7 @@ it('validates consultation OTP code using configured OTP length', function () {
         ->assertSessionHasErrors(['otp_code']);
 });
 
-it('assigned doctor can manually override paused identity verification', function () {
+it('assigned doctor cannot manually override paused identity verification', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
 
@@ -278,12 +288,49 @@ it('assigned doctor can manually override paused identity verification', functio
         ->post(route('consultations.identity-verification.override', $consultation))
         ->assertRedirect();
 
-    expect($consultation->fresh()->status)->toBe('ongoing');
-    expect($consultation->fresh()->identity_verification_target_user_id)->toBeNull();
-    expect($consultation->fresh()->identity_verification_attempts)->toBe(0);
-    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_RESOLVED);
-    expect($escalation->fresh()->decision)->toBe('continue');
-    expect(Cache::get("consultation:identity_verification:{$consultation->id}"))->toBeNull();
+    expect($consultation->fresh()->status)->toBe('paused');
+    expect($consultation->fresh()->identity_verification_target_user_id)->toBe($patientUser->id);
+    expect($consultation->fresh()->identity_verification_attempts)->toBe(1);
+    expect($escalation->fresh()->status)->toBe(DeepfakeEscalation::STATUS_OPEN);
+    expect($escalation->fresh()->decision)->toBeNull();
+    expect(Cache::get("consultation:identity_verification:{$consultation->id}"))->not->toBeNull();
+    expect(app(ConsultationIdentityVerificationService::class)
+        ->isManualOverrideEnabled($consultation->fresh()))->toBeFalse();
+});
+
+it('assigned doctor can enable manual override before consultation starts', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'scheduled',
+    ]);
+
+    $consultation->patient->update(['user_id' => $patientUser->id]);
+
+    $this->actingAs($doctor)
+        ->post(route('consultations.identity-verification.override', $consultation))
+        ->assertRedirect();
+
+    $freshConsultation = $consultation->fresh();
+
+    expect($freshConsultation->status)->toBe('scheduled');
+    expect($freshConsultation->identity_verification_target_user_id)->toBeNull();
+    expect(app(ConsultationIdentityVerificationService::class)
+        ->isManualOverrideEnabled($freshConsultation))->toBeTrue();
+
+    app(ConsultationIdentityVerificationService::class)->beginForDeepfakeLog(
+        DeepfakeScanLog::factory()->make([
+            'consultation_id' => $freshConsultation->id,
+            'verified_role' => 'patient',
+            'user_id' => $patientUser->id,
+            'result' => 'fake',
+        ])
+    );
+
+    expect($freshConsultation->fresh()->status)->toBe('scheduled');
+    expect($freshConsultation->fresh()->identity_verification_target_user_id)->toBeNull();
 });
 
 it('non-doctor cannot manually override paused identity verification', function () {

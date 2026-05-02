@@ -137,7 +137,7 @@ export default function ConsultationsIndex({
                         <h1 className="text-2xl font-semibold">Consultations</h1>
                         {is_doctor_daily_view && (
                             <p className="text-sm text-muted-foreground">
-                                Showing your assigned schedule for today.
+                                Showing your assigned schedule.
                             </p>
                         )}
                     </div>

@@ -128,6 +128,7 @@ export interface ConsultationIdentityVerificationState {
     is_paused: boolean;
     is_current_user_target: boolean;
     target_role: 'patient' | 'doctor' | null;
+    manual_override_enabled?: boolean;
     otp_length?: number;
     started_at?: string | null;
     expires_at?: string | null;

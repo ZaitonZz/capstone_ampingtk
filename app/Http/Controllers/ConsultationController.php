@@ -37,6 +37,7 @@ class ConsultationController extends Controller
 
         $user = $request->user();
         $isDoctor = $user->isDoctor();
+        $isDoctorDailyView = false;
         $canManageSchedule = $user->isMedicalStaff();
 
         $consultations = Consultation::query()
@@ -49,9 +50,7 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                fn ($q) => $q
-                    ->where('doctor_id', $user->id)
-                    ->whereDate('scheduled_at', today())
+                fn ($q) => $q->where('doctor_id', $user->id)
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -75,7 +74,7 @@ class ConsultationController extends Controller
             'consultations' => $consultations,
             'filters' => $request->only(['search', 'status', 'type', 'patient_id', 'doctor_id']),
             'can_manage_schedule' => $canManageSchedule,
-            'is_doctor_daily_view' => $isDoctor,
+            'is_doctor_daily_view' => $isDoctorDailyView,
         ]);
     }
 
@@ -204,15 +203,27 @@ class ConsultationController extends Controller
         $isDoctor = $user->isDoctor();
         $canManageSchedule = $user->isMedicalStaff();
 
+        $rangeStart = $request->query('start');
+        $rangeEnd = $request->query('end');
+
+        $calendarRangeStart = $rangeStart && $rangeEnd
+            ? Carbon::parse($rangeStart)
+            : now()->startOfMonth()->subWeek();
+
+        $calendarRangeEnd = $rangeStart && $rangeEnd
+            ? Carbon::parse($rangeEnd)
+            : now()->endOfMonth()->addWeek();
+
         $consultations = Consultation::query()
             ->with(['patient', 'doctor'])
             ->when(
                 $isDoctor,
                 fn ($q) => $q
                     ->where('doctor_id', $user->id)
-                    ->whereDate('scheduled_at', today())
+                    ->where('status', 'scheduled')
             )
             ->whereNotNull('scheduled_at')
+            ->whereBetween('scheduled_at', [$calendarRangeStart, $calendarRangeEnd])
             ->get()
             ->map(fn (Consultation $c) => [
                 'id' => $c->id,
