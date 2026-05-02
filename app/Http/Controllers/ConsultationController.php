@@ -19,6 +19,18 @@ use Inertia\Response;
 
 class ConsultationController extends Controller
 {
+    private function doctorAvailableForApproval(Consultation $consultation): bool
+    {
+        if ($consultation->doctor_id === null || $consultation->scheduled_at === null) {
+            return false;
+        }
+
+        return app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt(
+            (int) $consultation->doctor_id,
+            $consultation->scheduled_at->toDateTimeString(),
+        );
+    }
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Consultation::class);
@@ -49,6 +61,15 @@ class ConsultationController extends Controller
             ->orderByDesc('scheduled_at')
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
+
+        $consultations->getCollection()->transform(function (Consultation $consultation) {
+            $consultation->setAttribute(
+                'doctor_available_for_approval',
+                $this->doctorAvailableForApproval($consultation),
+            );
+
+            return $consultation;
+        });
 
         return Inertia::render('consultations/index', [
             'consultations' => $consultations,
@@ -125,6 +146,11 @@ class ConsultationController extends Controller
             'microchecks' => fn ($q) => $q->latest('scheduled_at')->limit(50),
         ]);
 
+        $consultation->setAttribute(
+            'doctor_available_for_approval',
+            $this->doctorAvailableForApproval($consultation),
+        );
+
         return Inertia::render('consultations/show', [
             'consultation' => $consultation,
             'permissions' => [
@@ -198,6 +224,7 @@ class ConsultationController extends Controller
                     'type' => $c->type,
                     'chief_complaint' => $c->chief_complaint,
                     'doctor_name' => $c->doctor?->name,
+                    'doctor_available_for_approval' => $this->doctorAvailableForApproval($c),
                     'consultation_id' => $c->id,
                 ],
             ]);
