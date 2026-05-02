@@ -110,7 +110,7 @@ class ConsultationIdentityVerificationService
                 return null;
             }
 
-            if (! in_array($consultation->status, ['pending', 'scheduled', 'ongoing', 'paused'], true)) {
+            if (! in_array($consultation->status, Consultation::IDENTITY_VERIFICATION_ELIGIBLE_STATUSES, true)) {
                 return null;
             }
 
@@ -140,12 +140,12 @@ class ConsultationIdentityVerificationService
                 'notes' => $notes,
             ]);
 
-            $statusBeforePause = $consultation->status === 'paused'
-                ? ($consultation->status_before_pause ?? 'ongoing')
+            $statusBeforePause = $consultation->status === Consultation::STATUS_PAUSED
+                ? ($consultation->status_before_pause ?? Consultation::STATUS_ONGOING)
                 : $consultation->status;
 
             $consultation->forceFill([
-                'status' => 'paused',
+                'status' => Consultation::STATUS_PAUSED,
                 'status_before_pause' => $statusBeforePause,
                 'identity_verification_target_user_id' => $targetUser->id,
                 'identity_verification_target_role' => $targetRole,
@@ -218,7 +218,7 @@ class ConsultationIdentityVerificationService
     {
         $this->ensureTargetActor($consultation, $actor);
 
-        if ($consultation->status !== 'paused') {
+        if ($consultation->status !== Consultation::STATUS_PAUSED) {
             return [
                 'status' => 'invalid_state',
                 'message' => 'Consultation is not waiting for identity verification.',
@@ -313,7 +313,7 @@ class ConsultationIdentityVerificationService
     {
         $this->ensureTargetActor($consultation, $actor);
 
-        if ($consultation->status !== 'paused') {
+        if ($consultation->status !== Consultation::STATUS_PAUSED) {
             return [
                 'status' => 'invalid_state',
                 'message' => 'Consultation is not waiting for identity verification.',
@@ -410,7 +410,7 @@ class ConsultationIdentityVerificationService
     {
         $this->ensureDoctorOverrideActor($consultation, $actor);
 
-        if ($consultation->status !== 'paused') {
+        if ($consultation->status !== Consultation::STATUS_PAUSED) {
             return [
                 'status' => 'invalid_state',
                 'message' => 'Consultation is not waiting for identity verification.',
@@ -423,7 +423,7 @@ class ConsultationIdentityVerificationService
                 ->lockForUpdate()
                 ->first();
 
-            if ($lockedConsultation === null || $lockedConsultation->status !== 'paused') {
+            if ($lockedConsultation === null || $lockedConsultation->status !== Consultation::STATUS_PAUSED) {
                 return false;
             }
 
@@ -467,7 +467,7 @@ class ConsultationIdentityVerificationService
             }
 
             $lockedConsultation->forceFill([
-                'status' => 'cancelled',
+                'status' => Consultation::STATUS_CANCELLED,
                 'cancellation_reason' => $reason,
                 'ended_at' => $lockedConsultation->ended_at ?? now(),
                 'status_before_pause' => null,
@@ -543,10 +543,10 @@ class ConsultationIdentityVerificationService
         int $resolvedBy,
         string $escalationNotes,
     ): void {
-        $statusBeforePause = $consultation->status_before_pause ?? 'ongoing';
+        $statusBeforePause = $consultation->status_before_pause ?? Consultation::STATUS_ONGOING;
 
-        if ($statusBeforePause === 'paused') {
-            $statusBeforePause = 'ongoing';
+        if ($statusBeforePause === Consultation::STATUS_PAUSED) {
+            $statusBeforePause = Consultation::STATUS_ONGOING;
         }
 
         $consultation->forceFill([

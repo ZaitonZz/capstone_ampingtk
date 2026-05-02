@@ -36,13 +36,13 @@ class ConsultationLiveKitController extends Controller
             abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
         }
 
-        if (in_array($consultation->status, ['cancelled', 'completed', 'no_show'], true)) {
+        if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json([
                 'message' => 'This consultation is no longer active.',
             ], 409);
         }
 
-        $isPausedForIdentityVerification = $consultation->status === 'paused';
+        $isPausedForIdentityVerification = $consultation->status === Consultation::STATUS_PAUSED;
         $isVerificationTarget =
             $consultation->identity_verification_target_user_id !== null
             && $consultation->identity_verification_target_user_id === $user->id;
@@ -54,7 +54,7 @@ class ConsultationLiveKitController extends Controller
                 'message' => $isVerificationTarget
                     ? 'Consultation is paused. Verify your identity in the lobby before rejoining.'
                     : sprintf('Consultation is paused while the %s completes identity verification.', $verificationTargetRole),
-                'status' => 'paused',
+                'status' => Consultation::STATUS_PAUSED,
                 'requires_identity_verification' => $isVerificationTarget,
                 'verification_target_role' => $verificationTargetRole,
             ], 423);

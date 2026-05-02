@@ -9,10 +9,10 @@ use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use App\Services\DoctorDutyAvailabilityService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -242,9 +242,9 @@ class ConsultationController extends Controller
     {
         $this->authorize('update', $consultation);
 
-        abort_unless($consultation->status === 'pending', 422, 'Only pending consultations can be approved.');
+        abort_unless($consultation->status === Consultation::STATUS_PENDING, 422, 'Only pending consultations can be approved.');
 
-        $consultation->update(['status' => 'scheduled']);
+        $consultation->update(['status' => Consultation::STATUS_SCHEDULED]);
 
         return back()->with('success', 'Appointment approved and scheduled.');
     }
@@ -254,7 +254,7 @@ class ConsultationController extends Controller
         $this->authorize('update', $consultation);
 
         abort_unless(
-            in_array($consultation->status, ['pending', 'scheduled'], true),
+            in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true),
             422,
             'Only pending or scheduled consultations can be rescheduled.'
         );
@@ -271,13 +271,13 @@ class ConsultationController extends Controller
         $this->authorize('update', $consultation);
 
         abort_unless(
-            in_array($consultation->status, ['pending', 'scheduled'], true),
+            in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true),
             422,
             'Only pending or scheduled consultations can be cancelled.'
         );
 
         $consultation->update([
-            'status' => 'cancelled',
+            'status' => Consultation::STATUS_CANCELLED,
             'cancellation_reason' => $request->validated('cancellation_reason'),
         ]);
 
