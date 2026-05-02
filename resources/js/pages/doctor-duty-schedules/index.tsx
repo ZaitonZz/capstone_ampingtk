@@ -87,6 +87,13 @@ const STATUS_COLORS: Record<DutyStatus, string> = {
     on_leave: '#f59e0b',
 };
 
+const STATUS_BADGE_CLASSES: Record<DutyStatus, string> = {
+    on_duty: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    off_duty: 'border-slate-300 bg-slate-100 text-slate-700',
+    absent: 'border-rose-200 bg-rose-50 text-rose-700',
+    on_leave: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
 const MODE_LABELS: Record<ScheduleMode, string> = {
     single: 'Single Date',
     multiple_dates: 'Multiple Dates',
@@ -110,13 +117,16 @@ const REQUEST_TYPE_LABELS: Record<DutyRequestType, string> = {
     on_leave: 'Leave',
 };
 
-const REQUEST_STATUS_VARIANT: Record<
-    DutyRequestStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    approved: 'secondary',
-    rejected: 'destructive',
+const REQUEST_STATUS_LABELS: Record<DutyRequestStatus, string> = {
+    pending: 'Pending',
+    approved: 'Approved',
+    rejected: 'Rejected',
+};
+
+const REQUEST_STATUS_BADGE_CLASSES: Record<DutyRequestStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    rejected: 'border-rose-200 bg-rose-50 text-rose-700',
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -1072,8 +1082,11 @@ export default function DoctorDutySchedulesIndex({
                                                     <div className="font-medium">
                                                         {request.doctor_name} - {REQUEST_TYPE_LABELS[request.request_type]}
                                                     </div>
-                                                    <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
-                                                        {request.status}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={REQUEST_STATUS_BADGE_CLASSES[request.status]}
+                                                    >
+                                                        {REQUEST_STATUS_LABELS[request.status]}
                                                     </Badge>
                                                 </div>
                                                 <p className="text-sm text-muted-foreground">
@@ -1147,8 +1160,11 @@ export default function DoctorDutySchedulesIndex({
                                                 <td className="px-3 py-2.5">{REQUEST_TYPE_LABELS[request.request_type]}</td>
                                                 <td className="px-3 py-2.5">{request.start_date} - {request.end_date}</td>
                                                 <td className="px-3 py-2.5">
-                                                    <Badge variant={REQUEST_STATUS_VARIANT[request.status]}>
-                                                        {request.status}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={REQUEST_STATUS_BADGE_CLASSES[request.status]}
+                                                    >
+                                                        {REQUEST_STATUS_LABELS[request.status]}
                                                     </Badge>
                                                 </td>
                                                 <td className="px-3 py-2.5">{request.remarks || '-'}</td>
@@ -1191,7 +1207,10 @@ export default function DoctorDutySchedulesIndex({
                                                 {schedule.start_time} - {schedule.end_time}
                                             </td>
                                             <td className="px-3 py-2.5">
-                                                <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={STATUS_BADGE_CLASSES[schedule.status]}
+                                                >
                                                     {STATUS_LABELS[schedule.status]}
                                                 </Badge>
                                             </td>
