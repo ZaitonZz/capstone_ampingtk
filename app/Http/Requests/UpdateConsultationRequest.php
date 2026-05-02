@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Consultation;
 use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,7 @@ class UpdateConsultationRequest extends FormRequest
         return [
             'doctor_id' => ['sometimes', Rule::exists('users', 'id')->where('role', 'doctor')],
             'type' => ['sometimes', 'in:in_person,teleconsultation'],
-            'status' => ['sometimes', 'in:pending,scheduled,ongoing,paused,completed,cancelled,no_show'],
+            'status' => ['sometimes', Rule::in(Consultation::STATUSES)],
             'chief_complaint' => ['nullable', 'string'],
             'scheduled_at' => ['nullable', 'date'],
             'started_at' => ['nullable', 'date'],

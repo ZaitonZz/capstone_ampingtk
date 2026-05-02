@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Consultation;
 use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class StoreConsultationRequest extends FormRequest
             'patient_id' => ['required', 'exists:patients,id'],
             'doctor_id' => ['required', Rule::exists('users', 'id')->where('role', 'doctor')],
             'type' => ['required', 'in:in_person,teleconsultation'],
-            'status' => ['sometimes', 'in:pending,scheduled,ongoing,paused,completed,cancelled,no_show'],
+            'status' => ['sometimes', Rule::in(Consultation::STATUSES)],
             'chief_complaint' => ['nullable', 'string'],
             'scheduled_at' => ['required', 'date'],
             'cancellation_reason' => ['nullable', 'string'],
