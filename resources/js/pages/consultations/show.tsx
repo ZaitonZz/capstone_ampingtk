@@ -33,17 +33,14 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     no_show: 'No Show',
 };
 
-const STATUS_VARIANT: Record<
-    ConsultationStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    scheduled: 'default',
-    ongoing: 'secondary',
-    paused: 'outline',
-    completed: 'secondary',
-    cancelled: 'destructive',
-    no_show: 'destructive',
+const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
+    ongoing: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    paused: 'border-orange-200 bg-orange-50 text-orange-700',
+    completed: 'border-slate-300 bg-slate-100 text-slate-700',
+    cancelled: 'border-rose-200 bg-rose-50 text-rose-700',
+    no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
 interface Props {
@@ -121,7 +118,10 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Badge variant={STATUS_VARIANT[consultation.status]}>
+                        <Badge
+                            variant="outline"
+                            className={STATUS_BADGE_CLASSES[consultation.status]}
+                        >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
                         {permissions.can_manage_schedule &&
