@@ -80,7 +80,7 @@ class ConsultationController extends Controller
 
         $data = $request->validated();
 
-        if (($data['type'] ?? 'in_person') === 'teleconsultation') {
+        if (($data['type'] ?? 'teleconsultation') === 'teleconsultation') {
             $data['session_token'] = Str::uuid()->toString();
         }
 
@@ -244,9 +244,27 @@ class ConsultationController extends Controller
 
         abort_unless($consultation->status === Consultation::STATUS_PENDING, 422, 'Only pending consultations can be approved.');
 
+        // Ensure the assigned doctor is on duty for the scheduled time.
+        $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
+        $doctorId = $consultation->doctor_id;
+
+        if ($doctorId === null || $scheduledAt === null) {
+            return redirect()
+                ->route('consultations.show', $consultation)
+                ->with('error', 'Consultation must have a scheduled time and assigned doctor before approval.');
+        }
+
+        if (! app(\App\Services\DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
+            return redirect()
+                ->route('consultations.show', $consultation)
+                ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+        }
+
         $consultation->update(['status' => Consultation::STATUS_SCHEDULED]);
 
-        return back()->with('success', 'Appointment approved and scheduled.');
+        return redirect()
+            ->route('consultations.show', $consultation)
+            ->with('success', 'Appointment approved and scheduled.');
     }
 
     public function reschedule(RescheduleConsultationRequest $request, Consultation $consultation): RedirectResponse
