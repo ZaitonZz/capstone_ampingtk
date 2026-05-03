@@ -20,7 +20,7 @@ class StoreConsultationRequest extends FormRequest
         return [
             'patient_id' => ['required', 'exists:patients,id'],
             'doctor_id' => ['required', Rule::exists('users', 'id')->where('role', 'doctor')],
-            'type' => ['required', 'in:teleconsultation'],
+            'type' => ['required', 'in:in_person,teleconsultation'],
             'status' => ['sometimes', Rule::in(Consultation::STATUSES)],
             'chief_complaint' => ['nullable', 'string'],
             'scheduled_at' => ['required', 'date'],

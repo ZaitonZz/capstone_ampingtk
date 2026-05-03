@@ -423,7 +423,7 @@ class ConsultationIdentityVerificationService
     {
         $this->ensureDoctorOverrideActor($consultation, $actor);
 
-        if ($consultation->status !== Consultation::STATUS_PAUSED) {
+        if (! in_array($consultation->status, ['pending', 'scheduled'], true)) {
             return [
                 'status' => 'invalid_state',
                 'message' => 'Consultation is not eligible for manual override before it starts.',
@@ -436,7 +436,7 @@ class ConsultationIdentityVerificationService
                 ->lockForUpdate()
                 ->first();
 
-            if ($lockedConsultation === null || $lockedConsultation->status !== Consultation::STATUS_PAUSED) {
+            if ($lockedConsultation === null || ! in_array($lockedConsultation->status, ['pending', 'scheduled'], true)) {
                 return false;
             }
 

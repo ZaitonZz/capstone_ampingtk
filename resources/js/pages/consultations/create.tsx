@@ -187,6 +187,7 @@ export default function ConsultationCreate({
                             onChange={(e) => setData('type', e.target.value as 'teleconsultation')}
                             className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                         >
+                            <option value="in_person">In Person</option>
                             <option value="teleconsultation">Teleconsultation</option>
                         </select>
                         {errors.type && (
