@@ -65,11 +65,16 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
         deepfake_verified: consultation.deepfake_verified ?? null,
     });
 
-    useEffect(() => {
-        if (!data.scheduled_at) {
-            // Use early return to reset state without cascading renders
+    const handleScheduledAtChange = (value: string) => {
+        setData('scheduled_at', value);
+        if (!value) {
             setAvailableDoctors([]);
             setData('doctor_id', '');
+        }
+    };
+
+    useEffect(() => {
+        if (!data.scheduled_at) {
             return;
         }
 
@@ -242,7 +247,7 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
                             type="datetime-local"
                             value={data.scheduled_at}
                             onChange={(e) =>
-                                setData('scheduled_at', e.target.value)
+                                handleScheduledAtChange(e.target.value)
                             }
                         />
                     </div>

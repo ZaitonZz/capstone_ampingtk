@@ -38,11 +38,16 @@ export default function ConsultationCreate({
         scheduled_at,
     });
 
-    useEffect(() => {
-        if (!data.scheduled_at) {
-            // Use early return to reset state without cascading renders
+    const handleScheduledAtChange = (value: string) => {
+        setData('scheduled_at', value);
+        if (!value) {
             setAvailableDoctors([]);
             setData('doctor_id', '');
+        }
+    };
+
+    useEffect(() => {
+        if (!data.scheduled_at) {
             return;
         }
 
@@ -201,7 +206,7 @@ export default function ConsultationCreate({
                             type="datetime-local"
                             value={data.scheduled_at}
                             onChange={(e) =>
-                                setData('scheduled_at', e.target.value)
+                                handleScheduledAtChange(e.target.value)
                             }
                         />
                         {errors.scheduled_at && (
