@@ -40,13 +40,14 @@ export default function ConsultationCreate({
 
     useEffect(() => {
         if (!data.scheduled_at) {
+            // Use early return to reset state without cascading renders
             setAvailableDoctors([]);
             setData('doctor_id', '');
-
             return;
         }
 
         const controller = new AbortController();
+        let isMounted = true;
 
         fetch(
             `/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
@@ -57,6 +58,7 @@ export default function ConsultationCreate({
             },
         )
             .then(async (response) => {
+                if (!isMounted) return;
                 if (!response.ok) {
                     return;
                 }
@@ -77,10 +79,15 @@ export default function ConsultationCreate({
                 }
             })
             .catch(() => {
-                setAvailableDoctors([]);
+                if (isMounted) {
+                    setAvailableDoctors([]);
+                }
             });
 
-        return () => controller.abort();
+        return () => {
+            isMounted = false;
+            controller.abort();
+        };
     }, [data.scheduled_at, data.doctor_id, setData]);
 
     function submit(e: FormEvent) {
