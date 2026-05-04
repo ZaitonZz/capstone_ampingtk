@@ -13,6 +13,54 @@ class Consultation extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_SCHEDULED = 'scheduled';
+
+    public const STATUS_ONGOING = 'ongoing';
+
+    public const STATUS_PAUSED = 'paused';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUS_NO_SHOW = 'no_show';
+
+    public const STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_SCHEDULED,
+        self::STATUS_ONGOING,
+        self::STATUS_PAUSED,
+        self::STATUS_COMPLETED,
+        self::STATUS_CANCELLED,
+        self::STATUS_NO_SHOW,
+    ];
+
+    public const RESCHEDULABLE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_SCHEDULED,
+    ];
+
+    public const TERMINAL_STATUSES = [
+        self::STATUS_CANCELLED,
+        self::STATUS_COMPLETED,
+        self::STATUS_NO_SHOW,
+    ];
+
+    public const LIVEKIT_ELIGIBLE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_SCHEDULED,
+        self::STATUS_ONGOING,
+    ];
+
+    public const IDENTITY_VERIFICATION_ELIGIBLE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_SCHEDULED,
+        self::STATUS_ONGOING,
+        self::STATUS_PAUSED,
+    ];
+
     protected $fillable = [
         'patient_id',
         'doctor_id',

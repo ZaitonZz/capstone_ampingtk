@@ -1,5 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
+import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
@@ -33,17 +34,14 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     no_show: 'No Show',
 };
 
-const STATUS_VARIANT: Record<
-    ConsultationStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    scheduled: 'default',
-    ongoing: 'secondary',
-    paused: 'outline',
-    completed: 'secondary',
-    cancelled: 'destructive',
-    no_show: 'destructive',
+const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
+    ongoing: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    paused: 'border-orange-200 bg-orange-50 text-orange-700',
+    completed: 'border-slate-300 bg-slate-100 text-slate-700',
+    cancelled: 'border-rose-200 bg-rose-50 text-rose-700',
+    no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
 interface Props {
@@ -51,6 +49,19 @@ interface Props {
     permissions: {
         can_manage_schedule: boolean;
         can_join_session: boolean;
+    };
+}
+
+interface PageProps {
+    consultation: Consultation;
+    permissions: {
+        can_manage_schedule: boolean;
+        can_join_session: boolean;
+    };
+    errors?: Record<string, string>;
+    flash?: {
+        success?: string | null;
+        error?: string | null;
     };
 }
 
@@ -66,6 +77,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function ConsultationShow({ consultation, permissions }: Props) {
+    const page = usePage<PageProps>();
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
     const escalationTimeline = consultation.deepfake_escalations ?? [];
@@ -85,7 +97,15 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
     }
 
     function handleApprove() {
-        router.patch(ConsultationController.approve.url(consultation.id));
+        router.patch(ConsultationController.approve.url(consultation.id), {}, {
+            preserveScroll: true,
+            onSuccess: () => {
+                toast.success('Appointment approved and scheduled.');
+            },
+            onError: () => {
+                toast.error('Approval failed.');
+            },
+        });
     }
 
     function formatEscalationType(
@@ -110,6 +130,13 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
             <div className="mx-auto max-w-3xl p-4 md:p-6">
                 {/* Header */}
+                {(page.props.flash?.error || page.props.errors?.doctor_id || page.props.errors?.scheduled_at) && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {page.props.flash?.error ??
+                            page.props.errors?.doctor_id ??
+                            page.props.errors?.scheduled_at}
+                    </div>
+                )}
                 <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-semibold">
@@ -121,20 +148,32 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Badge variant={STATUS_VARIANT[consultation.status]}>
+                        <Badge
+                            variant="outline"
+                            className={STATUS_BADGE_CLASSES[consultation.status]}
+                        >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
                         {permissions.can_manage_schedule &&
                             consultation.status === 'pending' && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleApprove}
-                                    className="text-green-600 hover:text-green-700"
-                                >
-                                    <CheckCircle className="mr-1 h-4 w-4" />
-                                    Approve
-                                </Button>
+                                consultation.doctor_available_for_approval ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleApprove}
+                                        className="text-green-600 hover:text-green-700"
+                                    >
+                                        <CheckCircle className="mr-1 h-4 w-4" />
+                                        Approve
+                                    </Button>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-amber-200 bg-amber-50 text-amber-700"
+                                    >
+                                        Preferred doctor is not on duty
+                                    </Badge>
+                                )
                             )}
                         <Button size="sm" variant="outline" asChild>
                             <Link
@@ -160,7 +199,22 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                 </Button>
                             )}
                         {permissions.can_manage_schedule && (
-                            <Button size="sm" variant="outline" asChild>
+                            <Button
+                                size="sm"
+                                variant={
+                                    consultation.status === 'pending' &&
+                                        !consultation.doctor_available_for_approval
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                asChild
+                                className={
+                                    consultation.status === 'pending' &&
+                                        !consultation.doctor_available_for_approval
+                                        ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600 hover:text-white'
+                                        : undefined
+                                }
+                            >
                                 <Link
                                     href={ConsultationController.edit.url(
                                         consultation.id,
@@ -186,14 +240,7 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
-                    <Field
-                        label="Type"
-                        value={
-                            consultation.type === 'in_person'
-                                ? 'In Person'
-                                : 'Teleconsultation'
-                        }
-                    />
+                    <Field label="Type" value={'Teleconsultation'} />
                     <Field
                         label="Scheduled"
                         value={

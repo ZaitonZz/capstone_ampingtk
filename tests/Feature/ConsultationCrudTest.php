@@ -3,6 +3,7 @@
 use App\Models\Consultation;
 use App\Models\DeepfakeEscalation;
 use App\Models\DeepfakeScanLog;
+use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\User;
 use App\Services\ConsultationIdentityVerificationService;
@@ -91,6 +92,11 @@ it('approves a pending consultation and transitions it to scheduled', function (
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $consultation->scheduled_at->toDateString(),
     ]);
 
     $this->actingAs($medicalStaff)
@@ -412,13 +418,19 @@ it('patient can submit an appointment request which creates a pending consultati
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
+    $scheduledAt = now()->addDays(3);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $scheduledAt->toDateString(),
+    ]);
 
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
             'type' => 'in_person',
             'chief_complaint' => 'Routine check-up',
-            'scheduled_at' => now()->addDays(3)->toDateTimeString(),
+            'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
         ->assertRedirect();
 

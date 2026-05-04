@@ -112,6 +112,7 @@ export interface Consultation {
     next_microcheck_due_at?: string | null;
     avg_microcheck_latency_ms?: number | null;
     latest_microcheck?: ConsultationMicrocheck | null;
+    doctor_available_for_approval?: boolean;
     cancellation_reason: string | null;
     duration_minutes: number | null;
     patient?: PatientSummary;
@@ -148,6 +149,7 @@ export interface CalendarEvent {
         type: ConsultationType;
         chief_complaint: string | null;
         doctor_name?: string | null;
+        doctor_available_for_approval?: boolean;
         specialty?: string | null;
         consultation_id: number;
     };

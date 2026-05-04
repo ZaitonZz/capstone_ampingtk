@@ -129,7 +129,7 @@ class ConsultationSeeder extends Seeder
                     Consultation::create([
                         'patient_id' => $pool->random()->id,
                         'doctor_id' => $doctor->id,
-                        'type' => $isTele ? 'teleconsultation' : 'in_person',
+                        'type' => 'teleconsultation',
                         'status' => 'completed',
                         'chief_complaint' => $complaints[array_rand($complaints)],
                         'scheduled_at' => $scheduledAt,
@@ -150,7 +150,7 @@ class ConsultationSeeder extends Seeder
                 Consultation::create([
                     'patient_id' => $pool->random()->id,
                     'doctor_id' => $doctor->id,
-                    'type' => 'in_person',
+                    'type' => 'teleconsultation',
                     'status' => 'no_show',
                     'chief_complaint' => $complaints[array_rand($complaints)],
                     'scheduled_at' => now()->subDays($daysAgo)->setTime($hour, 0),
@@ -170,7 +170,7 @@ class ConsultationSeeder extends Seeder
                 Consultation::create([
                     'patient_id' => $pool->random()->id,
                     'doctor_id' => $doctor->id,
-                    'type' => rand(0, 1) ? 'in_person' : 'teleconsultation',
+                    'type' => 'teleconsultation',
                     'status' => 'cancelled',
                     'chief_complaint' => $complaints[array_rand($complaints)],
                     'scheduled_at' => now()->subDays($daysAgo)->setTime($hour, 0),
@@ -186,7 +186,7 @@ class ConsultationSeeder extends Seeder
             Consultation::create([
                 'patient_id' => $pool->random()->id,
                 'doctor_id' => $doctor->id,
-                'type' => 'in_person',
+                'type' => 'teleconsultation',
                 'status' => 'ongoing',
                 'chief_complaint' => $complaints[array_rand($complaints)],
                 'scheduled_at' => now()->subMinutes(rand(10, 20)),
@@ -215,7 +215,7 @@ class ConsultationSeeder extends Seeder
                 Consultation::create([
                     'patient_id' => $pool->random()->id,
                     'doctor_id' => $doctor->id,
-                    'type' => $isTele ? 'teleconsultation' : 'in_person',
+                    'type' => 'teleconsultation',
                     'status' => 'scheduled',
                     'chief_complaint' => $complaints[array_rand($complaints)],
                     'scheduled_at' => $scheduledDate->setTime($hour, 0),
@@ -242,7 +242,7 @@ class ConsultationSeeder extends Seeder
                 Consultation::create([
                     'patient_id' => $pool->random()->id,
                     'doctor_id' => $doctor->id,
-                    'type' => $isTele ? 'teleconsultation' : 'in_person',
+                    'type' => 'teleconsultation',
                     'status' => 'pending',
                     'chief_complaint' => $complaints[array_rand($complaints)],
                     'scheduled_at' => $scheduledDate->setTime($hour, 0),

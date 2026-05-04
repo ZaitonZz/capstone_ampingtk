@@ -47,7 +47,9 @@ class ConsultationLiveKitWebhookController extends Controller
 
         match ($eventType) {
             'participant_joined' => $consultation->forceFill([
-                'status' => in_array($consultation->status, ['pending', 'scheduled'], true) ? 'ongoing' : $consultation->status,
+                'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
+                    ? Consultation::STATUS_ONGOING
+                    : $consultation->status,
                 'started_at' => $consultation->started_at ?? now(),
                 'livekit_last_activity_at' => now(),
             ])->save(),
@@ -55,7 +57,9 @@ class ConsultationLiveKitWebhookController extends Controller
                 'livekit_last_activity_at' => now(),
             ])->save(),
             'room_finished' => $consultation->forceFill([
-                'status' => $consultation->status === 'ongoing' ? 'completed' : $consultation->status,
+                'status' => $consultation->status === Consultation::STATUS_ONGOING
+                    ? Consultation::STATUS_COMPLETED
+                    : $consultation->status,
                 'ended_at' => $consultation->ended_at ?? now(),
                 'livekit_room_status' => 'ended',
                 'livekit_ended_at' => now(),
@@ -66,7 +70,7 @@ class ConsultationLiveKitWebhookController extends Controller
 
         if (
             $eventType === 'participant_joined'
-            && $consultation->status === 'paused'
+            && $consultation->status === Consultation::STATUS_PAUSED
             && $consultation->identity_verification_target_user_id !== null
         ) {
             $participantIdentity = (string) ($event['participant']['identity'] ?? '');

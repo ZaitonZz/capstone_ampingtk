@@ -170,6 +170,24 @@ class User extends Authenticatable
         return $this->hasMany(DoctorPhoto::class);
     }
 
+    /** Duty schedule slots assigned to this doctor */
+    public function dutySchedules(): HasMany
+    {
+        return $this->hasMany(DoctorDutySchedule::class, 'doctor_id');
+    }
+
+    /** Leave or absence requests submitted by this doctor */
+    public function dutyRequests(): HasMany
+    {
+        return $this->hasMany(DoctorDutyRequest::class, 'doctor_id');
+    }
+
+    /** Duty requests reviewed by this user */
+    public function reviewedDutyRequests(): HasMany
+    {
+        return $this->hasMany(DoctorDutyRequest::class, 'reviewed_by');
+    }
+
     /** Primary doctor photo for verification */
     public function primaryDoctorPhoto(): HasOne
     {

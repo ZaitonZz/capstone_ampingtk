@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\DoctorDutySchedule;
 use App\Models\User;
 
 it('forbids medical staff from accessing soap note endpoints', function () {
@@ -55,6 +56,11 @@ it('allows medical staff to approve pending consultations', function () {
         'status' => 'pending',
     ]);
 
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $consultation->doctor_id,
+        'duty_date' => $consultation->scheduled_at->toDateString(),
+    ]);
+
     $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertRedirect();
@@ -64,21 +70,33 @@ it('allows medical staff to approve pending consultations', function () {
 
 it('allows medical staff to reschedule pending consultations', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $newSchedule = now()->addDays(2)->setHour(10)->setMinute(0)->setSecond(0);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $newSchedule->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+        'status' => 'on_duty',
+    ]);
+
     $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
         'status' => 'pending',
         'scheduled_at' => now()->addDay(),
     ]);
 
-    $newSchedule = now()->addDays(2)->toDateTimeString();
+    $newScheduleString = $newSchedule->toDateTimeString();
 
     $this->actingAs($medicalStaff)
         ->patch(route('consultations.reschedule', $consultation), [
-            'scheduled_at' => $newSchedule,
+            'scheduled_at' => $newScheduleString,
         ])
         ->assertRedirect();
 
     expect($consultation->fresh()->scheduled_at?->toDateTimeString())->toBe(
-        \Illuminate\Support\Carbon::parse($newSchedule)->toDateTimeString()
+        \Illuminate\Support\Carbon::parse($newScheduleString)->toDateTimeString()
     );
 });
 

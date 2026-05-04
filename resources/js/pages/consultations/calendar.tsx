@@ -5,7 +5,7 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { List, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -37,17 +37,14 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     no_show: 'No Show',
 };
 
-const STATUS_VARIANT: Record<
-    ConsultationStatus,
-    'default' | 'secondary' | 'destructive' | 'outline'
-> = {
-    pending: 'outline',
-    scheduled: 'default',
-    ongoing: 'secondary',
-    paused: 'outline',
-    completed: 'secondary',
-    cancelled: 'destructive',
-    no_show: 'destructive',
+const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    scheduled: 'border-blue-200 bg-blue-50 text-blue-700',
+    ongoing: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    paused: 'border-orange-200 bg-orange-50 text-orange-700',
+    completed: 'border-slate-300 bg-slate-100 text-slate-700',
+    cancelled: 'border-rose-200 bg-rose-50 text-rose-700',
+    no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
 const STATUS_COLORS: Record<ConsultationStatus, string> = {
@@ -67,6 +64,7 @@ interface SelectedEvent {
     type: string;
     chief_complaint: string | null;
     doctor_name: string | null;
+    doctor_available_for_approval?: boolean;
     start: string;
 }
 
@@ -87,20 +85,77 @@ export default function ConsultationsCalendar({
 }: Props) {
     const [selected, setSelected] = useState<SelectedEvent | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [availableDoctors, setAvailableDoctors] =
+        useState<DoctorSummary[]>(doctors);
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const { data, setData, post, processing, errors, reset } = useForm({
         patient_id: '',
         doctor_id: '',
-        type: 'in_person' as 'in_person' | 'teleconsultation',
+        type: 'teleconsultation' as 'teleconsultation',
         status: 'pending',
         chief_complaint: '',
         scheduled_at: '',
     });
 
+    function handleScheduledAtChange(nextScheduledAt: string) {
+        setData((current) => ({
+            ...current,
+            scheduled_at: nextScheduledAt,
+            doctor_id: nextScheduledAt ? current.doctor_id : '',
+        }));
+
+        if (!nextScheduledAt) {
+            setAvailableDoctors([]);
+        }
+    }
+
+    useEffect(() => {
+        if (!data.scheduled_at) {
+            return;
+        }
+
+        const controller = new AbortController();
+
+        fetch(
+            `/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
+            {
+                method: 'GET',
+                headers: { Accept: 'application/json' },
+                signal: controller.signal,
+            },
+        )
+            .then(async (response) => {
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = (await response.json()) as {
+                    doctors?: DoctorSummary[];
+                };
+                const nextDoctors = payload.doctors ?? [];
+
+                setAvailableDoctors(nextDoctors);
+
+                if (
+                    data.doctor_id &&
+                    !nextDoctors.some(
+                        (doctor) => String(doctor.id) === data.doctor_id,
+                    )
+                ) {
+                    setData('doctor_id', '');
+                }
+            })
+            .catch(() => {
+                setAvailableDoctors([]);
+            });
+
+        return () => controller.abort();
+    }, [data.scheduled_at, data.doctor_id, setData]);
+
     function openCreateModal(scheduledAt = '') {
         reset();
-        setData('scheduled_at', scheduledAt);
+        handleScheduledAtChange(scheduledAt);
         setIsCreateOpen(true);
     }
 
@@ -282,7 +337,8 @@ export default function ConsultationsCalendar({
                                     Status:
                                 </span>
                                 <Badge
-                                    variant={STATUS_VARIANT[selected.status]}
+                                    variant="outline"
+                                    className={STATUS_BADGE_CLASSES[selected.status]}
                                 >
                                     {STATUS_LABELS[selected.status]}
                                 </Badge>
@@ -291,9 +347,7 @@ export default function ConsultationsCalendar({
                                 <span className="text-muted-foreground">
                                     Type:{' '}
                                 </span>
-                                {selected.type === 'in_person'
-                                    ? 'In Person'
-                                    : 'Teleconsultation'}
+                                Teleconsultation
                             </div>
                             <div>
                                 <span className="text-muted-foreground">
@@ -334,14 +388,23 @@ export default function ConsultationsCalendar({
                             )}
                             {can_manage_schedule &&
                                 selected.status === 'pending' && (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="text-green-600 hover:text-green-700"
-                                        onClick={() => handleApprove(selected.id)}
-                                    >
-                                        Approve
-                                    </Button>
+                                    selected.doctor_available_for_approval ? (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-green-600 hover:text-green-700"
+                                            onClick={() => handleApprove(selected.id)}
+                                        >
+                                            Approve
+                                        </Button>
+                                    ) : (
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-200 bg-amber-50 text-amber-700"
+                                        >
+                                            Preferred doctor is not on duty
+                                        </Badge>
+                                    )
                                 )}
                         </div>
                     </div>
@@ -410,9 +473,14 @@ export default function ConsultationsCalendar({
                                         setData('doctor_id', e.target.value)
                                     }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                    disabled={!data.scheduled_at}
                                 >
-                                    <option value="">Select doctor…</option>
-                                    {doctors.map((d) => (
+                                    <option value="">
+                                        {data.scheduled_at
+                                            ? 'Select doctor on duty...'
+                                            : 'Select schedule first...'}
+                                    </option>
+                                    {availableDoctors.map((d) => (
                                         <option key={d.id} value={d.id}>
                                             {d.name}
                                             {d.doctor_profile?.specialty
@@ -421,6 +489,13 @@ export default function ConsultationsCalendar({
                                         </option>
                                     ))}
                                 </select>
+                                {data.scheduled_at &&
+                                    availableDoctors.length === 0 && (
+                                        <p className="text-sm text-muted-foreground">
+                                            No doctors are on duty for the
+                                            selected schedule.
+                                        </p>
+                                    )}
                                 {errors.doctor_id && (
                                     <p className="text-sm text-destructive">
                                         {errors.doctor_id}
@@ -434,17 +509,9 @@ export default function ConsultationsCalendar({
                                 <select
                                     id="modal_type"
                                     value={data.type}
-                                    onChange={(e) =>
-                                        setData(
-                                            'type',
-                                            e.target.value as
-                                            | 'in_person'
-                                            | 'teleconsultation',
-                                        )
-                                    }
+                                    onChange={(e) => setData('type', e.target.value as 'teleconsultation')}
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="in_person">In Person</option>
                                     <option value="teleconsultation">
                                         Teleconsultation
                                     </option>
@@ -465,9 +532,7 @@ export default function ConsultationsCalendar({
                                     id="modal_scheduled_at"
                                     type="datetime-local"
                                     value={data.scheduled_at}
-                                    onChange={(e) =>
-                                        setData('scheduled_at', e.target.value)
-                                    }
+                                    onChange={(e) => handleScheduledAtChange(e.target.value)}
                                 />
                                 {errors.scheduled_at && (
                                     <p className="text-sm text-destructive">

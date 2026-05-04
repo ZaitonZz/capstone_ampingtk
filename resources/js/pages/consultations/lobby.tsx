@@ -235,7 +235,7 @@ export default function ConsultationLobbyPage({
         verification?.manual_override_enabled === true;
     const canApplyDoctorOverride = Boolean(
         verification?.override_url &&
-            page.props.auth?.user?.id === consultation.doctor_id,
+        page.props.auth?.user?.id === consultation.doctor_id,
     );
 
     const connectEndpoint = useMemo(
@@ -363,7 +363,7 @@ export default function ConsultationLobbyPage({
             const audioContext = new (
                 window.AudioContext || (window as any).webkitAudioContext
             )();
-            const resume = () => audioContext.resume().catch(() => {});
+            const resume = () => audioContext.resume().catch(() => { });
 
             void resume();
 
@@ -646,22 +646,22 @@ export default function ConsultationLobbyPage({
     const statusLabel = !isLiveKitEnabled
         ? 'LiveKit disabled'
         : isPaused
-          ? isCurrentUserVerificationTarget
-              ? 'Paused: verification required'
-              : `Paused: waiting for ${verificationTargetRole}`
-          : isAdminUser
-            ? 'Admin audit access'
-            : isConsentConfirmed
-              ? 'Ready to join'
-              : 'Consent required';
+            ? isCurrentUserVerificationTarget
+                ? 'Paused: verification required'
+                : `Paused: waiting for ${verificationTargetRole}`
+            : isAdminUser
+                ? 'Admin audit access'
+                : isConsentConfirmed
+                    ? 'Ready to join'
+                    : 'Consent required';
 
     const statusPillClass = !isLiveKitEnabled
         ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
         : isPaused
-          ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700'
-          : canJoinSession
-            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
-            : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
+            ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700'
+            : canJoinSession
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
+                : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -782,7 +782,7 @@ export default function ConsultationLobbyPage({
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
                                                             showLevelBars &&
-                                                            micLevel >= t
+                                                                micLevel >= t
                                                                 ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
                                                                 : 'bg-white/10',
                                                         ].join(' ')}
@@ -874,13 +874,7 @@ export default function ConsultationLobbyPage({
                                     icon={Video}
                                     label="Mode"
                                     iconClass="bg-emerald-500/10 text-emerald-500"
-                                    value={
-                                        consultation.type === 'teleconsultation'
-                                            ? 'Video Teleconsult'
-                                            : consultation.type === 'in_person'
-                                              ? 'In-person Consultation'
-                                              : '—'
-                                    }
+                                    value={'Video Teleconsult'}
                                 />
                                 <SessionRow
                                     icon={Calendar}
@@ -889,8 +883,8 @@ export default function ConsultationLobbyPage({
                                     value={
                                         consultation.scheduled_at
                                             ? new Date(
-                                                  consultation.scheduled_at,
-                                              ).toLocaleString()
+                                                consultation.scheduled_at,
+                                            ).toLocaleString()
                                             : '—'
                                     }
                                 />
@@ -1023,7 +1017,7 @@ export default function ConsultationLobbyPage({
                                                 disabled={
                                                     isSubmittingOtp ||
                                                     otpCode.trim().length !==
-                                                        otpLength
+                                                    otpLength
                                                 }
                                                 className="w-full"
                                             >
@@ -1047,8 +1041,8 @@ export default function ConsultationLobbyPage({
                                                 {resendInSeconds > 0
                                                     ? `Resend in ${formatCountdown(resendInSeconds)}`
                                                     : isResendingOtp
-                                                      ? 'Sending...'
-                                                      : 'Resend OTP'}
+                                                        ? 'Sending...'
+                                                        : 'Resend OTP'}
                                             </Button>
                                             {expiresInSeconds > 0 && (
                                                 <span className="text-[11px] text-amber-700 dark:text-amber-300">

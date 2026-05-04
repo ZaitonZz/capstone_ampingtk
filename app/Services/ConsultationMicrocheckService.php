@@ -216,6 +216,6 @@ class ConsultationMicrocheckService
             return false;
         }
 
-        return in_array($consultation->status, ['pending', 'scheduled', 'ongoing'], true);
+        return in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true);
     }
 }
