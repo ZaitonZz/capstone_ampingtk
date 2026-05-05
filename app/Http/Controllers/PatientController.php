@@ -21,8 +21,17 @@ class PatientController extends Controller
     {
         $this->authorize('viewAny', Patient::class);
 
+        $today = now()->startOfDay();
+        $tomorrow = now()->addDay()->startOfDay();
+
         $patients = Patient::query()
-            ->with(['primaryPhoto'])
+            ->with([
+                'primaryPhoto',
+                'consultations' => fn ($q) => $q->whereBetween('scheduled_at', [$today, $tomorrow])
+                    ->where('status', '!=', 'cancelled')
+                    ->where('status', '!=', 'no_show')
+                    ->orderBy('scheduled_at'),
+            ])
             ->when(
                 $request->search,
                 fn ($q, $search) => $q->where(
