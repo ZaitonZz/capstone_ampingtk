@@ -29,24 +29,18 @@ it("forbids a doctor from viewing another doctor's consultation lobby", function
 
 // ── Show page: no consent ─────────────────────────────────────────────────────
 
-it('renders the lobby page without an existing consent record', function () {
+it('redirects the lobby to consent when there is no consent record', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.lobby.show', $consultation))
-        ->assertOk()
-        ->assertInertia(
-            fn ($page) => $page
-                ->component('consultations/lobby')
-                ->has('consultation')
-                ->where('consent', null),
-        );
+        ->assertRedirect(route('consultations.consent.show', $consultation));
 });
 
 // ── Show page: consent not yet confirmed ─────────────────────────────────────
 
-it('renders the lobby page with an unconfirmed consent record', function () {
+it('redirects the lobby to consent when consent is unconfirmed', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
     ConsultationConsent::create([
@@ -58,13 +52,7 @@ it('renders the lobby page with an unconfirmed consent record', function () {
 
     $this->actingAs($doctor)
         ->get(route('consultations.lobby.show', $consultation))
-        ->assertOk()
-        ->assertInertia(
-            fn ($page) => $page
-                ->component('consultations/lobby')
-                ->has('consultation')
-                ->where('consent.consent_confirmed', false),
-        );
+        ->assertRedirect(route('consultations.consent.show', $consultation));
 });
 
 // ── Show page: consent confirmed ─────────────────────────────────────────────
@@ -102,6 +90,12 @@ it('allows the consultation patient to view the teleconsultation lobby', functio
         'doctor_id' => $doctor->id,
         'patient_id' => $patientProfile->id,
     ]);
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
 
     $this->actingAs($patientUser)
         ->get(route('consultations.lobby.show', $consultation))
@@ -132,6 +126,12 @@ it('includes configured OTP length in lobby verification payload', function () {
 
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
 
     $this->actingAs($doctor)
         ->get(route('consultations.lobby.show', $consultation))
@@ -148,6 +148,12 @@ it('shows manual override enabled state for assigned doctor in lobby payload', f
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
         'status' => 'scheduled',
+    ]);
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
     ]);
 
     $this->actingAs($doctor)
