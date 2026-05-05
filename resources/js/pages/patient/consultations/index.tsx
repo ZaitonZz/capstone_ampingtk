@@ -109,7 +109,6 @@ export default function PatientConsultationsIndex({
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All types</option>
-                        <option value="in_person">In Person</option>
                         <option value="teleconsultation">
                             Teleconsultation
                         </option>
@@ -159,14 +158,14 @@ export default function PatientConsultationsIndex({
                                         Dr. {c.doctor?.name ?? '—'}
                                     </td>
                                     <td className="px-4 py-3 capitalize">
-                                        {c.type === 'in_person'
-                                            ? 'In Person'
-                                            : 'Teleconsultation'}
+                                        Teleconsultation
                                     </td>
                                     <td className="px-4 py-3">
                                         <Badge
                                             variant="outline"
-                                            className={STATUS_BADGE_CLASSES[c.status]}
+                                            className={
+                                                STATUS_BADGE_CLASSES[c.status]
+                                            }
                                         >
                                             {STATUS_LABELS[c.status]}
                                         </Badge>
@@ -174,8 +173,8 @@ export default function PatientConsultationsIndex({
                                     <td className="px-4 py-3 text-muted-foreground">
                                         {c.scheduled_at
                                             ? new Date(
-                                                c.scheduled_at,
-                                            ).toLocaleString()
+                                                  c.scheduled_at,
+                                              ).toLocaleString()
                                             : '—'}
                                     </td>
                                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
