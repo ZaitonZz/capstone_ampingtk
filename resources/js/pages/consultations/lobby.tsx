@@ -17,6 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, ElementType, FormEvent } from 'react';
 import { toast } from 'sonner';
+import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
@@ -1107,6 +1108,21 @@ export default function ConsultationLobbyPage({
                                     </p>
                                 </>
                             )}
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full shadow-xs"
+                                asChild
+                            >
+                                <Link
+                                    href={ConsultationConsentController.show.url(
+                                        consultation.id,
+                                    )}
+                                >
+                                    View Full Consent
+                                </Link>
+                            </Button>
                         </div>
                     </div>
                 </div>
