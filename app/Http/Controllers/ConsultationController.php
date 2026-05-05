@@ -127,6 +127,7 @@ class ConsultationController extends Controller
             && $user !== null
             && ! $user->isMedicalStaff()
             && ($user->isAdmin() || $consultation->doctor_id === $user->id);
+        $consentCompleted = ! $consultation->requiresConsentForUser($user);
 
         $consultation->load([
             'patient',
@@ -152,11 +153,29 @@ class ConsultationController extends Controller
 
         return Inertia::render('consultations/show', [
             'consultation' => $consultation,
+            'consent_completed' => $consentCompleted,
             'permissions' => [
                 'can_manage_schedule' => $canManageSchedule,
                 'can_join_session' => $canJoinSession,
             ],
         ]);
+    }
+
+    public function start(Consultation $consultation): RedirectResponse
+    {
+        $this->authorize('view', $consultation);
+
+        $user = request()->user();
+
+        if ($consultation->type !== 'teleconsultation') {
+            return redirect()->route('consultations.show', $consultation);
+        }
+
+        if ($consultation->requiresConsentForUser($user)) {
+            return redirect()->route('consultations.consent.show', $consultation);
+        }
+
+        return redirect()->route('consultations.lobby.show', $consultation);
     }
 
     public function edit(Consultation $consultation): Response

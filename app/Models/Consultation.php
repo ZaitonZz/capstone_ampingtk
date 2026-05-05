@@ -179,4 +179,46 @@ class Consultation extends Model
     {
         return $this->hasMany(ConsultationConsent::class);
     }
+
+    public function consentForUser(?User $user): ?ConsultationConsent
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return $this->consents()
+            ->where('user_id', $user->id)
+            ->first();
+    }
+
+    public function hasConfirmedConsentForUser(?User $user): bool
+    {
+        return $this->consentForUser($user)?->consent_confirmed === true;
+    }
+
+    public function isConsultationDoctor(?User $user): bool
+    {
+        return $user !== null && $this->doctor_id === $user->id;
+    }
+
+    public function isConsultationPatient(?User $user): bool
+    {
+        return $user !== null && $this->patient()->where('user_id', $user->id)->exists();
+    }
+
+    public function isAdminAuditUser(?User $user): bool
+    {
+        return $user?->isAdmin() === true
+            && ! $this->isConsultationDoctor($user)
+            && ! $this->isConsultationPatient($user);
+    }
+
+    public function requiresConsentForUser(?User $user): bool
+    {
+        if ($this->isAdminAuditUser($user)) {
+            return false;
+        }
+
+        return ! $this->hasConfirmedConsentForUser($user);
+    }
 }
