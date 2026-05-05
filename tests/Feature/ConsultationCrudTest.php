@@ -428,7 +428,7 @@ it('patient can submit an appointment request which creates a pending consultati
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
             'chief_complaint' => 'Routine check-up',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
@@ -448,7 +448,8 @@ it('patient appointment request requires a future scheduled_at', function () {
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
+            'chief_complaint' => 'Routine check-up',
             'scheduled_at' => now()->subDay()->toDateTimeString(),
         ])
         ->assertSessionHasErrors(['scheduled_at']);

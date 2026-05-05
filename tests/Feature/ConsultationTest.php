@@ -119,13 +119,13 @@ it('creates an in-person consultation and redirects', function () {
         ->post(route('consultations.store'), [
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
             'chief_complaint' => 'Fever and headache',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
         ->assertRedirect();
 
-    expect(Consultation::where('type', 'in_person')->where('patient_id', $patient->id)->exists())->toBeTrue();
+    expect(Consultation::where('type', 'teleconsultation')->where('patient_id', $patient->id)->exists())->toBeTrue();
 });
 
 it('creates a teleconsultation and generates a session_token', function () {
@@ -203,7 +203,7 @@ it('forbids doctors from creating consultations', function () {
         ->post(route('consultations.store'), [
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
             'chief_complaint' => 'Headache',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
@@ -259,7 +259,8 @@ it('rejects consultation creation when doctor is not on duty', function () {
         ->post(route('consultations.store'), [
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
+            'chief_complaint' => 'Headache',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
         ->assertSessionHasErrors('doctor_id');

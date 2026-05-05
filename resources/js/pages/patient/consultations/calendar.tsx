@@ -3,11 +3,11 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
-import { Head } from '@inertiajs/react';
-import { useForm } from '@inertiajs/react';
-import { X, CalendarPlus } from 'lucide-react';
-import { useState } from 'react';
+import { Head, useForm } from '@inertiajs/react';
+import { CalendarPlus, X } from 'lucide-react';
 import type { FormEvent } from 'react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,35 +69,35 @@ interface SelectedEvent {
 
 interface Props {
     events: CalendarEvent[];
-    doctors: DoctorSummary[]; // backend-provided full list of doctors
+    doctors: DoctorSummary[];
 }
 
 export default function PatientConsultationCalendar({
     events,
     doctors,
 }: Props) {
-    const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<SelectedEvent | null>(
         null,
     );
-
-    const calendarEvents = events.map((e) => ({
-        id: String(e.id),
-        title: e.title,
-        start: e.start,
-        end: e.end ?? undefined,
-        backgroundColor: STATUS_COLORS[e.extendedProps.status],
-        borderColor: STATUS_COLORS[e.extendedProps.status],
-        textColor: '#ffffff',
-        extendedProps: e.extendedProps,
-    }));
+    const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         doctor_id: '',
-        type: 'teleconsultation' as 'in_person' | 'teleconsultation',
+        type: 'teleconsultation' as const,
         chief_complaint: '',
         scheduled_at: '',
     });
+
+    const calendarEvents = events.map((event) => ({
+        id: String(event.id),
+        title: event.title,
+        start: event.start,
+        end: event.end ?? undefined,
+        backgroundColor: STATUS_COLORS[event.extendedProps.status],
+        borderColor: STATUS_COLORS[event.extendedProps.status],
+        textColor: '#ffffff',
+        extendedProps: event.extendedProps,
+    }));
 
     function handleScheduledAtChange(nextScheduledAt: string) {
         setData('scheduled_at', nextScheduledAt);
@@ -113,12 +113,14 @@ export default function PatientConsultationCalendar({
             info.dateStr.length === 10
                 ? `${info.dateStr}T09:00`
                 : info.dateStr.slice(0, 16);
+
         openRequestModal(dt);
     }
 
     function handleEventClick(info: EventClickArg) {
         const props = info.event
             .extendedProps as CalendarEvent['extendedProps'];
+
         setSelectedEvent({
             title: info.event.title,
             status: props.status,
@@ -131,6 +133,12 @@ export default function PatientConsultationCalendar({
 
     function submitRequest(e: FormEvent) {
         e.preventDefault();
+
+        if (!data.chief_complaint || data.chief_complaint.trim() === '') {
+            toast.error('Chief complaint is required.');
+            return;
+        }
+
         post(PatientConsultationController.store.url(), {
             onSuccess: () => {
                 reset();
@@ -154,13 +162,18 @@ export default function PatientConsultationCalendar({
 
                 <div className="flex flex-wrap gap-3 text-sm">
                     {(Object.keys(STATUS_COLORS) as ConsultationStatus[]).map(
-                        (s) => (
-                            <span key={s} className="flex items-center gap-1.5">
+                        (status) => (
+                            <span
+                                key={status}
+                                className="flex items-center gap-1.5"
+                            >
                                 <span
                                     className="inline-block h-3 w-3 rounded-sm"
-                                    style={{ backgroundColor: STATUS_COLORS[s] }}
+                                    style={{
+                                        backgroundColor: STATUS_COLORS[status],
+                                    }}
                                 />
-                                {STATUS_LABELS[s]}
+                                {STATUS_LABELS[status]}
                             </span>
                         ),
                     )}
@@ -197,30 +210,43 @@ export default function PatientConsultationCalendar({
                     </div>
                     <div className="flex flex-col gap-2 text-sm">
                         <div>
-                            <span className="text-muted-foreground">Doctor:{' '}</span>
+                            <span className="text-muted-foreground">
+                                Doctor:{' '}
+                            </span>
                             {selectedEvent.title}
-                            {selectedEvent.specialty && ` (${selectedEvent.specialty})`}
+                            {selectedEvent.specialty &&
+                                ` (${selectedEvent.specialty})`}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">Status:</span>
+                            <span className="text-muted-foreground">
+                                Status:
+                            </span>
                             <Badge
                                 variant="outline"
-                                className={STATUS_BADGE_CLASSES[selectedEvent.status]}
+                                className={
+                                    STATUS_BADGE_CLASSES[selectedEvent.status]
+                                }
                             >
                                 {STATUS_LABELS[selectedEvent.status]}
                             </Badge>
                         </div>
                         <div>
-                            <span className="text-muted-foreground">Type:{' '}</span>
+                            <span className="text-muted-foreground">
+                                Type:{' '}
+                            </span>
                             Teleconsultation
                         </div>
                         <div>
-                            <span className="text-muted-foreground">Date:{' '}</span>
+                            <span className="text-muted-foreground">
+                                Date:{' '}
+                            </span>
                             {new Date(selectedEvent.start).toLocaleString()}
                         </div>
                         {selectedEvent.chief_complaint && (
                             <div>
-                                <span className="text-muted-foreground">Complaint:{' '}</span>
+                                <span className="text-muted-foreground">
+                                    Complaint:{' '}
+                                </span>
                                 {selectedEvent.chief_complaint}
                             </div>
                         )}
@@ -236,7 +262,9 @@ export default function PatientConsultationCalendar({
                     />
                     <div className="relative z-10 w-full max-w-md rounded-xl border bg-background p-6 shadow-lg">
                         <div className="mb-5 flex items-center justify-between">
-                            <h2 className="text-lg font-semibold">Request an Appointment</h2>
+                            <h2 className="text-lg font-semibold">
+                                Request an Appointment
+                            </h2>
                             <button
                                 onClick={() => setIsRequestModalOpen(false)}
                                 className="text-muted-foreground hover:text-foreground"
@@ -245,58 +273,107 @@ export default function PatientConsultationCalendar({
                             </button>
                         </div>
 
-                        <form onSubmit={submitRequest} className="flex flex-col gap-4">
+                        <form
+                            onSubmit={submitRequest}
+                            className="flex flex-col gap-4"
+                        >
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="doctor_id">Preferred Doctor</Label>
+                                <Label htmlFor="doctor_id">
+                                    Preferred Doctor
+                                </Label>
                                 <select
                                     id="doctor_id"
                                     value={data.doctor_id}
-                                    onChange={(e) => setData('doctor_id', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('doctor_id', e.target.value)
+                                    }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
-                                    <option value="">Select a preferred doctor...</option>
-                                    {doctors.map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name}
-                                            {d.doctor_profile?.specialty ? ` — ${d.doctor_profile.specialty}` : ''}
+                                    <option value="">
+                                        Select a preferred doctor...
+                                    </option>
+                                    {doctors.map((doctor) => (
+                                        <option
+                                            key={doctor.id}
+                                            value={doctor.id}
+                                        >
+                                            {doctor.name}
+                                            {doctor.doctor_profile?.specialty
+                                                ? ` — ${doctor.doctor_profile.specialty}`
+                                                : ''}
                                         </option>
                                     ))}
                                 </select>
-                                {errors.doctor_id && <p className="text-sm text-destructive">{errors.doctor_id}</p>}
+                                {errors.doctor_id && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.doctor_id}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="scheduled_at">Preferred Date &amp; Time</Label>
+                                <Label htmlFor="scheduled_at">
+                                    Preferred Date &amp; Time
+                                </Label>
                                 <Input
                                     id="scheduled_at"
                                     type="datetime-local"
                                     value={data.scheduled_at}
-                                    onChange={(e) => handleScheduledAtChange(e.target.value)}
+                                    onChange={(e) =>
+                                        handleScheduledAtChange(e.target.value)
+                                    }
                                 />
-                                {errors.scheduled_at && <p className="text-sm text-destructive">{errors.scheduled_at}</p>}
+                                {errors.scheduled_at && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.scheduled_at}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="req_complaint">
-                                    Chief Complaint <span className="text-muted-foreground">(optional)</span>
+                                    Chief Complaint
                                 </Label>
                                 <textarea
                                     id="req_complaint"
                                     value={data.chief_complaint}
-                                    onChange={(e) => setData('chief_complaint', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'chief_complaint',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                                     placeholder="Briefly describe your concern..."
                                 />
+                                {errors.chief_complaint && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.chief_complaint}
+                                    </p>
+                                )}
                             </div>
 
-                            <p className="text-xs text-muted-foreground">Your request will be reviewed by the medical staff and confirmed shortly.</p>
+                            <p className="text-xs text-muted-foreground">
+                                Your request will be reviewed by the medical
+                                staff and confirmed shortly.
+                            </p>
 
                             <div className="flex gap-3">
-                                <Button type="submit" disabled={processing} className="flex-1">
-                                    {processing ? 'Submitting..' : 'Submit Request'}
+                                <Button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="flex-1"
+                                >
+                                    {processing
+                                        ? 'Submitting..'
+                                        : 'Submit Request'}
                                 </Button>
-                                <Button type="button" variant="ghost" onClick={() => setIsRequestModalOpen(false)}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setIsRequestModalOpen(false)}
+                                >
                                     Cancel
                                 </Button>
                             </div>

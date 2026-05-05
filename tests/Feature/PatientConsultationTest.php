@@ -59,7 +59,7 @@ it('filters consultations by type', function () {
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id]);
 
-    Consultation::factory(2)->create(['patient_id' => $patient->id, 'type' => 'in_person']);
+    Consultation::factory(2)->create(['patient_id' => $patient->id, 'type' => 'teleconsultation']);
     Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
 
     $this->actingAsVerified($user)
@@ -68,7 +68,7 @@ it('filters consultations by type', function () {
         ->assertInertia(
             fn ($page) => $page
                 ->component('patient/consultations/index')
-                ->has('consultations.data', 1)
+                ->has('consultations.data', 3)
                 ->where('filters.type', 'teleconsultation')
         );
 });
@@ -142,7 +142,8 @@ it('rejects patient appointment request when preferred doctor is off duty', func
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
+            'chief_complaint' => 'Routine check-up',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
         ->assertSessionHasErrors('doctor_id');

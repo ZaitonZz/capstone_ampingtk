@@ -58,7 +58,7 @@ it('returns active teleconsultation rooms for the pipeline', function () {
         'livekit_room_status' => 'ended',
     ]);
 
-    Consultation::factory()->create(['type' => 'in_person']);
+    Consultation::factory()->create(['type' => 'teleconsultation']);
 
     // getJson sends json_encode([]) = '[]' as the request body — sign against that exact string
     $response = $this->withHeaders(pipelineSignedHeaders('[]'))

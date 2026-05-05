@@ -28,11 +28,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
-import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
-import { index as adminDeepfakeVerifications } from '@/routes/admin/deepfake-verifications';
-import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
@@ -40,6 +36,10 @@ import { dashboard as patientDashboard } from '@/routes/patient';
 import { index as patientConsultations } from '@/routes/patient/consultations';
 import { index as patientsList } from '@/routes/patients';
 import type { NavItem } from '@/types';
+import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
+import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
+import { index as adminDeepfakeVerifications } from '@/routes/admin/deepfake-verifications';
+import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 
 const footerNavItems: NavItem[] = [
     {
