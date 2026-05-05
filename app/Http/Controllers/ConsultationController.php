@@ -10,6 +10,7 @@ use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
 use App\Services\DoctorDutyAvailabilityService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -50,7 +51,9 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                fn ($q) => $q->where('doctor_id', $user->id)
+                fn ($q) => $q
+                    ->where('doctor_id', $user->id)
+                    ->visibleToDoctor()
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -103,6 +106,8 @@ class ConsultationController extends Controller
         if (($data['type'] ?? 'teleconsultation') === 'teleconsultation') {
             $data['session_token'] = Str::uuid()->toString();
         }
+
+        $data['status'] = Consultation::STATUS_PENDING;
 
         $consultation = Consultation::create($data);
 
@@ -220,7 +225,7 @@ class ConsultationController extends Controller
                 $isDoctor,
                 fn ($q) => $q
                     ->where('doctor_id', $user->id)
-                    ->where('status', 'scheduled')
+                    ->visibleToDoctor()
             )
             ->whereNotNull('scheduled_at')
             ->whereBetween('scheduled_at', [$calendarRangeStart, $calendarRangeEnd])
