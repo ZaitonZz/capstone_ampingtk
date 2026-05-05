@@ -1,4 +1,4 @@
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Patient } from '@/types/patient';
 
@@ -22,6 +22,14 @@ export default function PatientTable({
             year: 'numeric',
             month: 'short',
             day: 'numeric',
+        });
+    };
+
+    const formatTime = (dateString: string) => {
+        return new Date(dateString).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
         });
     };
 
@@ -77,14 +85,41 @@ export default function PatientTable({
                             patients.map((patient) => (
                                 <tr
                                     key={patient.id}
-                                    className="transition-colors hover:bg-muted/30"
+                                    className={`border-l-4 transition-colors ${
+                                        patient.has_today_schedule
+                                            ? 'border-l-blue-500 bg-blue-50/50 hover:bg-blue-100/50 dark:border-l-blue-400 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
+                                            : 'border-l-transparent hover:bg-muted/30'
+                                    }`}
                                 >
                                     <td className="px-4 py-3 text-sm">
                                         {patient.id.toString().padStart(6, '0')}
                                     </td>
                                     <td className="px-4 py-3 text-sm font-medium">
-                                        {patient.last_name}, {patient.first_name}
-                                        {patient.middle_name && ` ${patient.middle_name.charAt(0)}.`}
+                                        <div className="flex items-center gap-2">
+                                            <span>
+                                                {patient.last_name},
+                                                {' '}
+                                                {patient.first_name}
+                                                {patient.middle_name &&
+                                                    ` ${patient.middle_name.charAt(0)}.`}
+                                            </span>
+                                            {patient.has_today_schedule && (
+                                                <div
+                                                    className="flex items-center gap-1 rounded bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                                                    title={
+                                                        patient.consultations &&
+                                                        patient
+                                                            .consultations[0]
+                                                            ?.scheduled_at
+                                                            ? `Scheduled: ${formatTime(patient.consultations[0].scheduled_at)}`
+                                                            : 'Has schedule today'
+                                                    }
+                                                >
+                                                    <Calendar className="size-3" />
+                                                    Today
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 text-sm">
                                         {patient.age}
