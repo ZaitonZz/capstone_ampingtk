@@ -23,7 +23,6 @@ import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/C
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -32,8 +31,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -914,71 +911,35 @@ export default function ConsultationLobbyPage({
                                 </p>
                             </div>
 
-                            {hasJoinPermission ? (
-                                <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
+                            <div
+                                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ring-1 ${hasJoinPermission ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800' : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800'}`}
+                            >
+                                {hasJoinPermission ? (
                                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-semibold">
-                                        {isAdminUser
-                                            ? 'Admin audit mode ready'
-                                            : 'Consent confirmed'}
-                                    </span>
-                                    {consent?.confirmed_at && !isAdminUser && (
-                                        <span className="ml-auto opacity-60">
-                                            {new Date(
-                                                consent.confirmed_at,
-                                            ).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800">
-                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-medium">
-                                        Consent required before joining.
-                                    </span>
-                                </div>
-                            )}
-
-                            <ul className="mb-3 space-y-1.5 text-xs text-muted-foreground">
-                                {[
-                                    'Telemedicine consent',
-                                    'Data Privacy Act notice',
-                                    'Identity Guard verification',
-                                ].map((item) => (
-                                    <li
-                                        key={item}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <CheckCircle2
-                                            className={[
-                                                'h-3 w-3 shrink-0',
-                                                hasJoinPermission
-                                                    ? 'text-emerald-500'
-                                                    : 'text-muted-foreground/30',
-                                            ].join(' ')}
-                                        />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            <Separator className="mb-3" />
-
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="lobby-consent-check"
-                                    checked={hasJoinPermission}
-                                    disabled
-                                />
-                                <Label
-                                    htmlFor="lobby-consent-check"
-                                    className="cursor-not-allowed text-xs leading-snug"
-                                >
+                                ) : (
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                )}
+                                <span className="font-semibold">
                                     {isAdminUser
-                                        ? 'Audit access enabled for admin'
-                                        : 'I agree to the Privacy Notice and Consent'}
-                                </Label>
+                                        ? 'Admin audit mode ready'
+                                        : isConsentConfirmed
+                                            ? 'Consent confirmed'
+                                            : 'Consent required before joining'}
+                                </span>
+                                {consent?.confirmed_at && !isAdminUser && (
+                                    <span className="ml-auto opacity-60">
+                                        {new Date(
+                                            consent.confirmed_at,
+                                        ).toLocaleDateString()}
+                                    </span>
+                                )}
                             </div>
+
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                {hasJoinPermission
+                                    ? 'Consent is already in place. You can proceed to the call when the room is ready.'
+                                    : 'Complete consent from the consultation details page before joining.'}
+                            </p>
                         </div>
 
                         {isPaused && (
@@ -1137,8 +1098,8 @@ export default function ConsultationLobbyPage({
                                         {isApplyingOverride
                                             ? 'Applying override...'
                                             : isManualOverrideEnabled
-                                              ? 'Manual Override Enabled'
-                                              : 'Enable Manual Override'}
+                                                ? 'Manual Override Enabled'
+                                                : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
                                         Doctors can enable manual override

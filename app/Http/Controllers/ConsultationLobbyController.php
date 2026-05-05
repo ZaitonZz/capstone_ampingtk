@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Consultation;
-use App\Models\ConsultationConsent;
 use App\Services\ConsultationIdentityVerificationService;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,7 +14,7 @@ class ConsultationLobbyController extends Controller
         private ConsultationIdentityVerificationService $identityVerificationService,
     ) {}
 
-    public function show(Consultation $consultation): Response
+    public function show(Consultation $consultation): Response|RedirectResponse
     {
         $this->authorize('view', $consultation);
 
@@ -28,16 +28,15 @@ class ConsultationLobbyController extends Controller
             abort(404);
         }
 
+        if ($consultation->requiresConsentForUser($currentUser)) {
+            return redirect()->route('consultations.consent.show', $consultation);
+        }
+
         $consultation->load(['patient', 'doctor']);
 
-        $consent = ConsultationConsent::query()
-            ->where('consultation_id', $consultation->id)
-            ->where('user_id', $currentUser?->id)
-            ->first();
+        $consent = $consultation->consentForUser($currentUser);
 
-        $isConsultationDoctor =
-            $currentUser !== null
-            && $consultation->doctor_id === $currentUser->id;
+        $isConsultationDoctor = $consultation->isConsultationDoctor($currentUser);
         $isVerificationTarget =
             $currentUser !== null
             && $consultation->identity_verification_target_user_id !== null

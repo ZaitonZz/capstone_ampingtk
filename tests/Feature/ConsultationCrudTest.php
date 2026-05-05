@@ -92,14 +92,18 @@ it('approves a pending consultation and transitions it to scheduled', function (
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
+        'scheduled_at' => now()->addDay()->setHour(10)->setMinute(0)->setSecond(0),
     ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
         'duty_date' => $consultation->scheduled_at->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
-    $this->actingAs($medicalStaff)
+    $this->actingAsVerified($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertRedirect();
 
@@ -418,11 +422,14 @@ it('patient can submit an appointment request which creates a pending consultati
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
-    $scheduledAt = now()->addDays(3);
+    $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
         'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
     $this->actingAsVerified($user)

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\ConsultationConsent;
 use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\User;
@@ -98,7 +99,54 @@ it('renders the show page with all related data', function () {
                 ->component('consultations/show')
                 ->has('consultation.patient')
                 ->has('consultation.doctor')
+                ->where('consent_completed', false)
         );
+});
+
+it('shows consent as completed on the consultation details page when confirmed', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consent_completed', true)
+        );
+});
+
+it('redirects consultation start to consent when consent is incomplete', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    $this->actingAsVerified($doctor)
+        ->get(route('consultations.start', $consultation))
+        ->assertRedirect(route('consultations.consent.show', $consultation));
+});
+
+it('redirects consultation start directly to the lobby when consent is complete', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAsVerified($doctor)
+        ->get(route('consultations.start', $consultation))
+        ->assertRedirect(route('consultations.lobby.show', $consultation));
 });
 
 it('creates an in-person consultation and redirects', function () {

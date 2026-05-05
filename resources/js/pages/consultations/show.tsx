@@ -1,9 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Edit, Trash2, CheckCircle, ShieldCheck, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
-import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -46,14 +44,16 @@ const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
 
 interface Props {
     consultation: Consultation;
+    consent_completed: boolean;
     permissions: {
         can_manage_schedule: boolean;
         can_join_session: boolean;
     };
 }
 
-interface PageProps {
+interface PageProps extends Record<string, unknown> {
     consultation: Consultation;
+    consent_completed: boolean;
     permissions: {
         can_manage_schedule: boolean;
         can_join_session: boolean;
@@ -76,7 +76,11 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-export default function ConsultationShow({ consultation, permissions }: Props) {
+export default function ConsultationShow({
+    consultation,
+    consent_completed,
+    permissions,
+}: Props) {
     const page = usePage<PageProps>();
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
@@ -154,6 +158,17 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
+                        <Badge
+                            variant="outline"
+                            className={consent_completed
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'}
+                        >
+                            <ShieldCheck className="mr-1 h-4 w-4" />
+                            {consent_completed
+                                ? 'Consent Completed'
+                                : 'Consent Pending'}
+                        </Badge>
                         {permissions.can_manage_schedule &&
                             consultation.status === 'pending' && (
                                 consultation.doctor_available_for_approval ? (
@@ -175,21 +190,11 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                     </Badge>
                                 )
                             )}
-                        <Button size="sm" variant="outline" asChild>
-                            <Link
-                                href={ConsultationConsentController.show.url(
-                                    consultation.id,
-                                )}
-                            >
-                                <ShieldCheck className="mr-1 h-4 w-4" />
-                                Privacy Notice &amp; Consent
-                            </Link>
-                        </Button>
                         {consultation.type === 'teleconsultation' &&
                             permissions.can_join_session && (
                                 <Button size="sm" asChild>
                                     <Link
-                                        href={ConsultationLobbyController.show.url(
+                                        href={ConsultationController.start.url(
                                             consultation.id,
                                         )}
                                     >

@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminDeepfakeVerificationController;
 use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\AgentTestController;
+use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\ConsultationConsentController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
@@ -105,6 +106,9 @@ Route::get('/verify-otp', [OtpVerificationController::class, 'ensureOtp'])
 Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Default dashboard (accessible by all authenticated users)
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+
+    Route::get('consultations/{consultation}/start', [ConsultationController::class, 'start'])
+        ->name('consultations.start');
 
     // Doctor-specific dashboard
     Route::middleware('doctor')->group(function () {
