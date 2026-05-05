@@ -49,6 +49,20 @@ interface Props {
     filters: Filters;
 }
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function isScheduledForToday(scheduledAt: string | null): boolean {
+    if (!scheduledAt) return false;
+    const scheduledTime = new Date(scheduledAt).getTime();
+    if (Number.isNaN(scheduledTime)) return false;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfTomorrow = startOfToday + ONE_DAY_MS;
+
+    return scheduledTime >= startOfToday && scheduledTime < startOfTomorrow;
+}
+
 export default function PatientConsultationsIndex({
     consultations,
     filters,
@@ -153,10 +167,31 @@ export default function PatientConsultationsIndex({
                                     </td>
                                 </tr>
                             )}
-                            {consultations.data.map((c) => (
-                                <tr key={c.id} className="hover:bg-muted/30">
+                            {consultations.data.map((c) => {
+                                const isFinalStatus =
+                                    c.status === 'completed' ||
+                                    c.status === 'cancelled' ||
+                                    c.status === 'no_show';
+                                const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
+
+                                return (
+                                <tr
+                                    key={c.id}
+                                    className={
+                                        isToday
+                                            ? 'border-l-4 border-l-blue-500 bg-blue-50/60 hover:bg-blue-100/70 dark:border-l-blue-400 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
+                                            : 'hover:bg-muted/30'
+                                    }
+                                >
                                     <td className="px-4 py-3 font-medium">
-                                        Dr. {c.doctor?.name ?? '—'}
+                                        <div className="flex items-center gap-2">
+                                            <span>Dr. {c.doctor?.name ?? '—'}</span>
+                                            {isToday && (
+                                                <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                                                    Today
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-4 py-3 capitalize">
                                         {c.type === 'in_person'
@@ -199,7 +234,8 @@ export default function PatientConsultationsIndex({
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
