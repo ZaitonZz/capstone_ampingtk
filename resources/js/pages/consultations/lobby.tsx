@@ -1097,8 +1097,8 @@ export default function ConsultationLobbyPage({
                                         {isApplyingOverride
                                             ? 'Applying override...'
                                             : isManualOverrideEnabled
-                                              ? 'Manual Override Enabled'
-                                              : 'Enable Manual Override'}
+                                                ? 'Manual Override Enabled'
+                                                : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
                                         Doctors can enable manual override
