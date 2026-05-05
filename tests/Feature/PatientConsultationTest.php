@@ -125,7 +125,7 @@ it('returns only on-duty doctors for patient schedule selection', function () {
         ->assertJsonCount(1, 'doctors');
 });
 
-it('rejects patient appointment request when preferred doctor is off duty', function () {
+it('accepts patient appointment request when preferred doctor is off duty', function () {
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id]);
     $doctor = User::factory()->doctor()->create();
@@ -145,7 +145,11 @@ it('rejects patient appointment request when preferred doctor is off duty', func
             'type' => 'in_person',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
-        ->assertSessionHasErrors('doctor_id');
+        ->assertRedirect();
 
-    expect(Consultation::where('patient_id', $patient->id)->exists())->toBeFalse();
+    $consultation = Consultation::where('patient_id', $patient->id)->latest('id')->first();
+
+    expect($consultation)->not->toBeNull();
+    expect($consultation->doctor_id)->toBe($doctor->id);
+    expect($consultation->status)->toBe(Consultation::STATUS_PENDING);
 });
