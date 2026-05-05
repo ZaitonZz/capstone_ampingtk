@@ -34,7 +34,7 @@ class Patient extends Model
         'known_allergies',
     ];
 
-    protected $appends = ['age', 'full_name', 'profile_photo_url'];
+    protected $appends = ['age', 'full_name', 'profile_photo_url', 'has_today_schedule'];
 
     protected function casts(): array
     {
@@ -74,6 +74,16 @@ class Patient extends Model
         }
 
         return null;
+    }
+
+    /** Check if patient has a scheduled consultation for today */
+    public function getHasTodayScheduleAttribute(): bool
+    {
+        if (! $this->relationLoaded('consultations')) {
+            return false;
+        }
+
+        return $this->consultations->count() > 0;
     }
 
     // Relationships
