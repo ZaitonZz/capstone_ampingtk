@@ -68,41 +68,44 @@ it('prevents doctor from reviewing leave or absence requests', function () {
         ->assertForbidden();
 });
 
-it('approved leave request excludes doctor from consultation availability', function () {
-    $medicalStaff = User::factory()->medicalStaff()->create();
-    $doctor = User::factory()->doctor()->create();
-    $patient = Patient::factory()->create(['registered_by' => $medicalStaff->id]);
-    $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
+it(
+    'approved leave request excludes doctor from consultation availability',
+    function () {
+        $medicalStaff = User::factory()->medicalStaff()->create();
+        $doctor = User::factory()->doctor()->create();
+        $patient = Patient::factory()->create(['registered_by' => $medicalStaff->id]);
+        $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
 
-    DoctorDutySchedule::factory()->create([
-        'doctor_id' => $doctor->id,
-        'duty_date' => $scheduledAt->toDateString(),
-        'start_time' => '08:00',
-        'end_time' => '17:00',
-        'status' => 'on_duty',
-    ]);
-
-    $request = DoctorDutyRequest::factory()->create([
-        'doctor_id' => $doctor->id,
-        'request_type' => 'on_leave',
-        'start_date' => $scheduledAt->toDateString(),
-        'end_date' => $scheduledAt->toDateString(),
-        'status' => 'pending',
-    ]);
-
-    $this->actingAs($medicalStaff)
-        ->patch(route('doctor-duty-requests.review', $request), [
-            'decision' => 'approved',
-        ])
-        ->assertRedirect();
-
-    $this->actingAs($medicalStaff)
-        ->post(route('consultations.store'), [
-            'patient_id' => $patient->id,
+        DoctorDutySchedule::factory()->create([
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
-            'scheduled_at' => $scheduledAt->toDateTimeString(),
-        ])
-        ->assertSessionHasErrors('doctor_id');
-}
+            'duty_date' => $scheduledAt->toDateString(),
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+            'status' => 'on_duty',
+        ]);
+
+        $request = DoctorDutyRequest::factory()->create([
+            'doctor_id' => $doctor->id,
+            'request_type' => 'on_leave',
+            'start_date' => $scheduledAt->toDateString(),
+            'end_date' => $scheduledAt->toDateString(),
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($medicalStaff)
+            ->patch(route('doctor-duty-requests.review', $request), [
+                'decision' => 'approved',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($medicalStaff)
+            ->post(route('consultations.store'), [
+                'patient_id' => $patient->id,
+                'doctor_id' => $doctor->id,
+                'type' => 'teleconsultation',
+                'chief_complaint' => 'Routine follow-up',
+                'scheduled_at' => $scheduledAt->toDateTimeString(),
+            ])
+            ->assertSessionHasErrors('doctor_id');
+    }
 );
