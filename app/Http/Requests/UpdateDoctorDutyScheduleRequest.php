@@ -3,9 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\DoctorDutySchedule;
+use App\Services\DoctorDutyScheduleService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Services\DoctorDutyScheduleService;
 use Illuminate\Validation\Validator;
 
 class UpdateDoctorDutyScheduleRequest extends FormRequest
@@ -28,7 +28,7 @@ class UpdateDoctorDutyScheduleRequest extends FormRequest
             'remarks' => ['nullable', 'string', 'max:1000'],
         ];
     }
-    
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {

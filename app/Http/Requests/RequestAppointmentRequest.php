@@ -18,8 +18,8 @@ class RequestAppointmentRequest extends FormRequest
     {
         return [
             'doctor_id' => ['required', Rule::exists('users', 'id')->where('role', 'doctor')],
-            'type' => ['required', 'in:in_person,teleconsultation'],
-            'chief_complaint' => ['nullable', 'string', 'max:1000'],
+            'type' => ['required', 'in:teleconsultation'],
+            'chief_complaint' => ['required', 'string', 'max:1000'],
             'scheduled_at' => ['required', 'date', 'after:now'],
         ];
     }

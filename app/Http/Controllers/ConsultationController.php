@@ -13,6 +13,7 @@ use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -50,7 +51,25 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                fn ($q) => $q->where('doctor_id', $user->id)
+                function ($q) use ($user) {
+                    // Doctors should see consultations that are assigned to them
+                    // OR pending consultations that overlap with their on-duty schedule
+                    $q->where(function ($q2) use ($user) {
+                        $q2->where('doctor_id', $user->id)
+                            ->orWhere(function ($q3) use ($user) {
+                                $q3->where('status', 'pending')
+                                    ->whereExists(function ($sub) use ($user) {
+                                        $sub->select(DB::raw(1))
+                                            ->from('doctor_duty_schedules')
+                                            ->where('doctor_duty_schedules.doctor_id', $user->id)
+                                            ->where('doctor_duty_schedules.status', 'on_duty')
+                                            ->whereRaw('doctor_duty_schedules.duty_date = DATE(consultations.scheduled_at)')
+                                            ->whereRaw('doctor_duty_schedules.start_time <= TIME(consultations.scheduled_at)')
+                                            ->whereRaw('doctor_duty_schedules.end_time >= TIME(consultations.scheduled_at)');
+                                    });
+                            });
+                    });
+                }
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -278,30 +297,65 @@ class ConsultationController extends Controller
 
     public function approve(Consultation $consultation): RedirectResponse
     {
-        $this->authorize('update', $consultation);
+        $user = request()->user();
+        if (! $user?->isDoctor()) {
+            $this->authorize('update', $consultation);
+        }
 
         abort_unless($consultation->status === Consultation::STATUS_PENDING, 422, 'Only pending consultations can be approved.');
 
-        // Ensure the assigned doctor is on duty for the scheduled time.
         $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
-        $doctorId = $consultation->doctor_id;
 
-        if ($doctorId === null || $scheduledAt === null) {
+        if ($scheduledAt === null) {
             return redirect()
                 ->route('consultations.show', $consultation)
-                ->with('error', 'Consultation must have a scheduled time and assigned doctor before approval.');
+                ->with('error', 'Consultation must have a scheduled time before approval.');
         }
 
-        if (! app(\App\Services\DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
+        $acceptorIsDoctor = $user?->isDoctor() ?? false;
+
+        // If the acceptor is a doctor, ensure they're on duty at the scheduled time.
+        if ($acceptorIsDoctor) {
+            $acceptorId = $user->id;
+            if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($acceptorId, $scheduledAt)) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'You are not on duty for the scheduled time.');
+            }
+        } else {
+            // If acceptor is staff, ensure that the assigned doctor (if set) is on duty.
+            $assignedDoctorId = $consultation->doctor_id;
+            if ($assignedDoctorId === null) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'Consultation must have an assigned doctor before approval.');
+            }
+            if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($assignedDoctorId, $scheduledAt)) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+            }
+        }
+
+        // Atomic acceptance: only update when still pending to prevent races.
+        $attributes = ['status' => Consultation::STATUS_SCHEDULED];
+        if ($acceptorIsDoctor) {
+            $attributes['doctor_id'] = $acceptorId;
+        }
+
+        $updated = Consultation::query()
+            ->where('id', $consultation->id)
+            ->where('status', Consultation::STATUS_PENDING)
+            ->update($attributes);
+
+        if ($updated === 0) {
             return redirect()
                 ->route('consultations.show', $consultation)
-                ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+                ->with('error', 'Consultation was already accepted by another provider or is no longer pending.');
         }
-
-        $consultation->update(['status' => Consultation::STATUS_SCHEDULED]);
 
         return redirect()
-            ->route('consultations.show', $consultation)
+            ->route('consultations.show', $consultation->fresh())
             ->with('success', 'Appointment approved and scheduled.');
     }
 
