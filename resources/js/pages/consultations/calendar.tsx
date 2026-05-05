@@ -92,7 +92,7 @@ export default function ConsultationsCalendar({
     const { data, setData, post, processing, errors, reset } = useForm({
         patient_id: '',
         doctor_id: '',
-        type: 'teleconsultation' as 'teleconsultation',
+        type: 'teleconsultation' as const,
         status: 'pending',
         chief_complaint: '',
         scheduled_at: '',

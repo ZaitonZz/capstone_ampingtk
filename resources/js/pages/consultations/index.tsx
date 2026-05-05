@@ -134,7 +134,9 @@ export default function ConsultationsIndex({
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-semibold">Consultations</h1>
+                        <h1 className="text-2xl font-semibold">
+                            Consultations
+                        </h1>
                         {is_doctor_daily_view && (
                             <p className="text-sm text-muted-foreground">
                                 Showing your assigned schedule.
@@ -150,7 +152,9 @@ export default function ConsultationsIndex({
                         </Button>
                         {can_manage_schedule && (
                             <Button asChild>
-                                <Link href={ConsultationController.create.url()}>
+                                <Link
+                                    href={ConsultationController.create.url()}
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
                                     New Consultation
                                 </Link>
@@ -172,13 +176,13 @@ export default function ConsultationsIndex({
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All statuses</option>
-                        {(Object.keys(STATUS_LABELS) as ConsultationStatus[]).map(
-                            (s) => (
-                                <option key={s} value={s}>
-                                    {STATUS_LABELS[s]}
-                                </option>
-                            ),
-                        )}
+                        {(
+                            Object.keys(STATUS_LABELS) as ConsultationStatus[]
+                        ).map((s) => (
+                            <option key={s} value={s}>
+                                {STATUS_LABELS[s]}
+                            </option>
+                        ))}
                     </select>
                     <select
                         value={type}
@@ -186,8 +190,9 @@ export default function ConsultationsIndex({
                         className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                     >
                         <option value="">All types</option>
-                        <option value="in_person">In Person</option>
-                        <option value="teleconsultation">Teleconsultation</option>
+                        <option value="teleconsultation">
+                            Teleconsultation
+                        </option>
                     </select>
                     <Button type="submit" variant="secondary" size="sm">
                         Filter
@@ -198,13 +203,25 @@ export default function ConsultationsIndex({
                     <table className="w-full text-sm">
                         <thead className="border-b bg-muted/50 text-left">
                             <tr>
-                                <th className="px-4 py-3 font-medium">Patient</th>
+                                <th className="px-4 py-3 font-medium">
+                                    Patient
+                                </th>
                                 <th className="px-4 py-3 font-medium">Type</th>
-                                <th className="px-4 py-3 font-medium">Status</th>
-                                <th className="px-4 py-3 font-medium">Scheduled</th>
-                                <th className="px-4 py-3 font-medium">Chief Complaint</th>
-                                <th className="px-4 py-3 font-medium">Microcheck</th>
-                                <th className="px-4 py-3 font-medium">Actions</th>
+                                <th className="px-4 py-3 font-medium">
+                                    Status
+                                </th>
+                                <th className="px-4 py-3 font-medium">
+                                    Scheduled
+                                </th>
+                                <th className="px-4 py-3 font-medium">
+                                    Chief Complaint
+                                </th>
+                                <th className="px-4 py-3 font-medium">
+                                    Microcheck
+                                </th>
+                                <th className="px-4 py-3 font-medium">
+                                    Actions
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -224,21 +241,23 @@ export default function ConsultationsIndex({
                                         {c.patient?.full_name ?? '-'}
                                     </td>
                                     <td className="px-4 py-3 capitalize">
-                                        {c.type === 'in_person'
-                                            ? 'In Person'
-                                            : 'Teleconsultation'}
+                                        Teleconsultation
                                     </td>
                                     <td className="px-4 py-3">
                                         <Badge
                                             variant="outline"
-                                            className={STATUS_BADGE_CLASSES[c.status]}
+                                            className={
+                                                STATUS_BADGE_CLASSES[c.status]
+                                            }
                                         >
                                             {STATUS_LABELS[c.status]}
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground">
                                         {c.scheduled_at
-                                            ? new Date(c.scheduled_at).toLocaleString()
+                                            ? new Date(
+                                                  c.scheduled_at,
+                                              ).toLocaleString()
                                             : '-'}
                                     </td>
                                     <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
@@ -249,7 +268,11 @@ export default function ConsultationsIndex({
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                asChild
+                                            >
                                                 <Link
                                                     href={ConsultationController.show.url(
                                                         c.id,
@@ -261,16 +284,18 @@ export default function ConsultationsIndex({
                                             {can_manage_schedule && (
                                                 <Button
                                                     variant={
-                                                        c.status === 'pending' &&
-                                                            !c.doctor_available_for_approval
+                                                        c.status ===
+                                                            'pending' &&
+                                                        !c.doctor_available_for_approval
                                                             ? 'default'
                                                             : 'ghost'
                                                     }
                                                     size="sm"
                                                     asChild
                                                     className={
-                                                        c.status === 'pending' &&
-                                                            !c.doctor_available_for_approval
+                                                        c.status ===
+                                                            'pending' &&
+                                                        !c.doctor_available_for_approval
                                                             ? 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600 hover:text-white'
                                                             : undefined
                                                     }
@@ -285,28 +310,28 @@ export default function ConsultationsIndex({
                                                 </Button>
                                             )}
                                             {can_manage_schedule &&
-                                                c.status === 'pending' && (
-                                                    c.doctor_available_for_approval ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                handleApprove(c.id)
-                                                            }
-                                                            className="text-green-600 hover:text-green-700"
-                                                        >
-                                                            <Check className="mr-1 h-3 w-3" />
-                                                            Approve
-                                                        </Button>
-                                                    ) : (
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="border-amber-200 bg-amber-50 text-amber-700"
-                                                        >
-                                                            Preferred doctor is not on duty
-                                                        </Badge>
-                                                    )
-                                                )}
+                                                c.status === 'pending' &&
+                                                (c.doctor_available_for_approval ? (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleApprove(c.id)
+                                                        }
+                                                        className="text-green-600 hover:text-green-700"
+                                                    >
+                                                        <Check className="mr-1 h-3 w-3" />
+                                                        Approve
+                                                    </Button>
+                                                ) : (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-amber-200 bg-amber-50 text-amber-700"
+                                                    >
+                                                        Preferred doctor is not
+                                                        on duty
+                                                    </Badge>
+                                                ))}
                                         </div>
                                     </td>
                                 </tr>
@@ -325,7 +350,11 @@ export default function ConsultationsIndex({
                                 disabled={!link.url}
                                 onClick={() =>
                                     link.url &&
-                                    router.get(link.url, {}, { preserveScroll: true })
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
                                 }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
