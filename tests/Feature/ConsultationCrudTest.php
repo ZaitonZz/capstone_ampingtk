@@ -40,7 +40,7 @@ it('admin sees all consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 3));
 });
 
-it('doctor sees only their own scheduled consultations on the calendar', function () {
+it('doctor sees only their own doctor-visible consultations on the calendar', function () {
     $doctor = User::factory()->doctor()->create();
     $other = User::factory()->doctor()->create();
     Consultation::factory()->create([
@@ -50,7 +50,7 @@ it('doctor sees only their own scheduled consultations on the calendar', functio
     ]);
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
-        'status' => 'scheduled',
+        'status' => 'ongoing',
         'scheduled_at' => now()->addDay(),
     ]);
     Consultation::factory()->create([
@@ -70,18 +70,19 @@ it('doctor sees only their own scheduled consultations on the calendar', functio
         ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
-it('medical staff can access consultations index', function () {
+it('medical staff can access consultations index including pending consultations', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctorA = User::factory()->doctor()->create();
     $doctorB = User::factory()->doctor()->create();
 
-    Consultation::factory()->create(['doctor_id' => $doctorA->id]);
-    Consultation::factory()->create(['doctor_id' => $doctorB->id]);
+    Consultation::factory()->create(['doctor_id' => $doctorA->id, 'status' => 'scheduled']);
+    Consultation::factory()->create(['doctor_id' => $doctorB->id, 'status' => 'scheduled']);
+    Consultation::factory()->create(['doctor_id' => $doctorA->id, 'status' => 'pending']);
 
     $this->actingAs($medicalStaff)
         ->get(route('consultations.index'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('consultations.data', 2));
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 3));
 });
 
 // ── Approve ───────────────────────────────────────────────────────────────────
@@ -89,14 +90,19 @@ it('medical staff can access consultations index', function () {
 it('approves a pending consultation and transitions it to scheduled', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
     ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
-        'duty_date' => $consultation->scheduled_at->toDateString(),
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
     ]);
 
     $this->actingAs($medicalStaff)
@@ -418,11 +424,13 @@ it('patient can submit an appointment request which creates a pending consultati
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
-    $scheduledAt = now()->addDays(3);
+    $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
         'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
     ]);
 
     $this->actingAsVerified($user)
@@ -438,6 +446,16 @@ it('patient can submit an appointment request which creates a pending consultati
     expect($consultation)->not->toBeNull();
     expect($consultation->status)->toBe('pending');
     expect($consultation->doctor_id)->toBe($doctor->id);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 0));
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.calendar'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('events', 0));
 });
 
 it('patient appointment request requires a future scheduled_at', function () {
