@@ -54,14 +54,18 @@ it('allows medical staff to approve pending consultations', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $consultation = Consultation::factory()->create([
         'status' => 'pending',
+        'scheduled_at' => now()->addDay()->setHour(10)->setMinute(0)->setSecond(0),
     ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $consultation->doctor_id,
         'duty_date' => $consultation->scheduled_at->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
-    $this->actingAs($medicalStaff)
+    $this->actingAsVerified($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
         ->assertRedirect();
 

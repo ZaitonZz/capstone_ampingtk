@@ -128,7 +128,7 @@ it('redirects consultation start to consent when consent is incomplete', functio
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->get(route('consultations.start', $consultation))
         ->assertRedirect(route('consultations.consent.show', $consultation));
 });
@@ -144,7 +144,7 @@ it('redirects consultation start directly to the lobby when consent is complete'
         'confirmed_at' => now(),
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->get(route('consultations.start', $consultation))
         ->assertRedirect(route('consultations.lobby.show', $consultation));
 });
