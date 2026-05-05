@@ -1,7 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ShieldCheck, Video } from 'lucide-react';
-import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
-import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +30,7 @@ const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
 
 interface Props {
     consultation: Consultation;
+    consent_completed: boolean;
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -44,7 +44,10 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-export default function PatientConsultationShow({ consultation }: Props) {
+export default function PatientConsultationShow({
+    consultation,
+    consent_completed,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         {
             title: 'My Consultations',
@@ -78,25 +81,26 @@ export default function PatientConsultationShow({ consultation }: Props) {
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
-                        <Button size="sm" variant="outline" asChild>
-                            <Link
-                                href={ConsultationConsentController.show.url(
-                                    consultation.id,
-                                )}
-                            >
-                                <ShieldCheck className="mr-1 h-4 w-4" />
-                                Privacy Notice &amp; Consent
-                            </Link>
-                        </Button>
+                        <Badge
+                            variant="outline"
+                            className={consent_completed
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'}
+                        >
+                            <ShieldCheck className="mr-1 h-4 w-4" />
+                            {consent_completed
+                                ? 'Consent Completed'
+                                : 'Consent Pending'}
+                        </Badge>
                         {consultation.type === 'teleconsultation' && (
                             <Button size="sm" asChild>
                                 <Link
-                                    href={ConsultationLobbyController.show.url(
+                                    href={ConsultationController.start.url(
                                         consultation.id,
                                     )}
                                 >
                                     <Video className="mr-1 h-4 w-4" />
-                                    Join
+                                    Start Consultation
                                 </Link>
                             </Button>
                         )}
