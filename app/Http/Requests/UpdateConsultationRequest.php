@@ -19,9 +19,9 @@ class UpdateConsultationRequest extends FormRequest
     {
         return [
             'doctor_id' => ['sometimes', Rule::exists('users', 'id')->where('role', 'doctor')],
-            'type' => ['sometimes', 'in:in_person,teleconsultation'],
+            'type' => ['sometimes', 'in:teleconsultation'],
             'status' => ['sometimes', Rule::in(Consultation::STATUSES)],
-            'chief_complaint' => ['nullable', 'string'],
+            'chief_complaint' => ['sometimes', 'string', 'min:1'],
             'scheduled_at' => ['nullable', 'date'],
             'started_at' => ['nullable', 'date'],
             'ended_at' => ['nullable', 'date', 'after_or_equal:started_at'],

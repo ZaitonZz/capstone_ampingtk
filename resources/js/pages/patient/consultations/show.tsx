@@ -6,7 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation, ConsultationStatus } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationStatus,
+    ConsultationType,
+} from '@/types/consultation';
 
 const STATUS_LABELS: Record<ConsultationStatus, string> = {
     pending: 'Pending',
@@ -16,6 +20,11 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     completed: 'Completed',
     cancelled: 'Cancelled',
     no_show: 'No Show',
+};
+
+const TYPE_LABELS: Record<ConsultationType, string> = {
+    in_person: 'In-Person',
+    teleconsultation: 'Teleconsultation',
 };
 
 const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
@@ -77,7 +86,9 @@ export default function PatientConsultationShow({
                     <div className="flex items-center gap-2">
                         <Badge
                             variant="outline"
-                            className={STATUS_BADGE_CLASSES[consultation.status]}
+                            className={
+                                STATUS_BADGE_CLASSES[consultation.status]
+                            }
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
@@ -123,19 +134,15 @@ export default function PatientConsultationShow({
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
                     <Field
                         label="Type"
-                        value={
-                            consultation.type === 'in_person'
-                                ? 'In Person'
-                                : 'Teleconsultation'
-                        }
+                        value={TYPE_LABELS[consultation.type]}
                     />
                     <Field
                         label="Scheduled"
                         value={
                             consultation.scheduled_at
                                 ? new Date(
-                                    consultation.scheduled_at,
-                                ).toLocaleString()
+                                      consultation.scheduled_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -144,8 +151,8 @@ export default function PatientConsultationShow({
                         value={
                             consultation.started_at
                                 ? new Date(
-                                    consultation.started_at,
-                                ).toLocaleString()
+                                      consultation.started_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -154,8 +161,8 @@ export default function PatientConsultationShow({
                         value={
                             consultation.ended_at
                                 ? new Date(
-                                    consultation.ended_at,
-                                ).toLocaleString()
+                                      consultation.ended_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />

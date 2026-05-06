@@ -7,13 +7,13 @@ use App\Http\Requests\UpdateDoctorDutyScheduleRequest;
 use App\Models\DoctorDutyRequest;
 use App\Models\DoctorDutySchedule;
 use App\Models\User;
+use App\Services\DoctorDutyScheduleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Services\DoctorDutyScheduleService;
 
 class DoctorDutyScheduleController extends Controller
 {
