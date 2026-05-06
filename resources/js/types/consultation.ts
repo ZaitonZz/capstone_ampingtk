@@ -83,6 +83,42 @@ export interface ConsultationDeepfakeEscalation {
     updated_at: string;
 }
 
+export interface PatientNote {
+    id: number;
+    consultation_id: number;
+    patient_id: number;
+    doctor_id: number;
+    subjective: string | null;
+    objective: string | null;
+    assessment: string | null;
+    plan: string | null;
+    created_at: string;
+    updated_at: string;
+    doctor?: {
+        id: number;
+        name: string;
+    };
+}
+
+export interface Prescription {
+    id: number;
+    consultation_id: number;
+    patient_id: number;
+    doctor_id: number;
+    medication_name: string;
+    dosage: string | null;
+    frequency: string | null;
+    duration: string | null;
+    route: string | null;
+    instructions: string | null;
+    created_at: string;
+    updated_at: string;
+    doctor?: {
+        id: number;
+        name: string;
+    };
+}
+
 export interface Consultation {
     id: number;
     patient_id: number;
@@ -117,6 +153,8 @@ export interface Consultation {
     duration_minutes: number | null;
     patient?: PatientSummary;
     doctor?: DoctorSummary;
+    note?: PatientNote | null;
+    prescriptions?: Prescription[];
     microchecks?: ConsultationMicrocheck[];
     deepfake_scan_logs?: DeepfakeScanLog[];
     deepfake_escalations?: ConsultationDeepfakeEscalation[];

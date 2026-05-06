@@ -62,6 +62,19 @@ interface Props {
 }
 
 const TWO_DAYS_IN_MS = 2 * 24 * 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function isScheduledForToday(scheduledAt: string | null): boolean {
+    if (!scheduledAt) return false;
+    const scheduledTime = new Date(scheduledAt).getTime();
+    if (Number.isNaN(scheduledTime)) return false;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfTomorrow = startOfToday + ONE_DAY_MS;
+
+    return scheduledTime >= startOfToday && scheduledTime < startOfTomorrow;
+}
 
 function formatMicrocheckCell(consultation: Consultation) {
     if (consultation.type !== 'teleconsultation') {
@@ -264,7 +277,14 @@ export default function ConsultationsIndex({
                                     </td>
                                 </tr>
                             )}
-                            {consultations.data.map((c) => {
+                            {consultations.data
+                                .slice()
+                                .sort((a, b) => {
+                                    const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+                                    const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+                                    return aDate - bDate;
+                                })
+                                .map((c) => {
                                 const isFinalStatus =
                                     c.status === 'completed' ||
                                     c.status === 'cancelled' ||
@@ -273,6 +293,7 @@ export default function ConsultationsIndex({
                                     ? null
                                     : getUpcomingPriorityLabel(c.scheduled_at);
                                 const isUpcomingPriority = priorityLabel !== null;
+                                const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
 
                                 return (
                                 <tr
@@ -292,6 +313,11 @@ export default function ConsultationsIndex({
                                                     className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                                                 >
                                                     {priorityLabel}
+                                                </Badge>
+                                            )}
+                                            {isToday && (
+                                                <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                                                    Today
                                                 </Badge>
                                             )}
                                         </div>
@@ -429,3 +455,7 @@ export default function ConsultationsIndex({
         </AppLayout>
     );
 }
+
+
+
+

@@ -56,15 +56,18 @@ class ConsultationLiveKitWebhookController extends Controller
             'participant_left' => $consultation->forceFill([
                 'livekit_last_activity_at' => now(),
             ])->save(),
-            'room_finished' => $consultation->forceFill([
-                'status' => $consultation->status === Consultation::STATUS_ONGOING
-                    ? Consultation::STATUS_COMPLETED
-                    : $consultation->status,
-                'ended_at' => $consultation->ended_at ?? now(),
-                'livekit_room_status' => 'ended',
-                'livekit_ended_at' => now(),
-                'livekit_last_activity_at' => now(),
-            ])->save(),
+            'room_finished' => (function () use ($consultation) {
+                $hasDoc = $consultation->hasClinicalDocumentation();
+                $shouldComplete = $hasDoc && $consultation->status === Consultation::STATUS_ONGOING;
+
+                return $consultation->forceFill(array_filter([
+                    'status' => $shouldComplete ? Consultation::STATUS_COMPLETED : null,
+                    'ended_at' => $shouldComplete && $consultation->ended_at === null ? now() : null,
+                    'livekit_room_status' => 'ended',
+                    'livekit_ended_at' => now(),
+                    'livekit_last_activity_at' => now(),
+                ], static fn ($value) => $value !== null))->save();
+            })(),
             default => null,
         };
 

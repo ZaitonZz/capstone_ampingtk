@@ -211,6 +211,23 @@ class Consultation extends Model
         return $this->hasMany(ConsultationConsent::class);
     }
 
+    public function hasClinicalDocumentation(): bool
+    {
+        $this->loadMissing(['note', 'prescriptions']);
+
+        $note = $this->note;
+
+        if ($note !== null) {
+            foreach (['subjective', 'objective', 'assessment', 'plan'] as $field) {
+                if (filled($note->{$field})) {
+                    return true;
+                }
+            }
+        }
+
+        return $this->prescriptions->isNotEmpty();
+    }
+
     public function consentForUser(?User $user): ?ConsultationConsent
     {
         if ($user === null) {
