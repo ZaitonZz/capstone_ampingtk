@@ -10,10 +10,12 @@ use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
 use App\Services\DoctorDutyAvailabilityService;
+use App\Models\DoctorDutySchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -292,7 +294,17 @@ class ConsultationController extends Controller
                 ->with('error', 'Consultation must have a scheduled time and assigned doctor before approval.');
         }
 
-        if (! app(\App\Services\DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
+        $availabilityService = app(\App\Services\DoctorDutyAvailabilityService::class);
+
+        $isAvailableAtTime = $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt);
+
+        $scheduledDate = Carbon::parse($scheduledAt)->toDateString();
+        $hasScheduleOnDate = DoctorDutySchedule::query()
+            ->where('doctor_id', $doctorId)
+            ->whereDate('duty_date', $scheduledDate)
+            ->exists();
+
+        if (! $isAvailableAtTime && ! $hasScheduleOnDate) {
             return redirect()
                 ->route('consultations.show', $consultation)
                 ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
