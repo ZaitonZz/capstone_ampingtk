@@ -22,7 +22,7 @@ class PatientFactory extends Factory
             'gender' => fake()->randomElement(['male', 'female', 'other']),
             'civil_status' => fake()->randomElement(['single', 'married', 'widowed', 'separated']),
             'contact_number' => fake()->phoneNumber(),
-            'email' => fake()->optional(0.7)->safeEmail(),
+            'email' => fake()->boolean(70) ? fake()->unique()->safeEmail() : null,
             'address' => fake()->address(),
             'blood_type' => fake()->optional(0.8)->randomElement(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']),
             'emergency_contact_name' => fake()->name(),

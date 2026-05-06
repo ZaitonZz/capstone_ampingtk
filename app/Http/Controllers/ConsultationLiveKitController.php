@@ -4,13 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\LiveKitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ConsultationLiveKitController extends Controller
 {
-    public function __construct(private LiveKitService $liveKitService) {}
+    public function __construct(
+        private LiveKitService $liveKitService,
+        private ConsultationDeepfakeDetectionService $deepfakeDetectionService,
+    ) {}
 
     public function connect(Request $request, Consultation $consultation): JsonResponse
     {
@@ -38,7 +42,9 @@ class ConsultationLiveKitController extends Controller
 
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json([
-                'message' => 'This consultation is no longer active.',
+                'message' => $this->deepfakeDetectionService->isNoFaceCancellation($consultation)
+                    ? $this->deepfakeDetectionService->noFaceCancellationMessage()
+                    : 'This consultation is no longer active.',
             ], 409);
         }
 
@@ -83,6 +89,14 @@ class ConsultationLiveKitController extends Controller
         }
 
         $consultation = $this->liveKitService->ensureRoomForConsultation($consultation);
+        $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
+
+        if ($this->deepfakeDetectionService->isNoFaceCancellation($consultation)) {
+            return response()->json([
+                'message' => $this->deepfakeDetectionService->noFaceCancellationMessage(),
+                'status' => Consultation::STATUS_CANCELLED,
+            ], 409);
+        }
 
         $consultation->forceFill([
             'livekit_last_activity_at' => now(),

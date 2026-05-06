@@ -23,7 +23,6 @@ import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/C
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -32,13 +31,12 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
     ConsultationConsent,
+    ConsultationDeepfakeDetectionState,
     ConsultationIdentityVerificationState,
 } from '@/types/consultation';
 
@@ -75,6 +73,7 @@ interface Props {
     consent: ConsultationConsent | null;
     verification?: ConsultationIdentityVerificationState;
     livekit?: LiveKitLobbyProps;
+    deepfake_detection?: ConsultationDeepfakeDetectionState;
 }
 
 type ConnectState = 'idle' | 'connecting' | 'connected' | 'error';
@@ -140,6 +139,70 @@ function DeviceButton({
     );
 }
 
+function DeepfakeDetectionIndicator({
+    detection,
+}: {
+    detection?: ConsultationDeepfakeDetectionState;
+}) {
+    const state = detection?.state ?? 'unavailable';
+    const config = {
+        running: {
+            label: 'Detection running',
+            text: 'Deepfake monitoring is active for this consultation.',
+            className:
+                'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+            icon: CheckCircle2,
+        },
+        starting: {
+            label: 'Detection starting',
+            text: 'Waiting for the deepfake pipeline to confirm monitoring.',
+            className:
+                'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200',
+            icon: LoaderCircle,
+        },
+        delayed: {
+            label: 'Detection delayed',
+            text: `No active pipeline heartbeat detected within ${detection?.timeout_seconds ?? 60} seconds.`,
+            className:
+                'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+            icon: AlertTriangle,
+        },
+        cancelled: {
+            label: 'Consultation cancelled',
+            text: `No face was detected for ${detection?.no_face_timeout_seconds ?? 30} seconds, so the consultation was cancelled.`,
+            className:
+                'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200',
+            icon: AlertTriangle,
+        },
+        unavailable: {
+            label: 'Detection unavailable',
+            text: 'Deepfake monitoring starts after the video room is ready.',
+            className:
+                'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200',
+            icon: Shield,
+        },
+    }[state];
+    const Icon = config.icon;
+
+    return (
+        <div className={`rounded-2xl border p-4 shadow-sm ${config.className}`}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                <Icon
+                    className={`h-4 w-4 ${state === 'starting' ? 'animate-spin' : ''}`}
+                />
+                {config.label}
+            </div>
+            <p className="text-xs leading-snug">{config.text}</p>
+            {detection?.last_heartbeat_at && (
+                <p className="mt-2 text-[11px] opacity-75">
+                    Last heartbeat:{' '}
+                    {new Date(detection.last_heartbeat_at).toLocaleTimeString()}
+                </p>
+            )}
+        </div>
+    );
+}
+
 function getMetaCsrfToken(): string {
     const element = document.querySelector(
         'meta[name="csrf-token"]',
@@ -187,6 +250,7 @@ export default function ConsultationLobbyPage({
     consent,
     verification,
     livekit,
+    deepfake_detection,
 }: Props) {
     const page = usePage<PageProps>();
     const isPaused =
@@ -220,7 +284,8 @@ export default function ConsultationLobbyPage({
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
     const hasJoinPermission = isConsentConfirmed || isAdminUser;
-    const canJoinSession = hasJoinPermission && !isPaused;
+    const canJoinSession =
+        hasJoinPermission && !isPaused && consultation.status !== 'cancelled';
     const isLiveKitEnabled = livekit?.enabled === true;
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
@@ -839,6 +904,10 @@ export default function ConsultationLobbyPage({
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
                     <div className="flex w-full flex-col gap-3 lg:w-80">
+                        <DeepfakeDetectionIndicator
+                            detection={deepfake_detection}
+                        />
+
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
@@ -902,83 +971,33 @@ export default function ConsultationLobbyPage({
 
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
-                                <div
-                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${hasJoinPermission ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
-                                >
-                                    <CheckCircle2
-                                        className={`h-3 w-3 ${hasJoinPermission ? 'text-emerald-500' : 'text-amber-500'}`}
-                                    />
+                                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/10">
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                     Privacy and Consent
                                 </p>
                             </div>
 
-                            {hasJoinPermission ? (
-                                <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
-                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-semibold">
-                                        {isAdminUser
-                                            ? 'Admin audit mode ready'
-                                            : 'Consent confirmed'}
-                                    </span>
-                                    {consent?.confirmed_at && !isAdminUser && (
-                                        <span className="ml-auto opacity-60">
-                                            {new Date(
-                                                consent.confirmed_at,
-                                            ).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800">
-                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-medium">
-                                        Consent required before joining.
-                                    </span>
-                                </div>
-                            )}
-
-                            <ul className="mb-3 space-y-1.5 text-xs text-muted-foreground">
-                                {[
-                                    'Telemedicine consent',
-                                    'Data Privacy Act notice',
-                                    'Identity Guard verification',
-                                ].map((item) => (
-                                    <li
-                                        key={item}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <CheckCircle2
-                                            className={[
-                                                'h-3 w-3 shrink-0',
-                                                hasJoinPermission
-                                                    ? 'text-emerald-500'
-                                                    : 'text-muted-foreground/30',
-                                            ].join(' ')}
-                                        />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            <Separator className="mb-3" />
-
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="lobby-consent-check"
-                                    checked={hasJoinPermission}
-                                    disabled
-                                />
-                                <Label
-                                    htmlFor="lobby-consent-check"
-                                    className="cursor-not-allowed text-xs leading-snug"
-                                >
+                            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
+                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="font-semibold">
                                     {isAdminUser
-                                        ? 'Audit access enabled for admin'
-                                        : 'I agree to the Privacy Notice and Consent'}
-                                </Label>
+                                        ? 'Admin audit mode ready'
+                                        : 'Consent confirmed'}
+                                </span>
+                                {consent?.confirmed_at && !isAdminUser && (
+                                    <span className="ml-auto opacity-60">
+                                        {new Date(
+                                            consent.confirmed_at,
+                                        ).toLocaleDateString()}
+                                    </span>
+                                )}
                             </div>
+
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Consent is already in place. You can proceed to the call when the room is ready.
+                            </p>
                         </div>
 
                         {isPaused && (
@@ -1104,13 +1123,7 @@ export default function ConsultationLobbyPage({
                                 )}
                             </Button>
 
-                            {!hasJoinPermission && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    Complete consent to enable joining.
-                                </p>
-                            )}
-
-                            {hasJoinPermission && isPaused && (
+                            {isPaused && (
                                 <p className="text-center text-xs text-muted-foreground">
                                     Joining is disabled until identity
                                     verification is completed.
@@ -1137,8 +1150,8 @@ export default function ConsultationLobbyPage({
                                         {isApplyingOverride
                                             ? 'Applying override...'
                                             : isManualOverrideEnabled
-                                              ? 'Manual Override Enabled'
-                                              : 'Enable Manual Override'}
+                                                ? 'Manual Override Enabled'
+                                                : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
                                         Doctors can enable manual override

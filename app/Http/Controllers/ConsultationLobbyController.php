@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Consultation;
-use App\Models\ConsultationConsent;
+use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\ConsultationIdentityVerificationService;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -12,9 +13,10 @@ class ConsultationLobbyController extends Controller
 {
     public function __construct(
         private ConsultationIdentityVerificationService $identityVerificationService,
+        private ConsultationDeepfakeDetectionService $deepfakeDetectionService,
     ) {}
 
-    public function show(Consultation $consultation): Response
+    public function show(Consultation $consultation): Response|RedirectResponse
     {
         $this->authorize('view', $consultation);
 
@@ -28,16 +30,17 @@ class ConsultationLobbyController extends Controller
             abort(404);
         }
 
+        if ($consultation->requiresConsentForUser($currentUser)) {
+            return redirect()->route('consultations.consent.show', $consultation);
+        }
+
+        $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
+
         $consultation->load(['patient', 'doctor']);
 
-        $consent = ConsultationConsent::query()
-            ->where('consultation_id', $consultation->id)
-            ->where('user_id', $currentUser?->id)
-            ->first();
+        $consent = $consultation->consentForUser($currentUser);
 
-        $isConsultationDoctor =
-            $currentUser !== null
-            && $consultation->doctor_id === $currentUser->id;
+        $isConsultationDoctor = $consultation->isConsultationDoctor($currentUser);
         $isVerificationTarget =
             $currentUser !== null
             && $consultation->identity_verification_target_user_id !== null
@@ -70,6 +73,7 @@ class ConsultationLobbyController extends Controller
                 'connect_url' => route('consultations.livekit.connect', $consultation),
                 'ws_url' => config('services.livekit.ws_url'),
             ],
+            'deepfake_detection' => $this->deepfakeDetectionService->statusPayload($consultation),
         ]);
     }
 }

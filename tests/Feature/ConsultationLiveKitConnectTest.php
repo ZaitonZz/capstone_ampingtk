@@ -17,6 +17,7 @@ beforeEach(function () {
         'https://livekit.test/twirp/livekit.RoomService/CreateRoom' => Http::response([
             'sid' => 'RM_test_room_sid',
         ], 200),
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
     ]);
 });
 
@@ -118,4 +119,142 @@ it('forbids medical staff from connecting to a consultation session', function (
     $this->actingAs($medicalStaff)
         ->postJson(route('consultations.livekit.connect', $consultation))
         ->assertForbidden();
+});
+
+it('allows connect when deepfake detection heartbeat is stale', function () {
+    config()->set('services.pipeline.detection_timeout_seconds', 60);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-99-stale',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(61),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'room_status' => 'room_ready',
+            'role' => 'doctor',
+        ]);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->not->toBe('cancelled');
+    expect($consultation->livekit_room_status)->toBe('room_ready');
+});
+
+it('cancels connect when no face has been detected for 30 seconds', function () {
+    config()->set('services.pipeline.no_face_timeout_seconds', 30);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-101-no-face',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(5),
+        'pipeline_guidance' => [
+            'no_face_detected' => true,
+            'no_face_detected_since' => now()->subSeconds(31)->toIso8601String(),
+        ],
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertConflict()
+        ->assertJson([
+            'message' => 'Consultation cancelled because no face was detected for 30 seconds.',
+            'status' => 'cancelled',
+        ]);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe('cancelled');
+    expect($consultation->livekit_room_status)->toBe('ended');
+});
+
+it('allows connect when no face has not reached the cancellation timeout', function () {
+    config()->set('services.pipeline.no_face_timeout_seconds', 30);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-102-no-face-fresh',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(5),
+        'pipeline_guidance' => [
+            'no_face_detected' => true,
+            'no_face_detected_since' => now()->subSeconds(10)->toIso8601String(),
+        ],
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'room_status' => 'room_ready',
+            'role' => 'doctor',
+        ]);
+
+    expect($consultation->fresh()->status)->not->toBe('cancelled');
+});
+
+it('allows connect when deepfake detection heartbeat is fresh', function () {
+    config()->set('services.pipeline.detection_timeout_seconds', 60);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-100-fresh',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(10),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'room_status' => 'room_ready',
+            'role' => 'doctor',
+        ]);
+
+    expect($consultation->fresh()->status)->not->toBe('cancelled');
 });

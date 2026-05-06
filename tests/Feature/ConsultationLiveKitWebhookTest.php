@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\PatientNote;
+use App\Models\Prescription;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -107,6 +108,37 @@ it('keeps the consultation open when room_finished arrives without documentation
     expect($consultation->livekit_ended_at)->not->toBeNull();
     expect($consultation->status)->toBe(Consultation::STATUS_ONGOING);
     expect($consultation->ended_at)->toBeNull();
+});
+
+it('marks room as ended on room_finished event when only a prescription exists (no note)', function () {
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'status' => Consultation::STATUS_ONGOING,
+        'livekit_room_name' => 'consultation-57-abc12345',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    Prescription::factory()->for($consultation)->create();
+
+    $data = [
+        'event' => 'room_finished',
+        'room' => ['name' => 'consultation-57-abc12345', 'sid' => 'RM_test_3'],
+        'id' => 'EV_test_3',
+        'createdAt' => now()->timestamp,
+    ];
+
+    $body = json_encode($data);
+    $token = livekitWebhookToken($body);
+
+    $this->withHeaders(['Authorization' => $token])
+        ->postJson(route('livekit.webhook'), $data)
+        ->assertNoContent();
+
+    $consultation->refresh();
+
+    expect($consultation->livekit_room_status)->toBe('ended');
+    expect($consultation->livekit_ended_at)->not->toBeNull();
+    expect($consultation->status)->toBe(Consultation::STATUS_COMPLETED);
+    expect($consultation->ended_at)->not->toBeNull();
 });
 
 it('updates last activity on participant_joined event', function () {
