@@ -34,7 +34,7 @@ class Patient extends Model
         'known_allergies',
     ];
 
-    protected $appends = ['age', 'full_name', 'profile_photo_url', 'has_today_schedule'];
+    protected $appends = ['age', 'full_name', 'profile_photo_url'];
 
     protected function casts(): array
     {
