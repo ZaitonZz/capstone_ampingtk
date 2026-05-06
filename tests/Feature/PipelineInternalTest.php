@@ -132,6 +132,48 @@ it('returns only LiveKit-open rooms with visible participants for the pipeline',
 
 // ── Pipeline scan results endpoint ────────────────────────────────────────────
 
+it('stores deepfake detection runtime status posted by the pipeline', function () {
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'livekit_room_name' => 'consultation-30-runtime',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $data = [
+        'status' => 'running',
+        'room_name' => 'consultation-30-runtime',
+        'guidance' => [
+            'low_light' => true,
+            'too_far' => true,
+            'face_area_ratio' => 0.012,
+            'brightness' => 0.14,
+            'participant_identity' => 'user-22',
+            'role' => 'patient',
+        ],
+    ];
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.consultations.status.store', $consultation), $data)
+        ->assertOk()
+        ->assertJsonPath('deepfake_detection.state', 'running')
+        ->assertJsonPath('deepfake_detection.guidance.low_light', true)
+        ->assertJsonPath('deepfake_detection.guidance.too_far', true);
+
+    $consultation->refresh();
+
+    expect($consultation->pipeline_detection_status)->toBe('running');
+    expect($consultation->pipeline_last_heartbeat_at)->not->toBeNull();
+    expect($consultation->pipeline_guidance['brightness'])->toBe(0.14);
+});
+
+it('rejects deepfake detection runtime status without signature', function () {
+    $consultation = Consultation::factory()->teleconsultation()->create();
+
+    $this->postJson(route('pipeline.consultations.status.store', $consultation), [
+        'status' => 'running',
+    ])->assertUnauthorized();
+});
+
 it('rejects scan result without signature', function () {
     $consultation = Consultation::factory()->create();
 

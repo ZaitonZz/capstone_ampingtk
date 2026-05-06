@@ -139,3 +139,31 @@ it('includes configured OTP length in session verification payload', function ()
                 ->where('verification.otp_length', 8),
         );
 });
+
+it('includes deepfake detection status in session payload', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-session-detection',
+        'livekit_room_status' => 'room_ready',
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now(),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.session.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/session')
+                ->where('deepfake_detection.state', 'running'),
+        );
+});

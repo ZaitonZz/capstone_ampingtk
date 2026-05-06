@@ -17,6 +17,7 @@ beforeEach(function () {
         'https://livekit.test/twirp/livekit.RoomService/CreateRoom' => Http::response([
             'sid' => 'RM_test_room_sid',
         ], 200),
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
     ]);
 });
 
@@ -118,4 +119,72 @@ it('forbids medical staff from connecting to a consultation session', function (
     $this->actingAs($medicalStaff)
         ->postJson(route('consultations.livekit.connect', $consultation))
         ->assertForbidden();
+});
+
+it('cancels consultation when deepfake detection heartbeat is stale on connect', function () {
+    config()->set('services.pipeline.detection_timeout_seconds', 60);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-99-stale',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(61),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertStatus(409)
+        ->assertJson([
+            'status' => 'cancelled',
+            'message' => 'Consultation cancelled because deepfake detection was not running.',
+        ]);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe('cancelled');
+    expect($consultation->livekit_room_status)->toBe('ended');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/DeleteRoom'
+        && $request['room'] === 'consultation-99-stale');
+});
+
+it('allows connect when deepfake detection heartbeat is fresh', function () {
+    config()->set('services.pipeline.detection_timeout_seconds', 60);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-100-fresh',
+        'livekit_room_status' => 'room_ready',
+        'livekit_room_created_at' => now()->subMinutes(2),
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now()->subSeconds(10),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.connect', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'room_status' => 'room_ready',
+            'role' => 'doctor',
+        ]);
+
+    expect($consultation->fresh()->status)->not->toBe('cancelled');
 });

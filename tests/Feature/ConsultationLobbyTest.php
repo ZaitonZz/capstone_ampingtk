@@ -114,6 +114,26 @@ it('allows the consultation patient to view the teleconsultation lobby', functio
         );
 });
 
+it('includes deepfake detection status in lobby payload', function () {
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'livekit_room_name' => 'consultation-lobby-detection',
+        'livekit_room_status' => 'room_ready',
+        'pipeline_detection_status' => 'running',
+        'pipeline_last_heartbeat_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/lobby')
+                ->where('deepfake_detection.state', 'running'),
+        );
+});
+
 it('forbids medical staff from viewing the teleconsultation lobby', function () {
     $doctor = User::factory()->doctor()->create();
     $medicalStaff = User::factory()->medicalStaff()->create();
