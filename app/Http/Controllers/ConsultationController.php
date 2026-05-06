@@ -39,6 +39,9 @@ class ConsultationController extends Controller
             return true;
         }
 
+        // Fall back to checking whether the doctor has any duty scheduled on that date.
+        // A staff member approving the consultation may adjust the exact time — having
+        // any duty record on the date is considered sufficient for the UI to allow approval.
         return DoctorDutySchedule::query()
             ->where('doctor_id', $doctorId)
             ->whereDate('duty_date', $consultation->scheduled_at->toDateString())
