@@ -19,6 +19,13 @@ import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -29,10 +36,7 @@ type DutyStatus = 'on_duty' | 'off_duty' | 'absent' | 'on_leave';
 type RequestStatus = 'pending' | 'approved' | 'rejected';
 type RequestType = 'absent' | 'on_leave';
 type ScheduleMode = 'multiple_dates' | 'recurring_weekly';
-type DutyCalendarTab =
-    | 'calendar_overview'
-    | 'manage_schedules'
-    | 'records_requests';
+type DutyCalendarTab = 'calendar_overview' | 'records_requests';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 type StatusFilter = 'all' | DutyStatus;
 
@@ -98,11 +102,6 @@ const DUTY_CALENDAR_TABS: {
         id: 'calendar_overview',
         label: 'Calendar Overview',
         description: 'Month view and selected day details',
-    },
-    {
-        id: 'manage_schedules',
-        label: 'Manage Schedules',
-        description: 'Create schedules and edit selected records',
     },
     {
         id: 'records_requests',
@@ -513,6 +512,7 @@ export default function DoctorDutySchedulesIndex({
     );
     const [activeTab, setActiveTab] =
         useState<DutyCalendarTab>('calendar_overview');
+    const [isAddScheduleOpen, setAddScheduleOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [activeScheduleId, setActiveScheduleId] = useState<number | null>(
         null,
@@ -743,7 +743,7 @@ export default function DoctorDutySchedulesIndex({
 
     function openEdit(schedule: DutySchedule) {
         setSelectedSchedule(schedule);
-        setActiveTab('manage_schedules');
+        setActiveTab('calendar_overview');
         selectCalendarDate(schedule.duty_date, schedule.id);
         editForm.setData({
             doctor_id: String(schedule.doctor_id),
@@ -803,6 +803,7 @@ export default function DoctorDutySchedulesIndex({
             preserveScroll: true,
             onSuccess: () => {
                 resetCreateForm();
+                setAddScheduleOpen(false);
                 toast.success('Duty schedule saved.');
             },
             onError: () => {
@@ -905,6 +906,16 @@ export default function DoctorDutySchedulesIndex({
                                 Scan monthly coverage, inspect one day at a
                                 time, and manage duty records when needed.
                             </p>
+                            {can_manage_schedule && (
+                                <Button
+                                    type="button"
+                                    className="mt-4 bg-slate-900 hover:bg-slate-800"
+                                    onClick={() => setAddScheduleOpen(true)}
+                                >
+                                    <CalendarPlus className="mr-2 h-4 w-4" />
+                                    Add Duty Schedule
+                                </Button>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4 lg:min-w-[460px]">
@@ -948,7 +959,7 @@ export default function DoctorDutySchedulesIndex({
                     <div
                         role="tablist"
                         aria-label="Doctor duty calendar sections"
-                        className="grid gap-1 md:grid-cols-3"
+                        className="grid gap-1 md:grid-cols-2"
                     >
                         {DUTY_CALENDAR_TABS.map((tab) => {
                             const isActive = activeTab === tab.id;
@@ -1162,28 +1173,22 @@ export default function DoctorDutySchedulesIndex({
                     </div>
                 </section>
 
-                <section
-                    id="manage-schedules-panel"
-                    role="tabpanel"
-                    aria-labelledby="manage-schedules-tab"
-                    hidden={activeTab !== 'manage_schedules'}
-                    className="space-y-4 border-b pb-7"
-                >
-                    {can_manage_schedule ? (
-                        <>
-                            <div>
-                                <h2 className="text-xl font-semibold">
-                                    Add Duty Schedule
-                                </h2>
-                                <p className="mt-1 text-sm text-muted-foreground">
+                {can_manage_schedule && (
+                    <Dialog
+                        open={isAddScheduleOpen}
+                        onOpenChange={setAddScheduleOpen}
+                    >
+                        <DialogContent className="flex max-h-[90vh] overflow-hidden p-0 sm:max-w-5xl">
+                            <DialogHeader className="border-b p-4 pr-12">
+                                <DialogTitle>Add Duty Schedule</DialogTitle>
+                                <DialogDescription>
                                     Create schedules for specific dates or
                                     weekly recurring duty blocks.
-                                </p>
-                            </div>
-
+                                </DialogDescription>
+                            </DialogHeader>
                             <form
                                 onSubmit={handleCreateSubmit}
-                                className="rounded-lg border bg-background p-4 shadow-sm"
+                                className="flex-1 overflow-y-auto px-4 pt-4 pb-4"
                             >
                                 <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
                                     <div className="space-y-4">
@@ -1853,20 +1858,9 @@ export default function DoctorDutySchedulesIndex({
                                     </div>
                                 </div>
                             </form>
-                        </>
-                    ) : (
-                        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-12 text-center">
-                            <CalendarPlus className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                            <p className="mt-3 text-sm font-medium">
-                                Schedule management is unavailable
-                            </p>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Your account can view duty coverage, but cannot
-                                create or edit duty schedules.
-                            </p>
-                        </div>
-                    )}
-                </section>
+                        </DialogContent>
+                    </Dialog>
+                )}
 
                 <section
                     hidden={activeTab !== 'calendar_overview'}
@@ -2016,7 +2010,7 @@ export default function DoctorDutySchedulesIndex({
 
                 {can_manage_schedule &&
                     selectedSchedule &&
-                    activeTab === 'manage_schedules' && (
+                    activeTab === 'calendar_overview' && (
                         <section
                             id="edit-duty-schedule"
                             className="space-y-4 border-b pb-7"
