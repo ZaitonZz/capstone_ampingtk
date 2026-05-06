@@ -1,13 +1,9 @@
-import type { EventClickArg, EventContentArg } from '@fullcalendar/core';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import type { DateClickArg } from '@fullcalendar/interaction';
-import FullCalendar from '@fullcalendar/react';
-import timeGridPlugin from '@fullcalendar/timegrid';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     CalendarDays,
     CalendarPlus,
+    ChevronLeft,
+    ChevronRight,
     ClipboardCheck,
     Clock3,
     Info,
@@ -49,24 +45,6 @@ interface DutySchedule {
     remarks: string | null;
 }
 
-interface DutyEvent {
-    id: number;
-    title: string;
-    start: string;
-    end: string;
-    extendedProps: DutySchedule;
-}
-
-interface DutyScheduleGroup {
-    id: string;
-    title: string;
-    duty_date: string;
-    start_time: string;
-    end_time: string;
-    status: DutyStatus;
-    schedules: DutySchedule[];
-}
-
 interface CalendarSelection {
     title: string;
     subtitle: string;
@@ -75,7 +53,6 @@ interface CalendarSelection {
 
 interface Props {
     schedules: DutySchedule[];
-    events: DutyEvent[];
     doctors: DoctorOption[];
     can_manage_schedule: boolean;
     can_submit_duty_requests: boolean;
@@ -211,16 +188,57 @@ function formatTimeRange(start: string, end: string) {
     return `${formatTime(start)} - ${formatTime(end)}`;
 }
 
-function formatDoctorCount(count: number) {
-    return `${count} ${count === 1 ? 'Doctor' : 'Doctors'}`;
-}
-
 function buildInputDate(date: Date) {
     return [
         date.getFullYear(),
         String(date.getMonth() + 1).padStart(2, '0'),
         String(date.getDate()).padStart(2, '0'),
     ].join('-');
+}
+
+function startOfWeek(date: Date) {
+    const weekStart = new Date(date);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+
+    return weekStart;
+}
+
+function addDays(date: Date, days: number) {
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + days);
+
+    return nextDate;
+}
+
+function formatBoardDay(date: Date) {
+    return new Intl.DateTimeFormat('en', {
+        weekday: 'short',
+    }).format(date);
+}
+
+function formatBoardDate(date: Date) {
+    return new Intl.DateTimeFormat('en', {
+        month: 'numeric',
+        day: 'numeric',
+    }).format(date);
+}
+
+function formatWeekRange(startDate: Date, endDate: Date) {
+    const sameYear = startDate.getFullYear() === endDate.getFullYear();
+    const sameMonth = sameYear && startDate.getMonth() === endDate.getMonth();
+    const startFormat = new Intl.DateTimeFormat('en', {
+        month: 'long',
+        day: 'numeric',
+        year: sameYear ? undefined : 'numeric',
+    });
+    const endFormat = new Intl.DateTimeFormat('en', {
+        month: sameMonth ? undefined : 'long',
+        day: 'numeric',
+        year: 'numeric',
+    });
+
+    return `${startFormat.format(startDate)} - ${endFormat.format(endDate)}`;
 }
 
 function buildRecurringPreview(
@@ -282,6 +300,9 @@ export default function DoctorDutySchedulesIndex({
         useState<DutySchedule | null>(null);
     const [calendarSelection, setCalendarSelection] =
         useState<CalendarSelection | null>(null);
+    const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
+        startOfWeek(new Date()),
+    );
     const [draftDutyDate, setDraftDutyDate] = useState('');
     const [reviewerNotes, setReviewerNotes] = useState<Record<number, string>>(
         {},
@@ -326,69 +347,41 @@ export default function DoctorDutySchedulesIndex({
         [doctors],
     );
 
-    const groupedScheduleEvents = useMemo<DutyScheduleGroup[]>(() => {
-        const grouped = schedules.reduce<Record<string, DutySchedule[]>>(
-            (lookup, schedule) => {
-                const key = [
-                    schedule.duty_date,
-                    schedule.start_time,
-                    schedule.end_time,
-                    schedule.status,
-                ].join('|');
-
-                lookup[key] = [...(lookup[key] ?? []), schedule];
-
-                return lookup;
-            },
-            {},
-        );
-
-        return Object.entries(grouped)
-            .map(([key, groupSchedules]) => {
-                const [dutyDate, startTime, endTime, status] = key.split(
-                    '|',
-                ) as [string, string, string, DutyStatus];
-                const sortedSchedules = [...groupSchedules].sort((a, b) =>
-                    (a.doctor_name ?? '').localeCompare(b.doctor_name ?? ''),
-                );
-                const title = `${formatDoctorCount(sortedSchedules.length)} ${
-                    STATUS_LABELS[status]
-                }`;
-
-                return {
-                    id: key,
-                    title,
-                    duty_date: dutyDate,
-                    start_time: startTime,
-                    end_time: endTime,
-                    status,
-                    schedules: sortedSchedules,
-                };
-            })
-            .sort((a, b) =>
-                [a.duty_date, a.start_time, a.end_time]
-                    .join('|')
-                    .localeCompare(
-                        [b.duty_date, b.start_time, b.end_time].join('|'),
-                    ),
-            );
-    }, [schedules]);
-
-    const calendarEvents = useMemo(
+    const currentWeekDates = useMemo(
         () =>
-            groupedScheduleEvents.map((group) => ({
-                id: group.id,
-                title: group.title,
-                start: `${group.duty_date}T${group.start_time}`,
-                end: `${group.duty_date}T${group.end_time}`,
-                backgroundColor: STATUS_COLORS[group.status],
-                borderColor: STATUS_COLORS[group.status],
-                textColor: '#ffffff',
-                extendedProps: {
-                    group,
+            Array.from({ length: 7 }, (_, index) =>
+                addDays(visibleWeekStart, index),
+            ),
+        [visibleWeekStart],
+    );
+
+    const visibleWeekEnd = currentWeekDates[6] ?? visibleWeekStart;
+
+    const schedulesByDate = useMemo(
+        () =>
+            currentWeekDates.reduce<Record<string, DutySchedule[]>>(
+                (lookup, date) => {
+                    const dateKey = buildInputDate(date);
+
+                    lookup[dateKey] = schedules
+                        .filter((schedule) => schedule.duty_date === dateKey)
+                        .sort((a, b) =>
+                            [a.start_time, a.end_time, a.doctor_name ?? '']
+                                .join('|')
+                                .localeCompare(
+                                    [
+                                        b.start_time,
+                                        b.end_time,
+                                        b.doctor_name ?? '',
+                                    ].join('|'),
+                                ),
+                        );
+
+                    return lookup;
                 },
-            })),
-        [groupedScheduleEvents],
+                {},
+            ),
+        [currentWeekDates, schedules],
     );
 
     const recurringPreviewDates = useMemo(
@@ -478,7 +471,7 @@ export default function DoctorDutySchedulesIndex({
         setSelectedSchedule(schedule);
         setCalendarSelection({
             title: formatLongScheduleDate(schedule.duty_date),
-            subtitle: `${formatTimeRange(schedule.start_time, schedule.end_time)} · ${STATUS_LABELS[schedule.status]}`,
+            subtitle: `${formatTimeRange(schedule.start_time, schedule.end_time)} - ${STATUS_LABELS[schedule.status]}`,
             schedules: [schedule],
         });
         editForm.setData({
@@ -554,71 +547,47 @@ export default function DoctorDutySchedulesIndex({
         );
     }
 
-    function handleDateClick(info: DateClickArg) {
-        const clickedDate = [
-            info.date.getFullYear(),
-            String(info.date.getMonth() + 1).padStart(2, '0'),
-            String(info.date.getDate()).padStart(2, '0'),
-        ].join('-');
-
-        const daySchedules = schedules.filter(
-            (schedule) => schedule.duty_date === clickedDate,
-        );
+    function selectDay(date: string) {
+        const daySchedules = schedulesByDate[date] ?? [];
 
         setCalendarSelection({
-            title: formatLongScheduleDate(clickedDate),
+            title: formatLongScheduleDate(date),
             subtitle:
                 daySchedules.length > 0
                     ? `${daySchedules.length} schedule ${daySchedules.length === 1 ? 'entry' : 'entries'} for this day`
                     : 'No schedules for this day',
             schedules: daySchedules,
         });
+    }
 
+    function handleBoardDayClick(date: string) {
+        selectDay(date);
+    }
+
+    function handleBoardAddDate(date: string) {
+        selectDay(date);
         if (
             can_manage_schedule &&
             createForm.data.schedule_mode === 'multiple_dates'
         ) {
-            addDutyDate(clickedDate);
+            addDutyDate(date);
         }
     }
 
-    function handleEventClick(info: EventClickArg) {
-        const group = info.event.extendedProps.group as
-            | DutyScheduleGroup
-            | undefined;
-
-        if (!group) {
-            return;
-        }
-
-        setCalendarSelection({
-            title: `${formatDoctorCount(group.schedules.length)} ${
-                STATUS_LABELS[group.status]
-            }`,
-            subtitle: `${formatLongScheduleDate(group.duty_date)} · ${formatTimeRange(group.start_time, group.end_time)}`,
-            schedules: group.schedules,
-        });
+    function handleBoardScheduleClick(schedule: DutySchedule) {
+        selectDay(schedule.duty_date);
     }
 
-    function renderCalendarEvent(eventInfo: EventContentArg) {
-        const group = eventInfo.event.extendedProps.group as
-            | DutyScheduleGroup
-            | undefined;
+    function goToPreviousWeek() {
+        setVisibleWeekStart((current) => addDays(current, -7));
+    }
 
-        if (!group) {
-            return <span>{eventInfo.event.title}</span>;
-        }
+    function goToNextWeek() {
+        setVisibleWeekStart((current) => addDays(current, 7));
+    }
 
-        return (
-            <div className="min-w-0 px-1 py-0.5 leading-tight">
-                <div className="truncate text-[11px] font-semibold">
-                    {formatDoctorCount(group.schedules.length)}
-                </div>
-                <div className="truncate text-[10px] opacity-90">
-                    {STATUS_LABELS[group.status]}
-                </div>
-            </div>
-        );
+    function goToCurrentWeek() {
+        setVisibleWeekStart(startOfWeek(new Date()));
     }
 
     function setRecurringWeekdays(nextWeekdays: string[]) {
@@ -703,8 +672,8 @@ export default function DoctorDutySchedulesIndex({
                                 Duty Calendar
                             </h2>
                             <p className="text-sm text-muted-foreground">
-                                Overview only. Shared date and time slots are
-                                grouped so the full list stays readable below.
+                                Weekly coverage board. Select a day or duty row
+                                to review details below.
                             </p>
                         </div>
 
@@ -729,38 +698,187 @@ export default function DoctorDutySchedulesIndex({
                         </div>
                     </div>
 
-                    <div className="rounded-xl border bg-background p-2 shadow-inner sm:p-3">
-                        <div className="doctor-duty-calendar [&_.fc]:text-sm [&_.fc-button]:capitalize [&_.fc-button]:shadow-none [&_.fc-button]:ring-0 [&_.fc-button-primary]:border-emerald-500 [&_.fc-button-primary]:bg-emerald-600 [&_.fc-button-primary]:text-white [&_.fc-button-primary:hover]:bg-emerald-700 [&_.fc-col-header-cell-cushion]:py-2 [&_.fc-day-today]:bg-emerald-50/50 [&_.fc-event]:cursor-pointer [&_.fc-event]:rounded-md [&_.fc-event]:border-0 [&_.fc-event]:font-medium [&_.fc-scrollgrid]:rounded-lg [&_.fc-scrollgrid]:border-border [&_.fc-timegrid-slot]:h-12">
-                            <FullCalendar
-                                plugins={[
-                                    dayGridPlugin,
-                                    timeGridPlugin,
-                                    interactionPlugin,
-                                ]}
-                                initialView="timeGridWeek"
-                                allDaySlot={false}
-                                headerToolbar={{
-                                    left: 'prev,next today',
-                                    center: 'title',
-                                    right: 'dayGridMonth,timeGridWeek,timeGridDay',
-                                }}
-                                slotMinTime="06:00:00"
-                                slotMaxTime="20:00:00"
-                                slotDuration="01:00:00"
-                                events={calendarEvents}
-                                eventClick={handleEventClick}
-                                eventContent={renderCalendarEvent}
-                                dateClick={handleDateClick}
-                                height={460}
-                            />
+                    <div className="rounded-xl border bg-background p-3 shadow-inner">
+                        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={goToPreviousWeek}
+                                    aria-label="Previous week"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={goToNextWeek}
+                                    aria-label="Next week"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={goToCurrentWeek}
+                                >
+                                    Today
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center justify-start gap-2 text-lg font-semibold lg:justify-center">
+                                <CalendarDays className="h-5 w-5 text-emerald-600" />
+                                {formatWeekRange(
+                                    visibleWeekStart,
+                                    visibleWeekEnd,
+                                )}
+                            </div>
+
+                            <div className="flex justify-start lg:justify-end">
+                                <Badge
+                                    variant="outline"
+                                    className="border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700"
+                                >
+                                    Week
+                                </Badge>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <div className="grid min-w-[1120px] grid-cols-7 gap-2">
+                                {currentWeekDates.map((date) => {
+                                    const dateKey = buildInputDate(date);
+                                    const daySchedules =
+                                        schedulesByDate[dateKey] ?? [];
+                                    const onDutyCount = daySchedules.filter(
+                                        (schedule) =>
+                                            schedule.status === 'on_duty',
+                                    ).length;
+                                    const isToday =
+                                        dateKey === buildInputDate(new Date());
+                                    const isSelected =
+                                        calendarSelection?.title ===
+                                        formatLongScheduleDate(dateKey);
+
+                                    return (
+                                        <div
+                                            key={dateKey}
+                                            className={`flex h-[340px] flex-col rounded-lg border bg-card transition ${isToday ? 'border-emerald-200 bg-emerald-50/30' : ''} ${isSelected ? 'ring-2 ring-emerald-500/30' : ''}`}
+                                        >
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleBoardDayClick(dateKey)
+                                                }
+                                                className="flex items-center justify-between gap-2 border-b px-3 py-2 text-left hover:bg-muted/30"
+                                            >
+                                                <span className="font-semibold">
+                                                    {formatBoardDay(date)}{' '}
+                                                    {formatBoardDate(date)}
+                                                </span>
+                                                {daySchedules.length > 0 && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="shrink-0 border-emerald-100 bg-emerald-50 text-[11px] text-emerald-700"
+                                                    >
+                                                        {onDutyCount > 0
+                                                            ? `${onDutyCount} on duty`
+                                                            : `${daySchedules.length} scheduled`}
+                                                    </Badge>
+                                                )}
+                                            </button>
+
+                                            <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                                                {daySchedules.length > 0 ? (
+                                                    <div className="space-y-2">
+                                                        {daySchedules.map(
+                                                            (schedule) => (
+                                                                <button
+                                                                    key={
+                                                                        schedule.id
+                                                                    }
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleBoardScheduleClick(
+                                                                            schedule,
+                                                                        )
+                                                                    }
+                                                                    className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                                                                >
+                                                                    <span className="flex items-start gap-2">
+                                                                        <span
+                                                                            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT_CLASSES[schedule.status]}`}
+                                                                        />
+                                                                        <span className="min-w-0">
+                                                                            <span className="block truncate text-sm font-medium">
+                                                                                {
+                                                                                    schedule.doctor_name
+                                                                                }
+                                                                            </span>
+                                                                            <span className="block text-xs text-muted-foreground">
+                                                                                {formatTimeRange(
+                                                                                    schedule.start_time,
+                                                                                    schedule.end_time,
+                                                                                )}
+                                                                            </span>
+                                                                        </span>
+                                                                    </span>
+                                                                </button>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleBoardDayClick(
+                                                                dateKey,
+                                                            )
+                                                        }
+                                                        className="flex min-h-36 w-full flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-3 text-center text-sm text-muted-foreground hover:bg-muted/30"
+                                                    >
+                                                        <CalendarDays className="mb-2 h-7 w-7 text-muted-foreground/50" />
+                                                        No duty schedules
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {can_manage_schedule &&
+                                                createForm.data
+                                                    .schedule_mode ===
+                                                    'multiple_dates' && (
+                                                    <div className="border-t px-3 py-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="w-full justify-center text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                                            onClick={() =>
+                                                                handleBoardAddDate(
+                                                                    dateKey,
+                                                                )
+                                                            }
+                                                        >
+                                                            <CalendarPlus className="mr-2 h-4 w-4" />
+                                                            Add duty
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
                     {can_manage_schedule &&
                         createForm.data.schedule_mode === 'multiple_dates' && (
                             <p className="mt-3 rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                                Tip: while in Specific Dates mode, click dates
-                                on the calendar to add them instantly.
+                                Tip: while in Specific Dates mode, use Add duty
+                                on the weekly board to select dates instantly.
                             </p>
                         )}
                 </section>
@@ -1337,9 +1455,8 @@ export default function DoctorDutySchedulesIndex({
                                             Selected Schedule Details
                                         </h2>
                                         <p className="text-xs text-muted-foreground">
-                                            Click a grouped calendar block to
-                                            review every doctor in that date and
-                                            time slot.
+                                            Click a day or duty row to review
+                                            every schedule for that date.
                                         </p>
                                     </div>
                                     {calendarSelection && (
@@ -1379,6 +1496,9 @@ export default function DoctorDutySchedulesIndex({
                                                             <th className="px-3 py-2">
                                                                 Status
                                                             </th>
+                                                            <th className="px-3 py-2">
+                                                                Remarks
+                                                            </th>
                                                             {can_manage_schedule && (
                                                                 <th className="px-3 py-2 text-right">
                                                                     Action
@@ -1404,13 +1524,6 @@ export default function DoctorDutySchedulesIndex({
                                                                                 schedule.doctor_name
                                                                             }
                                                                         </span>
-                                                                        {schedule.remarks && (
-                                                                            <div className="mt-1 text-xs font-normal text-muted-foreground">
-                                                                                {
-                                                                                    schedule.remarks
-                                                                                }
-                                                                            </div>
-                                                                        )}
                                                                     </td>
                                                                     <td className="px-3 py-2">
                                                                         {formatTimeRange(
@@ -1435,6 +1548,10 @@ export default function DoctorDutySchedulesIndex({
                                                                                 ]
                                                                             }
                                                                         </Badge>
+                                                                    </td>
+                                                                    <td className="px-3 py-2 text-muted-foreground">
+                                                                        {schedule.remarks ||
+                                                                            '-'}
                                                                     </td>
                                                                     {can_manage_schedule && (
                                                                         <td className="px-3 py-2 text-right">
@@ -1469,12 +1586,11 @@ export default function DoctorDutySchedulesIndex({
                                     <div className="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center">
                                         <CalendarDays className="h-8 w-8 text-emerald-600" />
                                         <p className="mt-3 text-sm font-medium text-foreground">
-                                            Select a calendar block
+                                            Select a day
                                         </p>
                                         <p className="mt-1 text-xs text-muted-foreground">
-                                            Details appear here while the
-                                            schedule list remains the full
-                                            review area.
+                                            Select a day or duty row from the
+                                            weekly board.
                                         </p>
                                     </div>
                                 )}
