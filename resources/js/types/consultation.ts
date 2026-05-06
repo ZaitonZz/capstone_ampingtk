@@ -6,7 +6,7 @@ export type ConsultationStatus =
     | 'completed'
     | 'cancelled'
     | 'no_show';
-export type ConsultationType = 'teleconsultation';
+export type ConsultationType = 'in_person' | 'teleconsultation';
 
 export interface PatientSummary {
     id: number;
