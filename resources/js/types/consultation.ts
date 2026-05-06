@@ -124,6 +124,24 @@ export interface Consultation {
     updated_at: string;
 }
 
+export interface ConsultationDeepfakeGuidance {
+    low_light: boolean;
+    too_far: boolean;
+    face_area_ratio: number | null;
+    brightness: number | null;
+}
+
+export interface ConsultationDeepfakeDetectionState {
+    state: 'starting' | 'running' | 'delayed' | 'unavailable' | 'cancelled';
+    status: string | null;
+    timeout_seconds: number;
+    last_heartbeat_at: string | null;
+    last_heartbeat_age_seconds: number | null;
+    started_at: string | null;
+    last_scan_at: string | null;
+    guidance: ConsultationDeepfakeGuidance;
+}
+
 export interface ConsultationIdentityVerificationState {
     is_paused: boolean;
     is_current_user_target: boolean;

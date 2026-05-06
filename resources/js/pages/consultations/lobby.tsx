@@ -35,6 +35,7 @@ import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
     ConsultationConsent,
+    ConsultationDeepfakeDetectionState,
     ConsultationIdentityVerificationState,
 } from '@/types/consultation';
 
@@ -71,6 +72,7 @@ interface Props {
     consent: ConsultationConsent | null;
     verification?: ConsultationIdentityVerificationState;
     livekit?: LiveKitLobbyProps;
+    deepfake_detection?: ConsultationDeepfakeDetectionState;
 }
 
 type ConnectState = 'idle' | 'connecting' | 'connected' | 'error';
@@ -136,6 +138,70 @@ function DeviceButton({
     );
 }
 
+function DeepfakeDetectionIndicator({
+    detection,
+}: {
+    detection?: ConsultationDeepfakeDetectionState;
+}) {
+    const state = detection?.state ?? 'unavailable';
+    const config = {
+        running: {
+            label: 'Detection running',
+            text: 'Deepfake monitoring is active for this consultation.',
+            className:
+                'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200',
+            icon: CheckCircle2,
+        },
+        starting: {
+            label: 'Detection starting',
+            text: 'Waiting for the deepfake pipeline to confirm monitoring.',
+            className:
+                'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200',
+            icon: LoaderCircle,
+        },
+        delayed: {
+            label: 'Detection delayed',
+            text: `No active pipeline heartbeat detected within ${detection?.timeout_seconds ?? 60} seconds.`,
+            className:
+                'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
+            icon: AlertTriangle,
+        },
+        unavailable: {
+            label: 'Detection unavailable',
+            text: 'Deepfake monitoring starts after the video room is ready.',
+            className:
+                'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200',
+            icon: Shield,
+        },
+        cancelled: {
+            label: 'Consultation cancelled',
+            text: 'This consultation was cancelled because deepfake detection was not running.',
+            className:
+                'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200',
+            icon: AlertTriangle,
+        },
+    }[state];
+    const Icon = config.icon;
+
+    return (
+        <div className={`rounded-2xl border p-4 shadow-sm ${config.className}`}>
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
+                <Icon
+                    className={`h-4 w-4 ${state === 'starting' ? 'animate-spin' : ''}`}
+                />
+                {config.label}
+            </div>
+            <p className="text-xs leading-snug">{config.text}</p>
+            {detection?.last_heartbeat_at && (
+                <p className="mt-2 text-[11px] opacity-75">
+                    Last heartbeat:{' '}
+                    {new Date(detection.last_heartbeat_at).toLocaleTimeString()}
+                </p>
+            )}
+        </div>
+    );
+}
+
 function getMetaCsrfToken(): string {
     const element = document.querySelector(
         'meta[name="csrf-token"]',
@@ -183,6 +249,7 @@ export default function ConsultationLobbyPage({
     consent,
     verification,
     livekit,
+    deepfake_detection,
 }: Props) {
     const page = usePage<PageProps>();
     const isPaused =
@@ -835,6 +902,10 @@ export default function ConsultationLobbyPage({
 
                     {/* ── RIGHT (1 col): Details + Consent + Actions ───────── */}
                     <div className="flex w-full flex-col gap-3 lg:w-80">
+                        <DeepfakeDetectionIndicator
+                            detection={deepfake_detection}
+                        />
+
                         {/* Session Details card */}
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
