@@ -6,11 +6,12 @@ import {
     LiveKitRoom,
     ParticipantTile,
     RoomAudioRenderer,
+    useDataChannel,
     useTracks,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
+    ConsultationDeepfakeDetectionState,
     ConsultationIdentityVerificationState,
 } from '@/types/consultation';
 
@@ -40,9 +42,37 @@ interface Props {
     consultation: Consultation;
     verification?: ConsultationIdentityVerificationState;
     livekit: LiveKitSessionProps;
+    deepfake_detection?: ConsultationDeepfakeDetectionState;
 }
 
-function ConsultationCallStage() {
+function DeepfakeDataListener({
+    onUpdate,
+}: {
+    onUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+}) {
+    useDataChannel('deepfake_detection', (message) => {
+        try {
+            const payloadText = new TextDecoder().decode(message.payload);
+            const payload = JSON.parse(
+                payloadText,
+            ) as ConsultationDeepfakeDetectionState;
+
+            if (payload?.state) {
+                onUpdate(payload);
+            }
+        } catch {
+            // Ignore malformed agent data packets; the server poll remains authoritative.
+        }
+    });
+
+    return null;
+}
+
+function ConsultationCallStage({
+    onDetectionUpdate,
+}: {
+    onDetectionUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+}) {
     const tracks = useTracks([
         { source: Track.Source.Camera, withPlaceholder: false },
         { source: Track.Source.ScreenShare, withPlaceholder: false },
@@ -54,6 +84,8 @@ function ConsultationCallStage() {
 
     return (
         <div className="flex h-full flex-col">
+            <DeepfakeDataListener onUpdate={onDetectionUpdate} />
+
             <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2 p-2">
                 {activeTracks.length > 0 ? (
                     activeTracks.map((trackRef) => (
@@ -86,20 +118,127 @@ function ConsultationCallStage() {
     );
 }
 
+function DetectionStatusPanel({
+    detection,
+}: {
+    detection?: ConsultationDeepfakeDetectionState;
+}) {
+    const state = detection?.state ?? 'unavailable';
+    const label = {
+        running: 'Detection running',
+        starting: 'Detection starting',
+        delayed: 'Detection delayed',
+        unavailable: 'Detection unavailable',
+        cancelled: 'Consultation cancelled',
+    }[state];
+    const description = {
+        running: 'Deepfake monitoring is active.',
+        starting: 'Waiting for the pipeline to confirm monitoring.',
+        delayed: `No active heartbeat within ${detection?.timeout_seconds ?? 60} seconds.`,
+        unavailable: 'Monitoring starts when the room and pipeline are ready.',
+        cancelled: 'Deepfake detection was not running, so the consultation was cancelled.',
+    }[state];
+    const tone =
+        state === 'running'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+            : state === 'cancelled'
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : state === 'delayed'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-blue-200 bg-blue-50 text-blue-800';
+    const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
+
+    return (
+        <div className={`rounded-2xl border p-4 shadow-sm ${tone}`}>
+            <div className="mb-1 flex items-center gap-2 font-semibold">
+                <Icon className="h-4 w-4" />
+                {label}
+            </div>
+            <p className="text-sm">{description}</p>
+            {detection?.last_heartbeat_at && (
+                <p className="mt-2 text-xs opacity-75">
+                    Last heartbeat:{' '}
+                    {new Date(detection.last_heartbeat_at).toLocaleTimeString()}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function GuidancePanel({
+    detection,
+}: {
+    detection?: ConsultationDeepfakeDetectionState;
+}) {
+    const guidance = detection?.guidance;
+    const notices = [
+        guidance?.too_far
+            ? 'Move closer to the camera so your face is easier to verify.'
+            : null,
+        guidance?.low_light
+            ? 'Increase lighting in your environment so detection remains reliable.'
+            : null,
+    ].filter(Boolean);
+
+    if (notices.length === 0) {
+        return (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 shadow-sm">
+                <div className="mb-1 flex items-center gap-2 font-semibold">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Camera guidance clear
+                </div>
+                <p className="text-sm">
+                    The pipeline has no current distance or lighting warning.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 shadow-sm">
+            <div className="mb-2 flex items-center gap-2 font-semibold">
+                <AlertTriangle className="h-4 w-4" />
+                Camera guidance
+            </div>
+            <div className="space-y-2 text-sm">
+                {notices.map((notice) => (
+                    <p key={notice}>{notice}</p>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function ConsultationSessionPage({
     consultation,
     verification,
     livekit,
+    deepfake_detection,
 }: Props) {
     const isPaused =
         verification?.is_paused === true || consultation.status === 'paused';
-    usePoll(5000, { only: ['consultation', 'verification'] });
+    const [liveDetection, setLiveDetection] = useState<
+        ConsultationDeepfakeDetectionState | undefined
+    >(deepfake_detection);
+    usePoll(5000, {
+        only: ['consultation', 'verification', 'deepfake_detection'],
+        onSuccess: (page) => {
+            const props = page.props as {
+                deepfake_detection?: ConsultationDeepfakeDetectionState;
+            };
+
+            if (props.deepfake_detection) {
+                setLiveDetection(props.deepfake_detection);
+            }
+        },
+    });
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
     const hasAutoRedirectedRef = useRef(false);
+    const effectiveDetection = liveDetection ?? deepfake_detection;
 
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
@@ -124,12 +263,17 @@ export default function ConsultationSessionPage({
 
     const refreshVerificationState = useCallback((): void => {
         router.reload({
-            only: ['consultation', 'verification'],
+            only: ['consultation', 'verification', 'deepfake_detection'],
             onSuccess: (page) => {
                 const props = page.props as {
                     consultation?: Consultation;
                     verification?: ConsultationIdentityVerificationState;
+                    deepfake_detection?: ConsultationDeepfakeDetectionState;
                 };
+
+                if (props.deepfake_detection) {
+                    setLiveDetection(props.deepfake_detection);
+                }
 
                 const refreshedIsPaused =
                     props.verification?.is_paused === true ||
@@ -181,7 +325,8 @@ export default function ConsultationSessionPage({
         livekit.enabled &&
         payload?.participant_token &&
         payload?.room_name &&
-        serverUrl,
+        serverUrl &&
+        consultation.status !== 'cancelled',
     );
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -314,7 +459,9 @@ export default function ConsultationSessionPage({
                                         refreshVerificationState();
                                     }}
                                 >
-                                    <ConsultationCallStage />
+                                    <ConsultationCallStage
+                                        onDetectionUpdate={setLiveDetection}
+                                    />
                                 </LiveKitRoom>
                             </div>
                         ) : (
@@ -333,6 +480,10 @@ export default function ConsultationSessionPage({
                     </div>
 
                     <div className="space-y-4">
+                        <DetectionStatusPanel detection={effectiveDetection} />
+
+                        <GuidancePanel detection={effectiveDetection} />
+
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                 Connection Details
