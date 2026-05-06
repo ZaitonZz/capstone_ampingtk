@@ -13,8 +13,6 @@ import type {
     ConsultationDeepfakeEscalation,
     ConsultationStatus,
     ConsultationType,
-    PatientNote,
-    Prescription,
 } from '@/types/consultation';
 
 const MICROCHECK_VARIANT: Record<
