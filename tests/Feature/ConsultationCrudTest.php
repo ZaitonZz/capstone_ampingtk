@@ -418,7 +418,7 @@ it('patient can submit an appointment request which creates a pending consultati
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
-    $scheduledAt = now()->addDays(3);
+    $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
