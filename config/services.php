@@ -51,6 +51,8 @@ return [
         'microcheck_min_interval_seconds' => (int) env('PIPELINE_MICROCHECK_MIN_INTERVAL_SECONDS', 5),
         'microcheck_max_interval_seconds' => (int) env('PIPELINE_MICROCHECK_MAX_INTERVAL_SECONDS', 20),
         'microcheck_expiry_seconds' => (int) env('PIPELINE_MICROCHECK_EXPIRY_SECONDS', 45),
+        'detection_timeout_seconds' => (int) env('PIPELINE_DETECTION_TIMEOUT_SECONDS', 60),
+        'no_face_timeout_seconds' => (int) env('PIPELINE_NO_FACE_TIMEOUT_SECONDS', 30),
     ],
 
 ];

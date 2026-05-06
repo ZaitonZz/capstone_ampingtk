@@ -90,7 +90,7 @@ class LiveKitService
                 'roomJoin' => true,
                 'room' => $consultation->livekit_room_name,
                 'canPublish' => false,
-                'canPublishData' => false,
+                'canPublishData' => true,
                 'canSubscribe' => true,
                 'hidden' => true,
                 'recorder' => true,

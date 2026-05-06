@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\AgentTestController;
 use App\Http\Controllers\ConsultationConsentController;
+use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\ConsultationSessionController;
 use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
 use App\Http\Controllers\PipelineDoctorFaceEmbeddingController;
+use App\Http\Controllers\PipelineConsultationStatusController;
 use App\Http\Controllers\PipelineFaceEmbeddingController;
 use App\Http\Controllers\PipelineFaceMatchResultController;
 use App\Http\Controllers\PipelineMicrocheckController;
@@ -420,6 +422,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::prefix('consultations/{consultation}')->name('consultations.')->group(function () {
+        Route::get('start', [ConsultationController::class, 'start'])->name('start');
         Route::get('consent', [ConsultationConsentController::class, 'show'])->name('consent.show');
         Route::post('consent', [ConsultationConsentController::class, 'store'])->name('consent.store');
         Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
@@ -511,6 +514,7 @@ Route::prefix('internal/pipeline')
     ->group(function () {
         Route::get('rooms', [PipelineRoomsController::class, 'index'])->name('rooms');
         Route::post('scan-results', [PipelineScanResultController::class, 'store'])->name('scan-results.store');
+        Route::post('consultations/{consultation}/status', [PipelineConsultationStatusController::class, 'store'])->name('consultations.status.store');
         Route::get('consultation/{roomName}/patient-face', [PipelinePatientFaceController::class, 'show'])->name('patient-face.show');
         Route::post('face-embeddings/doctor/{doctorPhoto}', [PipelineDoctorFaceEmbeddingController::class, 'store'])->name('face-embeddings-doctor.store');
         Route::post('face-embeddings/{patientPhoto}', [PipelineFaceEmbeddingController::class, 'store'])->name('face-embeddings.store');

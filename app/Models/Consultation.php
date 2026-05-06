@@ -90,6 +90,12 @@ class Consultation extends Model
         'livekit_ended_at',
         'livekit_last_error',
         'deepfake_verified',
+        'pipeline_detection_status',
+        'pipeline_detection_started_at',
+        'pipeline_last_heartbeat_at',
+        'pipeline_last_scan_at',
+        'pipeline_last_error',
+        'pipeline_guidance',
         'identity_verification_target_user_id',
         'identity_verification_target_role',
         'identity_verification_started_at',
@@ -103,6 +109,12 @@ class Consultation extends Model
         'session_token',
         'livekit_room_sid',
         'livekit_last_error',
+        'pipeline_detection_status',
+        'pipeline_detection_started_at',
+        'pipeline_last_heartbeat_at',
+        'pipeline_last_scan_at',
+        'pipeline_last_error',
+        'pipeline_guidance',
     ];
 
     protected $appends = ['duration_minutes'];
@@ -117,6 +129,10 @@ class Consultation extends Model
             'livekit_last_activity_at' => 'datetime',
             'livekit_ended_at' => 'datetime',
             'deepfake_verified' => 'boolean',
+            'pipeline_detection_started_at' => 'datetime',
+            'pipeline_last_heartbeat_at' => 'datetime',
+            'pipeline_last_scan_at' => 'datetime',
+            'pipeline_guidance' => 'array',
             'identity_verification_started_at' => 'datetime',
             'identity_verification_expires_at' => 'datetime',
             'identity_verification_attempts' => 'integer',
@@ -210,5 +226,47 @@ class Consultation extends Model
         }
 
         return $this->prescriptions->isNotEmpty();
+    }
+
+    public function consentForUser(?User $user): ?ConsultationConsent
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return $this->consents()
+            ->where('user_id', $user->id)
+            ->first();
+    }
+
+    public function hasConfirmedConsentForUser(?User $user): bool
+    {
+        return $this->consentForUser($user)?->consent_confirmed === true;
+    }
+
+    public function isConsultationDoctor(?User $user): bool
+    {
+        return $user !== null && $this->doctor_id === $user->id;
+    }
+
+    public function isConsultationPatient(?User $user): bool
+    {
+        return $user !== null && $this->patient()->where('user_id', $user->id)->exists();
+    }
+
+    public function isAdminAuditUser(?User $user): bool
+    {
+        return $user?->isAdmin() === true
+            && ! $this->isConsultationDoctor($user)
+            && ! $this->isConsultationPatient($user);
+    }
+
+    public function requiresConsentForUser(?User $user): bool
+    {
+        if ($this->isAdminAuditUser($user)) {
+            return false;
+        }
+
+        return ! $this->hasConfirmedConsentForUser($user);
     }
 }
