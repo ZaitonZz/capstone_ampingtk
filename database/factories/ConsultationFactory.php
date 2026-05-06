@@ -19,7 +19,7 @@ class ConsultationFactory extends Factory
             'type' => 'teleconsultation',
             'status' => 'scheduled',
             'chief_complaint' => fake()->sentence(),
-            'scheduled_at' => now()->addDay(),
+            'scheduled_at' => now()->addDay()->setTime(10, 0),
             'started_at' => null,
             'ended_at' => null,
             'session_token' => null,
