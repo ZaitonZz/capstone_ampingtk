@@ -162,7 +162,7 @@ class DoctorDutyScheduleService
 
     private function normalizeTime(string $time): string
     {
-        return Str::length($time) === 5 ? $time . ':00' : $time;
+        return Str::length($time) === 5 ? $time.':00' : $time;
     }
 
     private function indexKey(int $doctorId, string $date, string $startTime, string $endTime): string

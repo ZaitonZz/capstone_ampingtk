@@ -299,40 +299,70 @@ class ConsultationController extends Controller
 
     public function approve(Consultation $consultation): RedirectResponse
     {
-        $this->authorize('update', $consultation);
+        $user = request()->user();
+        if (! $user?->isDoctor()) {
+            $this->authorize('update', $consultation);
+        }
 
         abort_unless($consultation->status === Consultation::STATUS_PENDING, 422, 'Only pending consultations can be approved.');
 
-        // Ensure the assigned doctor is on duty for the scheduled time.
         $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
-        $doctorId = $consultation->doctor_id;
 
-        if ($doctorId === null || $scheduledAt === null) {
+        if ($scheduledAt === null) {
             return redirect()
                 ->route('consultations.show', $consultation)
-                ->with('error', 'Consultation must have a scheduled time and assigned doctor before approval.');
+                ->with('error', 'Consultation must have a scheduled time before approval.');
         }
 
-        $availabilityService = app(DoctorDutyAvailabilityService::class);
+        $acceptorIsDoctor = $user?->isDoctor() ?? false;
 
-        $isAvailableAtTime = $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt);
+        // If the acceptor is a doctor, ensure they're on duty at the scheduled time.
+        if ($acceptorIsDoctor) {
+            $acceptorId = $user->id;
+            if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($acceptorId, $scheduledAt)) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'You are not on duty for the scheduled time.');
+            }
+        } else {
+            // If acceptor is staff, ensure that the assigned doctor (if set) is on duty.
+            $assignedDoctorId = $consultation->doctor_id;
+            if ($assignedDoctorId === null) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'Consultation must have an assigned doctor before approval.');
+            }
+            $availableAtTime = app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($assignedDoctorId, $scheduledAt);
+            $hasScheduleOnDate = $availableAtTime || DoctorDutySchedule::query()
+                ->where('doctor_id', $assignedDoctorId)
+                ->whereDate('duty_date', Carbon::parse($scheduledAt)->toDateString())
+                ->exists();
+            if (! $hasScheduleOnDate) {
+                return redirect()
+                    ->route('consultations.show', $consultation)
+                    ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+            }
+        }
 
-        $scheduledDate = Carbon::parse($scheduledAt)->toDateString();
-        $hasScheduleOnDate = DoctorDutySchedule::query()
-            ->where('doctor_id', $doctorId)
-            ->whereDate('duty_date', $scheduledDate)
-            ->exists();
+        // Atomic acceptance: only update when still pending to prevent races.
+        $attributes = ['status' => Consultation::STATUS_SCHEDULED];
+        if ($acceptorIsDoctor) {
+            $attributes['doctor_id'] = $acceptorId;
+        }
 
-        if (! $isAvailableAtTime && ! $hasScheduleOnDate) {
+        $updated = Consultation::query()
+            ->where('id', $consultation->id)
+            ->where('status', Consultation::STATUS_PENDING)
+            ->update($attributes);
+
+        if ($updated === 0) {
             return redirect()
                 ->route('consultations.show', $consultation)
-                ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+                ->with('error', 'Consultation was already accepted by another provider or is no longer pending.');
         }
-
-        $consultation->update(['status' => Consultation::STATUS_SCHEDULED]);
 
         return redirect()
-            ->route('consultations.show', $consultation)
+            ->route('consultations.show', $consultation->fresh())
             ->with('success', 'Appointment approved and scheduled.');
     }
 

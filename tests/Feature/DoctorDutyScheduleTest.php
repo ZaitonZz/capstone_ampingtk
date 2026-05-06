@@ -102,7 +102,7 @@ it('creates recurring weekly duty schedules and supports doctor availability fil
 
     $this->actingAs($medicalStaff)
         ->getJson(route('consultations.available-doctors', [
-            'scheduled_at' => $firstRecurringDate . ' 10:00:00',
+            'scheduled_at' => $firstRecurringDate.' 10:00:00',
         ]))
         ->assertOk()
         ->assertJsonPath('doctors.0.id', $doctor->id);

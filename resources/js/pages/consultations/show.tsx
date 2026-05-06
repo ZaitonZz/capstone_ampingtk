@@ -12,6 +12,7 @@ import type {
     Consultation,
     ConsultationDeepfakeEscalation,
     ConsultationStatus,
+    ConsultationType,
 } from '@/types/consultation';
 
 const MICROCHECK_VARIANT: Record<
@@ -32,6 +33,11 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     completed: 'Completed',
     cancelled: 'Cancelled',
     no_show: 'No Show',
+};
+
+const TYPE_LABELS: Record<ConsultationType, string> = {
+    in_person: 'In-Person',
+    teleconsultation: 'Teleconsultation',
 };
 
 const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
@@ -97,15 +103,19 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
     }
 
     function handleApprove() {
-        router.patch(ConsultationController.approve.url(consultation.id), {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Appointment approved and scheduled.');
+        router.patch(
+            ConsultationController.approve.url(consultation.id),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Appointment approved and scheduled.');
+                },
+                onError: () => {
+                    toast.error('Approval failed.');
+                },
             },
-            onError: () => {
-                toast.error('Approval failed.');
-            },
-        });
+        );
     }
 
     function formatEscalationType(
@@ -130,7 +140,9 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
             <div className="mx-auto max-w-3xl p-4 md:p-6">
                 {/* Header */}
-                {(page.props.flash?.error || page.props.errors?.doctor_id || page.props.errors?.scheduled_at) && (
+                {(page.props.flash?.error ||
+                    page.props.errors?.doctor_id ||
+                    page.props.errors?.scheduled_at) && (
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                         {page.props.flash?.error ??
                             page.props.errors?.doctor_id ??
@@ -150,31 +162,32 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                     <div className="flex items-center gap-2">
                         <Badge
                             variant="outline"
-                            className={STATUS_BADGE_CLASSES[consultation.status]}
+                            className={
+                                STATUS_BADGE_CLASSES[consultation.status]
+                            }
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
                         {permissions.can_manage_schedule &&
-                            consultation.status === 'pending' && (
-                                consultation.doctor_available_for_approval ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleApprove}
-                                        className="text-green-600 hover:text-green-700"
-                                    >
-                                        <CheckCircle className="mr-1 h-4 w-4" />
-                                        Approve
-                                    </Button>
-                                ) : (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-amber-200 bg-amber-50 text-amber-700"
-                                    >
-                                        Preferred doctor is not on duty
-                                    </Badge>
-                                )
-                            )}
+                            consultation.status === 'pending' &&
+                            (consultation.doctor_available_for_approval ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleApprove}
+                                    className="text-green-600 hover:text-green-700"
+                                >
+                                    <CheckCircle className="mr-1 h-4 w-4" />
+                                    Approve
+                                </Button>
+                            ) : (
+                                <Badge
+                                    variant="outline"
+                                    className="border-amber-200 bg-amber-50 text-amber-700"
+                                >
+                                    Preferred doctor is not on duty
+                                </Badge>
+                            ))}
                         <Button size="sm" variant="outline" asChild>
                             <Link
                                 href={ConsultationConsentController.show.url(
@@ -203,14 +216,14 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                 size="sm"
                                 variant={
                                     consultation.status === 'pending' &&
-                                        !consultation.doctor_available_for_approval
+                                    !consultation.doctor_available_for_approval
                                         ? 'default'
                                         : 'outline'
                                 }
                                 asChild
                                 className={
                                     consultation.status === 'pending' &&
-                                        !consultation.doctor_available_for_approval
+                                    !consultation.doctor_available_for_approval
                                         ? 'border-amber-500 bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600 hover:text-white'
                                         : undefined
                                 }
@@ -240,14 +253,17 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
-                    <Field label="Type" value={'Teleconsultation'} />
+                    <Field
+                        label="Type"
+                        value={TYPE_LABELS[consultation.type]}
+                    />
                     <Field
                         label="Scheduled"
                         value={
                             consultation.scheduled_at
                                 ? new Date(
-                                    consultation.scheduled_at,
-                                ).toLocaleString()
+                                      consultation.scheduled_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -256,8 +272,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         value={
                             consultation.started_at
                                 ? new Date(
-                                    consultation.started_at,
-                                ).toLocaleString()
+                                      consultation.started_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -266,8 +282,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         value={
                             consultation.ended_at
                                 ? new Date(
-                                    consultation.ended_at,
-                                ).toLocaleString()
+                                      consultation.ended_at,
+                                  ).toLocaleString()
                                 : null
                         }
                     />
@@ -285,8 +301,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                             consultation.deepfake_verified == null
                                 ? null
                                 : consultation.deepfake_verified
-                                    ? 'Yes'
-                                    : 'No'
+                                  ? 'Yes'
+                                  : 'No'
                         }
                     />
                     {consultation.cancellation_reason && (
@@ -370,7 +386,7 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                                 <Badge
                                                     variant={
                                                         MICROCHECK_VARIANT[
-                                                        check.status
+                                                            check.status
                                                         ]
                                                     }
                                                 >
@@ -391,8 +407,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {check.completed_at
                                                     ? new Date(
-                                                        check.completed_at,
-                                                    ).toLocaleString()
+                                                          check.completed_at,
+                                                      ).toLocaleString()
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
@@ -448,8 +464,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {log.scanned_at
                                                     ? new Date(
-                                                        log.scanned_at,
-                                                    ).toLocaleString()
+                                                          log.scanned_at,
+                                                      ).toLocaleString()
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2">
@@ -459,8 +475,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                                                             ? 'destructive'
                                                             : log.result ===
                                                                 'real'
-                                                                ? 'secondary'
-                                                                : 'outline'
+                                                              ? 'secondary'
+                                                              : 'outline'
                                                     }
                                                 >
                                                     {log.result}
