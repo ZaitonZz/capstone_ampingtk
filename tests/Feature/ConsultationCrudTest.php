@@ -103,9 +103,10 @@ it('approves a pending consultation and transitions it to scheduled', function (
         'duty_date' => $scheduledAt->toDateString(),
         'start_time' => '08:00',
         'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
-    $response = $this->actingAs($medicalStaff)
+    $response = $this->actingAsVerified($medicalStaff)
         ->patch(route('consultations.approve', $consultation));
 
     $response->assertRedirect();
@@ -609,6 +610,7 @@ it('patient can submit an appointment request which creates a pending consultati
         'duty_date' => $scheduledAt->toDateString(),
         'start_time' => '08:00',
         'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
     $this->actingAsVerified($user)

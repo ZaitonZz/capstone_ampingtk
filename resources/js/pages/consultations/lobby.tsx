@@ -1,6 +1,5 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Calendar,
     CheckCircle2,
     LoaderCircle,
@@ -23,7 +22,6 @@ import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/C
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -32,8 +30,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type {
@@ -902,83 +898,33 @@ export default function ConsultationLobbyPage({
 
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
-                                <div
-                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${hasJoinPermission ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
-                                >
-                                    <CheckCircle2
-                                        className={`h-3 w-3 ${hasJoinPermission ? 'text-emerald-500' : 'text-amber-500'}`}
-                                    />
+                                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/10">
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                     Privacy and Consent
                                 </p>
                             </div>
 
-                            {hasJoinPermission ? (
-                                <div className="mb-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
-                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-semibold">
-                                        {isAdminUser
-                                            ? 'Admin audit mode ready'
-                                            : 'Consent confirmed'}
-                                    </span>
-                                    {consent?.confirmed_at && !isAdminUser && (
-                                        <span className="ml-auto opacity-60">
-                                            {new Date(
-                                                consent.confirmed_at,
-                                            ).toLocaleDateString()}
-                                        </span>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="mb-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700 ring-1 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800">
-                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <span className="font-medium">
-                                        Consent required before joining.
-                                    </span>
-                                </div>
-                            )}
-
-                            <ul className="mb-3 space-y-1.5 text-xs text-muted-foreground">
-                                {[
-                                    'Telemedicine consent',
-                                    'Data Privacy Act notice',
-                                    'Identity Guard verification',
-                                ].map((item) => (
-                                    <li
-                                        key={item}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <CheckCircle2
-                                            className={[
-                                                'h-3 w-3 shrink-0',
-                                                hasJoinPermission
-                                                    ? 'text-emerald-500'
-                                                    : 'text-muted-foreground/30',
-                                            ].join(' ')}
-                                        />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-
-                            <Separator className="mb-3" />
-
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="lobby-consent-check"
-                                    checked={hasJoinPermission}
-                                    disabled
-                                />
-                                <Label
-                                    htmlFor="lobby-consent-check"
-                                    className="cursor-not-allowed text-xs leading-snug"
-                                >
+                            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
+                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                <span className="font-semibold">
                                     {isAdminUser
-                                        ? 'Audit access enabled for admin'
-                                        : 'I agree to the Privacy Notice and Consent'}
-                                </Label>
+                                        ? 'Admin audit mode ready'
+                                        : 'Consent confirmed'}
+                                </span>
+                                {consent?.confirmed_at && !isAdminUser && (
+                                    <span className="ml-auto opacity-60">
+                                        {new Date(
+                                            consent.confirmed_at,
+                                        ).toLocaleDateString()}
+                                    </span>
+                                )}
                             </div>
+
+                            <p className="mt-3 text-xs text-muted-foreground">
+                                Consent is already in place. You can proceed to the call when the room is ready.
+                            </p>
                         </div>
 
                         {isPaused && (
@@ -1104,13 +1050,7 @@ export default function ConsultationLobbyPage({
                                 )}
                             </Button>
 
-                            {!hasJoinPermission && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    Complete consent to enable joining.
-                                </p>
-                            )}
-
-                            {hasJoinPermission && isPaused && (
+                            {isPaused && (
                                 <p className="text-center text-xs text-muted-foreground">
                                     Joining is disabled until identity
                                     verification is completed.
@@ -1137,8 +1077,8 @@ export default function ConsultationLobbyPage({
                                         {isApplyingOverride
                                             ? 'Applying override...'
                                             : isManualOverrideEnabled
-                                              ? 'Manual Override Enabled'
-                                              : 'Enable Manual Override'}
+                                                ? 'Manual Override Enabled'
+                                                : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
                                         Doctors can enable manual override

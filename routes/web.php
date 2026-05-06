@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminMicrocheckLogController;
 use App\Http\Controllers\AdminUserManagementController;
 use App\Http\Controllers\AgentTestController;
 use App\Http\Controllers\ConsultationConsentController;
+use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\ConsultationIdentityVerificationController;
 use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
@@ -420,6 +421,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::prefix('consultations/{consultation}')->name('consultations.')->group(function () {
+        Route::get('start', [ConsultationController::class, 'start'])->name('start');
         Route::get('consent', [ConsultationConsentController::class, 'show'])->name('consent.show');
         Route::post('consent', [ConsultationConsentController::class, 'store'])->name('consent.store');
         Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
