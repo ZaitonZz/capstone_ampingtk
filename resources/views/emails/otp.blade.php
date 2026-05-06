@@ -168,7 +168,7 @@
             <!-- Info Section -->
             <div class="info-section">
                 <strong>What to do:</strong>
-                Enter this 6-digit verification code in the login screen to gain access to your account.
+                Please check your email. Enter this 6-digit verification code in the login screen to gain access to your account.
             </div>
 
             <!-- Security Note -->

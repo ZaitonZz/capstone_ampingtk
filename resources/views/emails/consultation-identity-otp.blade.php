@@ -118,7 +118,7 @@
             <p class="otp-label">Verification Code</p>
             <p class="otp-code">{{ $otp }}</p>
             <div class="notice">
-                This code expires in {{ $expiryMinutes }} minute(s). Do not share it with anyone.
+                Please check your email. This code expires in {{ $expiryMinutes }} minute(s). Do not share it with anyone.
             </div>
         </div>
 

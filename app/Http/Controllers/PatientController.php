@@ -21,8 +21,17 @@ class PatientController extends Controller
     {
         $this->authorize('viewAny', Patient::class);
 
+        $today = now()->startOfDay();
+        $tomorrow = now()->addDay()->startOfDay();
+
         $patients = Patient::query()
-            ->with(['primaryPhoto'])
+            ->with([
+                'primaryPhoto',
+                'consultations' => fn ($q) => $q->whereBetween('scheduled_at', [$today, $tomorrow])
+                    ->where('status', '!=', 'cancelled')
+                    ->where('status', '!=', 'no_show')
+                    ->orderBy('scheduled_at'),
+            ])
             ->when(
                 $request->search,
                 fn ($q, $search) => $q->where(
@@ -37,7 +46,8 @@ class PatientController extends Controller
             )
             ->latest()
             ->paginate($request->integer('per_page', 15))
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn ($patient) => $patient->append('has_today_schedule'));
 
         // Return JSON for API/test requests
         if ($request->expectsJson()) {

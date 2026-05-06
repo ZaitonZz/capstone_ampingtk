@@ -3,7 +3,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePoll } from '@inertiajs/react';
 import { List, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -97,6 +97,20 @@ export default function ConsultationsCalendar({
         chief_complaint: '',
         scheduled_at: '',
     });
+
+    // Poll for calendar updates every 5 seconds to reflect status changes
+    const { start: startPolling, stop: stopPolling } = usePoll(5000, {
+        only: ['events'],
+    });
+
+    // Auto-start polling to keep calendar in sync with status changes
+    useEffect(() => {
+        startPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [startPolling, stopPolling]);
 
     function handleScheduledAtChange(nextScheduledAt: string) {
         setData((current) => ({

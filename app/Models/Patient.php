@@ -76,6 +76,29 @@ class Patient extends Model
         return null;
     }
 
+    /** Check if patient has a scheduled consultation for today */
+    public function getHasTodayScheduleAttribute(): bool
+    {
+        // If consultations are eager loaded (controller usually does this with a
+        // scoped query for today's consultations), use the loaded relation to
+        // avoid extra queries.
+        if ($this->relationLoaded('consultations')) {
+            return $this->consultations->count() > 0;
+        }
+
+        // Fallback: query for consultations scheduled today excluding cancelled
+        // and no_show statuses. This ensures the attribute is correct even when
+        // the relation wasn't preloaded (avoids false negatives seen in tests).
+        $today = now()->startOfDay();
+        $tomorrow = now()->addDay()->startOfDay();
+
+        return $this->consultations()
+            ->whereBetween('scheduled_at', [$today, $tomorrow])
+            ->where('status', '!=', 'cancelled')
+            ->where('status', '!=', 'no_show')
+            ->exists();
+    }
+
     // Relationships
     public function user(): BelongsTo
     {
