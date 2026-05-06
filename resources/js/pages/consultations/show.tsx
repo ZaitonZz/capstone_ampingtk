@@ -13,6 +13,8 @@ import type {
     ConsultationDeepfakeEscalation,
     ConsultationStatus,
     ConsultationType,
+    PatientNote,
+    Prescription,
 } from '@/types/consultation';
 
 const MICROCHECK_VARIANT: Record<
@@ -87,6 +89,8 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
     const microchecks = consultation.microchecks ?? [];
     const deepfakeLogs = consultation.deepfake_scan_logs ?? [];
     const escalationTimeline = consultation.deepfake_escalations ?? [];
+    const note = consultation.note;
+    const prescriptions = consultation.prescriptions ?? [];
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: ConsultationController.index.url() },
@@ -338,6 +342,151 @@ export default function ConsultationShow({ consultation, permissions }: Props) {
                         </p>
                     </div>
                 )}
+
+                {/* SOAP Notes Section */}
+                <div className="mt-4 rounded-xl border p-4">
+                    <h2 className="mb-3 text-base font-semibold">Clinical Notes</h2>
+
+                    {note ? (
+                        <div className="space-y-4">
+                            {note.subjective && (
+                                <div>
+                                    <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
+                                        Subjective (S)
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-sm">
+                                        {note.subjective}
+                                    </p>
+                                </div>
+                            )}
+                            {note.objective && (
+                                <div>
+                                    <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
+                                        Objective (O)
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-sm">
+                                        {note.objective}
+                                    </p>
+                                </div>
+                            )}
+                            {note.assessment && (
+                                <div>
+                                    <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
+                                        Assessment (A)
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-sm">
+                                        {note.assessment}
+                                    </p>
+                                </div>
+                            )}
+                            {note.plan && (
+                                <div>
+                                    <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
+                                        Plan (P)
+                                    </h3>
+                                    <p className="whitespace-pre-wrap text-sm">
+                                        {note.plan}
+                                    </p>
+                                </div>
+                            )}
+                            {!note.subjective &&
+                                !note.objective &&
+                                !note.assessment &&
+                                !note.plan && (
+                                    <p className="text-sm text-muted-foreground">
+                                        No notes recorded yet.
+                                    </p>
+                                )}
+                            <div className="mt-2 text-xs text-muted-foreground">
+                                Last updated:{' '}
+                                {new Date(note.updated_at).toLocaleString()}{' '}
+                                {note.doctor?.name && `by Dr. ${note.doctor.name}`}
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            No clinical notes recorded yet.
+                        </p>
+                    )}
+                </div>
+
+                {/* Prescriptions Section */}
+                <div className="mt-4 rounded-xl border p-4">
+                    <h2 className="mb-3 text-base font-semibold">Prescriptions</h2>
+
+                    {prescriptions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No prescriptions recorded yet.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {prescriptions.map((prescription) => (
+                                <div
+                                    key={prescription.id}
+                                    className="rounded-lg border bg-slate-50 p-3"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                            <h3 className="font-medium text-base">
+                                                {prescription.medication_name}
+                                            </h3>
+                                            <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
+                                                {prescription.dosage && (
+                                                    <div>
+                                        <span className="font-medium">
+                                            Dosage:
+                                        </span>{' '}
+                                        {prescription.dosage}
+                                                    </div>
+                                                )}
+                                                {prescription.frequency && (
+                                                    <div>
+                                        <span className="font-medium">
+                                            Frequency:
+                                        </span>{' '}
+                                        {prescription.frequency}
+                                                    </div>
+                                                )}
+                                                {prescription.duration && (
+                                                    <div>
+                                        <span className="font-medium">
+                                            Duration:
+                                        </span>{' '}
+                                        {prescription.duration}
+                                                    </div>
+                                                )}
+                                                {prescription.route && (
+                                                    <div>
+                                        <span className="font-medium">
+                                            Route:
+                                        </span>{' '}
+                                        {prescription.route}
+                                                    </div>
+                                                )}
+                                                {prescription.instructions && (
+                                                    <div>
+                                        <span className="font-medium">
+                                            Instructions:
+                                        </span>{' '}
+                                        {prescription.instructions}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        Created:{' '}
+                                        {new Date(
+                                            prescription.created_at,
+                                        ).toLocaleString()}{' '}
+                                        {prescription.doctor?.name &&
+                                            `by Dr. ${prescription.doctor.name}`}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mt-4 rounded-xl border p-4">
                     <div className="mb-3 flex items-center justify-between">
