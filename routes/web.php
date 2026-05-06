@@ -428,6 +428,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('lobby', [ConsultationLobbyController::class, 'show'])->name('lobby.show');
         Route::get('session', [ConsultationSessionController::class, 'show'])->name('session.show');
         Route::post('livekit/connect', [ConsultationLiveKitController::class, 'connect'])->name('livekit.connect');
+        Route::post('livekit/leave', [ConsultationLiveKitController::class, 'leave'])->name('livekit.leave');
         Route::post('identity-verification/verify', [ConsultationIdentityVerificationController::class, 'verify'])
             ->name('identity-verification.verify');
         Route::post('identity-verification/resend', [ConsultationIdentityVerificationController::class, 'resend'])
