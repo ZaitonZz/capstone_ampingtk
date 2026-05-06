@@ -92,6 +92,18 @@ export default function PatientConsultationShow({
                                 ? 'Consent Completed'
                                 : 'Consent Pending'}
                         </Badge>
+                        {!consent_completed && (
+                            <Button size="sm" variant="outline" asChild>
+                                <Link
+                                    href={PatientConsultationController.consent.url(
+                                        consultation.id,
+                                    )}
+                                >
+                                    <ShieldCheck className="mr-1 h-4 w-4" />
+                                    Complete Consent
+                                </Link>
+                            </Button>
+                        )}
                         {consultation.type === 'teleconsultation' && (
                             <Button size="sm" asChild>
                                 <Link
