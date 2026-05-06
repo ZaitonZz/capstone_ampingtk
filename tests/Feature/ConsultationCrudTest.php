@@ -287,6 +287,22 @@ it('handles race condition when two approvals happen simultaneously', function (
     expect($consultation->fresh()->status)->toBe('scheduled');
 });
 
+it('cannot approve a pending consultation when assigned doctor is off duty', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect(route('consultations.show', $consultation))
+        ->assertSessionHas('error');
+
+    expect($consultation->fresh()->status)->toBe(Consultation::STATUS_PENDING);
+});
+
 it('flagged participant can verify OTP and resume a paused consultation', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
