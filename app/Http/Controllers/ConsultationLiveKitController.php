@@ -8,6 +8,7 @@ use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\LiveKitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ConsultationLiveKitController extends Controller
 {
@@ -111,5 +112,141 @@ class ConsultationLiveKitController extends Controller
             'ws_url' => config('services.livekit.ws_url'),
             'role' => $isAdminAudit ? 'admin_audit' : $user->role,
         ]);
+    }
+
+    public function leave(Request $request, Consultation $consultation): JsonResponse
+    {
+        $this->authorize('view', $consultation);
+
+        if ($consultation->type !== 'teleconsultation') {
+            abort(404);
+        }
+
+        $user = $request->user();
+
+        if ($user === null) {
+            abort(403);
+        }
+
+        if ($user->isMedicalStaff()) {
+            abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
+        }
+
+        $isConsultationDoctor = $consultation->doctor_id === $user->id;
+        $isConsultationPatient = $consultation->patient()->where('user_id', $user->id)->exists();
+        $isAdminAudit = $user->isAdmin() && ! $isConsultationDoctor && ! $isConsultationPatient;
+
+        if (! $isConsultationDoctor && ! $isConsultationPatient && ! $isAdminAudit) {
+            abort(403);
+        }
+
+        if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
+            return response()->json([
+                'status' => $consultation->status,
+                'cancelled' => false,
+                'redirect_url' => route('consultations.lobby.show', $consultation),
+            ]);
+        }
+
+        if (! $isAdminAudit) {
+            try {
+                $this->liveKitService->removeParticipantFromConsultation($consultation, $user);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                $consultation->forceFill([
+                    'livekit_last_error' => $exception->getMessage(),
+                ])->save();
+            }
+        }
+
+        $cancelled = false;
+        $consultation = $consultation->fresh();
+
+        if (
+            ! $isAdminAudit
+            && in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true)
+            && ! $this->hasHumanConsultationParticipantInRoom($consultation)
+        ) {
+            try {
+                $this->liveKitService->deleteRoom($consultation);
+            } catch (Throwable $exception) {
+                report($exception);
+
+                $consultation->forceFill([
+                    'livekit_last_error' => $exception->getMessage(),
+                ])->save();
+            }
+
+            $consultation->forceFill([
+                'status' => Consultation::STATUS_CANCELLED,
+                'ended_at' => now(),
+                'cancellation_reason' => 'Consultation cancelled because the last participant left the call.',
+            ])->save();
+
+            $cancelled = true;
+            $consultation = $consultation->fresh();
+        }
+
+        return response()->json([
+            'status' => $consultation->status,
+            'cancelled' => $cancelled,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+    }
+
+    private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
+    {
+        try {
+            $participants = $this->liveKitService->listParticipants($consultation);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+
+            return true;
+        }
+
+        $patientUserId = $consultation->patient()->value('user_id');
+        $doctorUserId = $consultation->doctor_id;
+
+        foreach ($participants as $participant) {
+            if ($this->participantRepresentsUser($participant['identity'], $doctorUserId)) {
+                return true;
+            }
+
+            if ($patientUserId !== null && $this->participantRepresentsUser($participant['identity'], (int) $patientUserId)) {
+                return true;
+            }
+
+            $metadata = $this->decodeParticipantMetadata($participant['metadata']);
+
+            if (($metadata['role'] ?? null) === 'doctor' || ($metadata['role'] ?? null) === 'patient') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function participantRepresentsUser(string $identity, int $userId): bool
+    {
+        return $identity === sprintf('user-%d', $userId) || $identity === (string) $userId;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeParticipantMetadata(?string $metadata): array
+    {
+        if ($metadata === null) {
+            return [];
+        }
+
+        $decoded = json_decode($metadata, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 }
