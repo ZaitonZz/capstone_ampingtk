@@ -43,24 +43,166 @@ it('allows medical staff to create, update, and delete doctor duty schedules', f
     expect(DoctorDutySchedule::query()->count())->toBe(0);
 });
 
-it('creates duty schedules for multiple selected dates', function () {
+it('creates duty schedules with per-date entries and different times', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
-    $dates = [
-        now()->startOfWeek()->addDay()->toDateString(),
-        now()->startOfWeek()->addDays(2)->toDateString(),
-        now()->startOfWeek()->addDays(4)->toDateString(),
-    ];
+    $date1 = now()->startOfWeek()->addDay()->toDateString();
+    $date2 = now()->startOfWeek()->addDays(2)->toDateString();
+    $date3 = now()->startOfWeek()->addDays(4)->toDateString();
 
     $this->actingAs($medicalStaff)
         ->post(route('doctor-duty-schedules.store'), [
             'doctor_id' => $doctor->id,
             'schedule_mode' => 'multiple_dates',
-            'duty_dates' => $dates,
-            'start_time' => '08:00',
-            'end_time' => '16:00',
-            'status' => 'on_duty',
-            'remarks' => 'Bulk OPD block',
+            'specific_date_entries' => [
+                [
+                    'duty_date' => $date1,
+                    'start_time' => '08:00',
+                    'end_time' => '12:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Morning OPD',
+                ],
+                [
+                    'duty_date' => $date2,
+                    'start_time' => '13:00',
+                    'end_time' => '17:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Afternoon clinic',
+                ],
+                [
+                    'duty_date' => $date3,
+                    'start_time' => '09:00',
+                    'end_time' => '14:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Half day',
+                ],
+            ],
+        ])
+        ->assertRedirect();
+
+    expect(DoctorDutySchedule::query()->where('doctor_id', $doctor->id)->count())->toBe(3);
+
+    // Verify each entry has the correct times
+    $schedules = DoctorDutySchedule::query()
+        ->where('doctor_id', $doctor->id)
+        ->orderBy('duty_date')
+        ->get();
+
+    expect($schedules[0]->duty_date->toDateString())->toBe($date1);
+    expect(substr((string) $schedules[0]->start_time, 0, 5))->toBe('08:00');
+    expect(substr((string) $schedules[0]->end_time, 0, 5))->toBe('12:00');
+
+    expect($schedules[1]->duty_date->toDateString())->toBe($date2);
+    expect(substr((string) $schedules[1]->start_time, 0, 5))->toBe('13:00');
+    expect(substr((string) $schedules[1]->end_time, 0, 5))->toBe('17:00');
+
+    expect($schedules[2]->duty_date->toDateString())->toBe($date3);
+    expect(substr((string) $schedules[2]->start_time, 0, 5))->toBe('09:00');
+    expect(substr((string) $schedules[2]->end_time, 0, 5))->toBe('14:00');
+});
+
+it('validates individual date entries in specific_date_entries', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $date1 = now()->startOfWeek()->addDay()->toDateString();
+    $date2 = now()->startOfWeek()->addDays(2)->toDateString();
+
+    $this->actingAs($medicalStaff)
+        ->post(route('doctor-duty-schedules.store'), [
+            'doctor_id' => $doctor->id,
+            'schedule_mode' => 'multiple_dates',
+            'specific_date_entries' => [
+                [
+                    'duty_date' => $date1,
+                    'start_time' => '08:00',
+                    'end_time' => '12:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Valid entry',
+                ],
+                [
+                    'duty_date' => $date2,
+                    'start_time' => '17:00',
+                    'end_time' => '13:00', // End time before start time - should fail
+                    'status' => 'on_duty',
+                    'remarks' => 'Invalid entry',
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors();
+
+    // No schedules should be created
+    expect(DoctorDutySchedule::query()->where('doctor_id', $doctor->id)->count())->toBe(0);
+});
+
+it('detects overlapping schedules with per-date entries', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $dutyDate = now()->addDay()->toDateString();
+
+    // Create an existing schedule
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $dutyDate,
+        'start_time' => '08:00',
+        'end_time' => '12:00',
+        'status' => 'on_duty',
+    ]);
+
+    // Try to add an overlapping schedule using specific_date_entries
+    $this->actingAs($medicalStaff)
+        ->post(route('doctor-duty-schedules.store'), [
+            'doctor_id' => $doctor->id,
+            'schedule_mode' => 'multiple_dates',
+            'specific_date_entries' => [
+                [
+                    'duty_date' => $dutyDate,
+                    'start_time' => '11:00',
+                    'end_time' => '14:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Overlapping shift',
+                ],
+            ],
+        ])
+        ->assertSessionHasErrors('specific_date_entries');
+
+    // Still only one schedule should exist
+    expect(DoctorDutySchedule::query()->where('doctor_id', $doctor->id)->count())->toBe(1);
+});
+
+it('creates duty schedules for multiple selected dates', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $date1 = now()->startOfWeek()->addDay()->toDateString();
+    $date2 = now()->startOfWeek()->addDays(2)->toDateString();
+    $date3 = now()->startOfWeek()->addDays(4)->toDateString();
+
+    $this->actingAs($medicalStaff)
+        ->post(route('doctor-duty-schedules.store'), [
+            'doctor_id' => $doctor->id,
+            'schedule_mode' => 'multiple_dates',
+            'specific_date_entries' => [
+                [
+                    'duty_date' => $date1,
+                    'start_time' => '08:00',
+                    'end_time' => '16:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Bulk OPD block',
+                ],
+                [
+                    'duty_date' => $date2,
+                    'start_time' => '08:00',
+                    'end_time' => '16:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Bulk OPD block',
+                ],
+                [
+                    'duty_date' => $date3,
+                    'start_time' => '08:00',
+                    'end_time' => '16:00',
+                    'status' => 'on_duty',
+                    'remarks' => 'Bulk OPD block',
+                ],
+            ],
         ])
         ->assertRedirect();
 
@@ -131,7 +273,7 @@ it('rejects overlapping duty schedules for the same doctor and date', function (
             'status' => 'on_duty',
             'remarks' => 'Conflicting block',
         ])
-        ->assertSessionHasErrors('duty_dates');
+        ->assertSessionHasErrors('specific_date_entries');
 });
 
 it('allows doctors to view duty calendar but not manage schedules', function () {
