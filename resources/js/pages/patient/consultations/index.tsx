@@ -39,16 +39,6 @@ const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
     no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
-interface Filters {
-    status?: string;
-    type?: string;
-}
-
-interface Props {
-    consultations: PaginatedConsultations;
-    filters: Filters;
-}
-
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 function isScheduledForToday(scheduledAt: string | null): boolean {
@@ -62,6 +52,17 @@ function isScheduledForToday(scheduledAt: string | null): boolean {
 
     return scheduledTime >= startOfToday && scheduledTime < startOfTomorrow;
 }
+
+interface Filters {
+    status?: string;
+    type?: string;
+}
+
+interface Props {
+    consultations: PaginatedConsultations;
+    filters: Filters;
+}
+
 
 export default function PatientConsultationsIndex({
     consultations,
@@ -166,7 +167,14 @@ export default function PatientConsultationsIndex({
                                     </td>
                                 </tr>
                             )}
-                            {consultations.data.map((c) => {
+                                                        {consultations.data
+                                                            .slice()
+                                                            .sort((a, b) => {
+                                                                const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+                                                                const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+                                                                return aDate - bDate;
+                                                        })
+                                .map((c) => {
                                 const isFinalStatus =
                                     c.status === 'completed' ||
                                     c.status === 'cancelled' ||
@@ -191,6 +199,8 @@ export default function PatientConsultationsIndex({
                                                 </Badge>
                                             )}
                                         </div>
+                                                .map((c) => {
+                                                    const isFinalStatus =
                                     </td>
                                     <td className="px-4 py-3 capitalize">
                                         Teleconsultation
@@ -265,3 +275,4 @@ export default function PatientConsultationsIndex({
         </AppLayout>
     );
 }
+
