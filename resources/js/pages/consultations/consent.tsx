@@ -285,7 +285,7 @@ export default function ConsultationConsentPage({
                                         asChild
                                     >
                                         <a
-                                            href={PatientConsultationController.show.url(
+                                            href={ConsultationController.show.url(
                                                 consultation.id,
                                             )}
                                         >
