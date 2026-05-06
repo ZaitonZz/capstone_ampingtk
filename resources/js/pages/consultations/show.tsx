@@ -158,17 +158,31 @@ export default function ConsultationShow({
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
-                        <Badge
-                            variant="outline"
-                            className={consent_completed
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-amber-200 bg-amber-50 text-amber-700'}
-                        >
-                            <ShieldCheck className="mr-1 h-4 w-4" />
-                            {consent_completed
-                                ? 'Consent Completed'
-                                : 'Consent Pending'}
-                        </Badge>
+                        {consent_completed ? (
+                            <Badge
+                                variant="outline"
+                                className="border-emerald-200 bg-emerald-50 text-emerald-700"
+                            >
+                                <ShieldCheck className="mr-1 h-4 w-4" />
+                                Consent Completed
+                            </Badge>
+                        ) : (
+                            <Link
+                                href={ConsultationController.edit.url(
+                                    consultation.id,
+                                )}
+                                title="Open consultation to complete consent"
+                                aria-label="Open consultation to complete consent"
+                            >
+                                <Badge
+                                    variant="outline"
+                                    className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                >
+                                    <ShieldCheck className="mr-1 h-4 w-4" />
+                                    Consent Pending
+                                </Badge>
+                            </Link>
+                        )}
                         {permissions.can_manage_schedule &&
                             consultation.status === 'pending' && (
                                 consultation.doctor_available_for_approval ? (
