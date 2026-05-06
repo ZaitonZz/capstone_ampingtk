@@ -44,7 +44,7 @@ const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
 
 interface Props {
     consultation: Consultation;
-    consent_completed: boolean;
+    consent_completed: boolean | null;
     permissions: {
         can_manage_schedule: boolean;
         can_join_session: boolean;
@@ -53,7 +53,7 @@ interface Props {
 
 interface PageProps extends Record<string, unknown> {
     consultation: Consultation;
-    consent_completed: boolean;
+    consent_completed: boolean | null;
     permissions: {
         can_manage_schedule: boolean;
         can_join_session: boolean;
@@ -158,7 +158,7 @@ export default function ConsultationShow({
                         >
                             {STATUS_LABELS[consultation.status]}
                         </Badge>
-                        {consent_completed ? (
+                        {consent_completed === true && (
                             <Badge
                                 variant="outline"
                                 className="border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -166,7 +166,8 @@ export default function ConsultationShow({
                                 <ShieldCheck className="mr-1 h-4 w-4" />
                                 Consent Completed
                             </Badge>
-                        ) : (
+                        )}
+                        {consent_completed === false && (
                             <Link
                                 href={ConsultationController.edit.url(
                                     consultation.id,

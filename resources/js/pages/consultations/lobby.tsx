@@ -1,6 +1,5 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Calendar,
     CheckCircle2,
     LoaderCircle,
@@ -899,32 +898,20 @@ export default function ConsultationLobbyPage({
 
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <div className="mb-3 flex items-center gap-2">
-                                <div
-                                    className={`flex h-5 w-5 items-center justify-center rounded-md ${hasJoinPermission ? 'bg-emerald-500/10' : 'bg-amber-500/10'}`}
-                                >
-                                    <CheckCircle2
-                                        className={`h-3 w-3 ${hasJoinPermission ? 'text-emerald-500' : 'text-amber-500'}`}
-                                    />
+                                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/10">
+                                    <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                                 </div>
                                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                     Privacy and Consent
                                 </p>
                             </div>
 
-                            <div
-                                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ring-1 ${hasJoinPermission ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800' : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-800'}`}
-                            >
-                                {hasJoinPermission ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                                ) : (
-                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                )}
+                            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-800">
+                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                                 <span className="font-semibold">
                                     {isAdminUser
                                         ? 'Admin audit mode ready'
-                                        : isConsentConfirmed
-                                            ? 'Consent confirmed'
-                                            : 'Consent required before joining'}
+                                        : 'Consent confirmed'}
                                 </span>
                                 {consent?.confirmed_at && !isAdminUser && (
                                     <span className="ml-auto opacity-60">
@@ -936,9 +923,7 @@ export default function ConsultationLobbyPage({
                             </div>
 
                             <p className="mt-3 text-xs text-muted-foreground">
-                                {hasJoinPermission
-                                    ? 'Consent is already in place. You can proceed to the call when the room is ready.'
-                                    : 'Complete consent from the consultation details page before joining.'}
+                                Consent is already in place. You can proceed to the call when the room is ready.
                             </p>
                         </div>
 
@@ -1065,13 +1050,7 @@ export default function ConsultationLobbyPage({
                                 )}
                             </Button>
 
-                            {!hasJoinPermission && (
-                                <p className="text-center text-xs text-muted-foreground">
-                                    Complete consent to enable joining.
-                                </p>
-                            )}
-
-                            {hasJoinPermission && isPaused && (
+                            {isPaused && (
                                 <p className="text-center text-xs text-muted-foreground">
                                     Joining is disabled until identity
                                     verification is completed.

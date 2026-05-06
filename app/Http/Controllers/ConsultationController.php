@@ -127,7 +127,9 @@ class ConsultationController extends Controller
             && $user !== null
             && ! $user->isMedicalStaff()
             && ($user->isAdmin() || $consultation->doctor_id === $user->id);
-        $consentCompleted = ! $consultation->requiresConsentForUser($user);
+        $consentCompleted = $consultation->isAdminAuditUser($user)
+            ? null
+            : $consultation->hasConfirmedConsentForUser($user);
 
         $consultation->load([
             'patient',
@@ -311,7 +313,7 @@ class ConsultationController extends Controller
                 ->with('error', 'Consultation must have a scheduled time and assigned doctor before approval.');
         }
 
-        if (! app(\App\Services\DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
+        if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
             return redirect()
                 ->route('consultations.show', $consultation)
                 ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
