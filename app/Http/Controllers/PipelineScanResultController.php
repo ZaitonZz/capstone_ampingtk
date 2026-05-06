@@ -99,9 +99,15 @@ class PipelineScanResultController extends Controller
             'scanned_at' => $completedAt,
         ]);
 
+        $consultationUpdates = [
+            'pipeline_last_scan_at' => $completedAt,
+        ];
+
         if ($log->result === 'fake') {
-            $consultation->update(['deepfake_verified' => false]);
+            $consultationUpdates['deepfake_verified'] = false;
         }
+
+        $consultation->update($consultationUpdates);
 
         $this->deepfakeEscalationService->handleNewScanLog($log);
 

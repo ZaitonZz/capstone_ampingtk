@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\ConsultationIdentityVerificationService;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -12,6 +13,7 @@ class ConsultationLobbyController extends Controller
 {
     public function __construct(
         private ConsultationIdentityVerificationService $identityVerificationService,
+        private ConsultationDeepfakeDetectionService $deepfakeDetectionService,
     ) {}
 
     public function show(Consultation $consultation): Response
@@ -29,6 +31,7 @@ class ConsultationLobbyController extends Controller
         }
 
         $consultation->load(['patient', 'doctor']);
+        $consultation = $this->deepfakeDetectionService->enforceOrCancel($consultation);
 
         $consent = ConsultationConsent::query()
             ->where('consultation_id', $consultation->id)
@@ -70,6 +73,7 @@ class ConsultationLobbyController extends Controller
                 'connect_url' => route('consultations.livekit.connect', $consultation),
                 'ws_url' => config('services.livekit.ws_url'),
             ],
+            'deepfake_detection' => $this->deepfakeDetectionService->statusPayload($consultation),
         ]);
     }
 }

@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Services\ConsultationDeepfakeDetectionService;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ConsultationSessionController extends Controller
 {
+    public function __construct(private ConsultationDeepfakeDetectionService $deepfakeDetectionService) {}
+
     public function show(Consultation $consultation): Response
     {
         $this->authorize('view', $consultation);
@@ -24,6 +27,7 @@ class ConsultationSessionController extends Controller
         }
 
         $consultation->load(['patient', 'doctor']);
+        $consultation = $this->deepfakeDetectionService->enforceOrCancel($consultation);
 
         $isConsultationDoctor = $user !== null && $consultation->doctor_id === $user->id;
         $isConsultationPatient = $user !== null && $consultation->patient()->where('user_id', $user->id)->exists();
@@ -61,6 +65,7 @@ class ConsultationSessionController extends Controller
                 'room_name' => $consultation->livekit_room_name,
                 'room_status' => $consultation->livekit_room_status,
             ],
+            'deepfake_detection' => $this->deepfakeDetectionService->statusPayload($consultation),
         ]);
     }
 }
