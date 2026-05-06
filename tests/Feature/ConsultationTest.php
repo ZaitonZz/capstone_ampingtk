@@ -5,6 +5,7 @@ use App\Models\ConsultationConsent;
 use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\PatientNote;
+use App\Models\Prescription;
 use App\Models\User;
 
 it('redirects guests to login', function () {
@@ -256,7 +257,7 @@ it('prevents marking a consultation as completed without documentation', functio
 
     $this->actingAs($medicalStaff)
         ->patch(route('consultations.update', $consultation), ['status' => 'completed'])
-        ->assertSessionHasErrors(['status', 'ended_at']);
+        ->assertSessionHasErrors(['status']);
 
     expect($consultation->fresh()->status)->not->toBe('completed');
 });
@@ -267,6 +268,20 @@ it('updates consultation status after a clinical note exists', function () {
     $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
 
     PatientNote::factory()->for($consultation)->create();
+
+    $this->actingAs($medicalStaff)
+        ->patch(route('consultations.update', $consultation), ['status' => 'completed'])
+        ->assertRedirect(route('consultations.show', $consultation));
+
+    expect($consultation->fresh()->status)->toBe('completed');
+});
+
+it('updates consultation status when only a prescription exists (no note)', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create(['doctor_id' => $doctor->id]);
+
+    Prescription::factory()->for($consultation)->create();
 
     $this->actingAs($medicalStaff)
         ->patch(route('consultations.update', $consultation), ['status' => 'completed'])

@@ -66,19 +66,12 @@ class UpdateConsultationRequest extends FormRequest
                 return;
             }
 
-            $currentIsEnded = $consultation->status === Consultation::STATUS_COMPLETED
-                || $consultation->ended_at !== null;
-
             $nextStatus = $this->input('status', $consultation->status);
-            $nextEndedAt = $this->input('ended_at', $consultation->ended_at?->toDateTimeString());
 
-            $isMarkingEnded = ! $currentIsEnded
-                && (
-                    $nextStatus === Consultation::STATUS_COMPLETED
-                    || $nextEndedAt !== null && $nextEndedAt !== ''
-                );
+            $isMarkingCompleted = $consultation->status !== Consultation::STATUS_COMPLETED
+                && $nextStatus === Consultation::STATUS_COMPLETED;
 
-            if (! $isMarkingEnded) {
+            if (! $isMarkingCompleted) {
                 return;
             }
 
@@ -89,7 +82,6 @@ class UpdateConsultationRequest extends FormRequest
             $message = 'Enter a clinical note or add a prescription before marking the consultation as completed.';
 
             $validator->errors()->add('status', $message);
-            $validator->errors()->add('ended_at', $message);
         });
     }
 }
