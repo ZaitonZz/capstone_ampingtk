@@ -34,7 +34,10 @@ class RequestAppointmentRequest extends FormRequest
             $doctorId = (int) $this->input('doctor_id');
             $scheduledAt = (string) $this->input('scheduled_at');
 
-            if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($doctorId, $scheduledAt)) {
+            $availabilityService = app(DoctorDutyAvailabilityService::class);
+
+            // For patient requests, require exact time availability
+            if (! $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt)) {
                 $validator->errors()->add('doctor_id', 'Selected doctor is not on duty for the specified appointment schedule.');
             }
         });

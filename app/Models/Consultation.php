@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -61,6 +62,15 @@ class Consultation extends Model
         self::STATUS_PAUSED,
     ];
 
+    public const DOCTOR_VISIBLE_STATUSES = [
+        self::STATUS_SCHEDULED,
+        self::STATUS_ONGOING,
+        self::STATUS_PAUSED,
+        self::STATUS_COMPLETED,
+        self::STATUS_CANCELLED,
+        self::STATUS_NO_SHOW,
+    ];
+
     protected $fillable = [
         'patient_id',
         'doctor_id',
@@ -115,6 +125,11 @@ class Consultation extends Model
     }
 
     /** Duration in minutes (null if not yet ended) */
+    public function scopeVisibleToDoctor(Builder $query): Builder
+    {
+        return $query->whereIn('status', self::DOCTOR_VISIBLE_STATUSES);
+    }
+
     public function getDurationMinutesAttribute(): ?int
     {
         if ($this->started_at && $this->ended_at) {

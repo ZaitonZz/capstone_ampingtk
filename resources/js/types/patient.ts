@@ -1,3 +1,9 @@
+export type Consultation = {
+    id: number;
+    scheduled_at: string;
+    status: string;
+};
+
 export type Patient = {
     id: number;
     first_name: string;
@@ -17,6 +23,8 @@ export type Patient = {
     known_allergies?: string;
     created_at: string;
     updated_at: string;
+    has_today_schedule?: boolean;
+    consultations?: Consultation[];
 };
 
 export type PaginatedData<T> = {

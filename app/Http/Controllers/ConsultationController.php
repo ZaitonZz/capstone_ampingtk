@@ -7,6 +7,7 @@ use App\Http\Requests\RescheduleConsultationRequest;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
+use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\User;
 use App\Services\DoctorDutyAvailabilityService;
@@ -14,7 +15,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -27,10 +27,25 @@ class ConsultationController extends Controller
             return false;
         }
 
-        return app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt(
-            (int) $consultation->doctor_id,
-            $consultation->scheduled_at->toDateTimeString(),
+        $doctorId = (int) $consultation->doctor_id;
+        $scheduledAt = $consultation->scheduled_at->toDateTimeString();
+
+        $isAvailableAtTime = app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt(
+            $doctorId,
+            $scheduledAt,
         );
+
+        if ($isAvailableAtTime) {
+            return true;
+        }
+
+        // Fall back to checking whether the doctor has any duty scheduled on that date.
+        // A staff member approving the consultation may adjust the exact time — having
+        // any duty record on the date is considered sufficient for the UI to allow approval.
+        return DoctorDutySchedule::query()
+            ->where('doctor_id', $doctorId)
+            ->whereDate('duty_date', $consultation->scheduled_at->toDateString())
+            ->exists();
     }
 
     public function index(Request $request): Response
@@ -52,25 +67,9 @@ class ConsultationController extends Controller
             ], 'latency_ms')
             ->when(
                 $isDoctor,
-                function ($q) use ($user) {
-                    // Doctors should see consultations that are assigned to them
-                    // OR pending consultations that overlap with their on-duty schedule
-                    $q->where(function ($q2) use ($user) {
-                        $q2->where('doctor_id', $user->id)
-                            ->orWhere(function ($q3) use ($user) {
-                                $q3->where('status', 'pending')
-                                    ->whereExists(function ($sub) use ($user) {
-                                        $sub->select(DB::raw(1))
-                                            ->from('doctor_duty_schedules')
-                                            ->where('doctor_duty_schedules.doctor_id', $user->id)
-                                            ->where('doctor_duty_schedules.status', 'on_duty')
-                                            ->whereRaw('doctor_duty_schedules.duty_date = DATE(consultations.scheduled_at)')
-                                            ->whereRaw('doctor_duty_schedules.start_time <= TIME(consultations.scheduled_at)')
-                                            ->whereRaw('doctor_duty_schedules.end_time >= TIME(consultations.scheduled_at)');
-                                    });
-                            });
-                    });
-                }
+                fn ($q) => $q
+                    ->where('doctor_id', $user->id)
+                    ->visibleToDoctor()
             )
             ->when($request->patient_id, fn ($q, $id) => $q->where('patient_id', $id))
             ->when($request->doctor_id, fn ($q, $id) => $q->where('doctor_id', $id))
@@ -123,6 +122,8 @@ class ConsultationController extends Controller
         if (($data['type'] ?? 'teleconsultation') === 'teleconsultation') {
             $data['session_token'] = Str::uuid()->toString();
         }
+
+        $data['status'] = Consultation::STATUS_PENDING;
 
         $consultation = Consultation::create($data);
 
@@ -240,7 +241,7 @@ class ConsultationController extends Controller
                 $isDoctor,
                 fn ($q) => $q
                     ->where('doctor_id', $user->id)
-                    ->where('status', 'scheduled')
+                    ->visibleToDoctor()
             )
             ->whereNotNull('scheduled_at')
             ->whereBetween('scheduled_at', [$calendarRangeStart, $calendarRangeEnd])
@@ -331,7 +332,12 @@ class ConsultationController extends Controller
                     ->route('consultations.show', $consultation)
                     ->with('error', 'Consultation must have an assigned doctor before approval.');
             }
-            if (! app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($assignedDoctorId, $scheduledAt)) {
+            $availableAtTime = app(DoctorDutyAvailabilityService::class)->isDoctorAvailableAt($assignedDoctorId, $scheduledAt);
+            $hasScheduleOnDate = $availableAtTime || DoctorDutySchedule::query()
+                ->where('doctor_id', $assignedDoctorId)
+                ->whereDate('duty_date', Carbon::parse($scheduledAt)->toDateString())
+                ->exists();
+            if (! $hasScheduleOnDate) {
                 return redirect()
                     ->route('consultations.show', $consultation)
                     ->with('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
