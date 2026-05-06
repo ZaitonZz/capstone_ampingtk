@@ -46,7 +46,8 @@ class PatientController extends Controller
             )
             ->latest()
             ->paginate($request->integer('per_page', 15))
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn ($patient) => $patient->append('has_today_schedule'));
 
         // Return JSON for API/test requests
         if ($request->expectsJson()) {
