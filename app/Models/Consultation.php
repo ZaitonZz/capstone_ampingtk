@@ -109,6 +109,12 @@ class Consultation extends Model
         'session_token',
         'livekit_room_sid',
         'livekit_last_error',
+        'pipeline_detection_status',
+        'pipeline_detection_started_at',
+        'pipeline_last_heartbeat_at',
+        'pipeline_last_scan_at',
+        'pipeline_last_error',
+        'pipeline_guidance',
     ];
 
     protected $appends = ['duration_minutes'];

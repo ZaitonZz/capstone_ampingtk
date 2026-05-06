@@ -39,8 +39,7 @@ class ConsultationDeepfakeDetectionService
             'last_heartbeat_age_seconds' => $ageSeconds,
             'started_at' => $consultation->pipeline_detection_started_at?->toIso8601String(),
             'last_scan_at' => $consultation->pipeline_last_scan_at?->toIso8601String(),
-            'last_error' => $consultation->pipeline_last_error,
-            'guidance' => $this->normalizeGuidance($consultation->pipeline_guidance),
+            'guidance' => $this->publicGuidancePayload($consultation->pipeline_guidance),
         ];
     }
 
@@ -177,6 +176,18 @@ class ConsultationDeepfakeDetectionService
             'brightness' => isset($guidance['brightness']) ? (float) $guidance['brightness'] : null,
             'participant_identity' => isset($guidance['participant_identity']) ? (string) $guidance['participant_identity'] : null,
             'role' => isset($guidance['role']) ? (string) $guidance['role'] : null,
+        ];
+    }
+
+    private function publicGuidancePayload(mixed $guidance): array
+    {
+        $normalizedGuidance = $this->normalizeGuidance($guidance);
+
+        return [
+            'low_light' => $normalizedGuidance['low_light'],
+            'too_far' => $normalizedGuidance['too_far'],
+            'face_area_ratio' => $normalizedGuidance['face_area_ratio'],
+            'brightness' => $normalizedGuidance['brightness'],
         ];
     }
 
