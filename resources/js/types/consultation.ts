@@ -103,6 +103,12 @@ export interface Consultation {
     livekit_ended_at: string | null;
     livekit_last_error: string | null;
     deepfake_verified: boolean | null;
+    pipeline_detection_status: string | null;
+    pipeline_detection_started_at: string | null;
+    pipeline_last_heartbeat_at: string | null;
+    pipeline_last_scan_at: string | null;
+    pipeline_last_error: string | null;
+    pipeline_guidance: ConsultationDeepfakeGuidance | null;
     identity_verification_target_user_id: number | null;
     identity_verification_target_role: 'patient' | 'doctor' | null;
     identity_verification_started_at: string | null;
@@ -122,6 +128,27 @@ export interface Consultation {
     deepfake_escalations?: ConsultationDeepfakeEscalation[];
     created_at: string;
     updated_at: string;
+}
+
+export interface ConsultationDeepfakeGuidance {
+    low_light: boolean;
+    too_far: boolean;
+    face_area_ratio: number | null;
+    brightness: number | null;
+    participant_identity: string | null;
+    role: string | null;
+}
+
+export interface ConsultationDeepfakeDetectionState {
+    state: 'starting' | 'running' | 'delayed' | 'unavailable' | 'cancelled';
+    status: string | null;
+    timeout_seconds: number;
+    last_heartbeat_at: string | null;
+    last_heartbeat_age_seconds: number | null;
+    started_at: string | null;
+    last_scan_at: string | null;
+    last_error: string | null;
+    guidance: ConsultationDeepfakeGuidance;
 }
 
 export interface ConsultationIdentityVerificationState {
