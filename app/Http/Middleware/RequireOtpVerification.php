@@ -16,12 +16,12 @@ class RequireOtpVerification
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!(bool) config('auth_otp.enabled', true)) {
+        if (! (bool) config('auth_otp.enabled', true)) {
             return $next($request);
         }
 
         // If user is authenticated but OTP not verified
-        if (auth()->check() && !session('otp_verified')) {
+        if (auth()->check() && ! session('otp_verified')) {
             // Redirect to OTP verification page
             // OTP initialization happens in the route handler, not here
             return redirect()->route('verify-otp');

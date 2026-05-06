@@ -3,7 +3,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePoll } from '@inertiajs/react';
 import { List, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -92,11 +92,25 @@ export default function ConsultationsCalendar({
     const { data, setData, post, processing, errors, reset } = useForm({
         patient_id: '',
         doctor_id: '',
-        type: 'teleconsultation' as 'teleconsultation',
+        type: 'teleconsultation' as const,
         status: 'pending',
         chief_complaint: '',
         scheduled_at: '',
     });
+
+    // Poll for calendar updates every 5 seconds to reflect status changes
+    const { start: startPolling, stop: stopPolling } = usePoll(5000, {
+        only: ['events'],
+    });
+
+    // Auto-start polling to keep calendar in sync with status changes
+    useEffect(() => {
+        startPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [startPolling, stopPolling]);
 
     function handleScheduledAtChange(nextScheduledAt: string) {
         setData((current) => ({
@@ -287,7 +301,9 @@ export default function ConsultationsCalendar({
                             interactionPlugin,
                         ]}
                         initialView={
-                            is_doctor_daily_view ? 'timeGridDay' : 'timeGridWeek'
+                            is_doctor_daily_view
+                                ? 'timeGridDay'
+                                : 'timeGridWeek'
                         }
                         headerToolbar={{
                             left: 'prev,next today',
@@ -338,7 +354,9 @@ export default function ConsultationsCalendar({
                                 </span>
                                 <Badge
                                     variant="outline"
-                                    className={STATUS_BADGE_CLASSES[selected.status]}
+                                    className={
+                                        STATUS_BADGE_CLASSES[selected.status]
+                                    }
                                 >
                                     {STATUS_LABELS[selected.status]}
                                 </Badge>
@@ -387,25 +405,26 @@ export default function ConsultationsCalendar({
                                 </Button>
                             )}
                             {can_manage_schedule &&
-                                selected.status === 'pending' && (
-                                    selected.doctor_available_for_approval ? (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="text-green-600 hover:text-green-700"
-                                            onClick={() => handleApprove(selected.id)}
-                                        >
-                                            Approve
-                                        </Button>
-                                    ) : (
-                                        <Badge
-                                            variant="outline"
-                                            className="border-amber-200 bg-amber-50 text-amber-700"
-                                        >
-                                            Preferred doctor is not on duty
-                                        </Badge>
-                                    )
-                                )}
+                                selected.status === 'pending' &&
+                                (selected.doctor_available_for_approval ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-green-600 hover:text-green-700"
+                                        onClick={() =>
+                                            handleApprove(selected.id)
+                                        }
+                                    >
+                                        Approve
+                                    </Button>
+                                ) : (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-amber-200 bg-amber-50 text-amber-700"
+                                    >
+                                        Preferred doctor is not on duty
+                                    </Badge>
+                                ))}
                         </div>
                     </div>
                 </div>
@@ -509,7 +528,13 @@ export default function ConsultationsCalendar({
                                 <select
                                     id="modal_type"
                                     value={data.type}
-                                    onChange={(e) => setData('type', e.target.value as 'teleconsultation')}
+                                    onChange={(e) =>
+                                        setData(
+                                            'type',
+                                            e.target
+                                                .value as 'teleconsultation',
+                                        )
+                                    }
                                     className="h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
                                 >
                                     <option value="teleconsultation">
@@ -532,7 +557,9 @@ export default function ConsultationsCalendar({
                                     id="modal_scheduled_at"
                                     type="datetime-local"
                                     value={data.scheduled_at}
-                                    onChange={(e) => handleScheduledAtChange(e.target.value)}
+                                    onChange={(e) =>
+                                        handleScheduledAtChange(e.target.value)
+                                    }
                                 />
                                 {errors.scheduled_at && (
                                     <p className="text-sm text-destructive">
@@ -556,6 +583,7 @@ export default function ConsultationsCalendar({
                                         )
                                     }
                                     rows={3}
+                                    required
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground"
                                     placeholder="Describe the patient's main concern…"
                                 />

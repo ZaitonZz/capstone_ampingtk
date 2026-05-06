@@ -19,18 +19,31 @@ class PipelineRoomsController extends Controller
         $page = max(1, $page);
         $offset = ($page - 1) * $perPage;
 
-        $rooms = Consultation::query()
+        $candidateConsultations = Consultation::query()
             ->where('type', 'teleconsultation')
             ->whereIn('status', Consultation::LIVEKIT_ELIGIBLE_STATUSES)
             ->where('livekit_room_status', 'room_ready')
             ->whereNotNull('livekit_room_name')
-            ->skip($offset)
-            ->take($perPage)
-            ->get()
+            ->orderBy('id')
+            ->get();
+
+        $participantCounts = $this->liveKitService->activeRoomParticipantCounts(
+            $candidateConsultations
+                ->pluck('livekit_room_name')
+                ->filter()
+                ->values()
+                ->all()
+        );
+
+        $rooms = $candidateConsultations
+            ->filter(fn (Consultation $c): bool => ($participantCounts[$c->livekit_room_name] ?? 0) > 0)
+            ->slice($offset, $perPage)
+            ->values()
             ->map(fn (Consultation $c): array => [
                 'consultation_id' => $c->id,
                 'room_name' => $c->livekit_room_name,
                 'room_sid' => $c->livekit_room_sid,
+                'participant_count' => $participantCounts[$c->livekit_room_name] ?? 0,
                 'ws_url' => config('services.livekit.ws_url'),
                 'pipeline_token' => $this->liveKitService->issuePipelineToken($c),
             ]);

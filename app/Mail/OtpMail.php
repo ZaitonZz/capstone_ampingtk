@@ -20,8 +20,7 @@ class OtpMail extends Mailable
         public readonly string $userEmail,
         public readonly string $otp,
         public readonly int $expiryMinutes = 5,
-    ) {
-    }
+    ) {}
 
     /**
      * Get the message envelope.

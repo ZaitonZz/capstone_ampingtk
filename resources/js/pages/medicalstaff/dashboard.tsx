@@ -29,7 +29,7 @@ interface PendingConsultation {
     id: number;
     patient_name: string;
     doctor_name: string;
-    type: 'in_person' | 'teleconsultation';
+    type: 'teleconsultation';
     scheduled_at: string | null;
     reschedule_url: string;
     cancel_url: string;
@@ -76,7 +76,10 @@ const DUTY_REQUEST_TYPE_LABELS: Record<DutyRequest['request_type'], string> = {
     on_leave: 'Leave',
 };
 
-const DUTY_REQUEST_STATUS_VARIANT: Record<DutyRequest['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const DUTY_REQUEST_STATUS_VARIANT: Record<
+    DutyRequest['status'],
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'outline',
     approved: 'secondary',
     rejected: 'destructive',
@@ -104,10 +107,18 @@ function toDatetimeLocal(iso: string | null): string {
 }
 
 export default function MedicalStaffDashboardPage() {
-    const { metrics, pending_consultations, recent_registrations, duty_requests } =
-        usePage<PageProps>().props;
-    const [rescheduleDrafts, setRescheduleDrafts] = useState<Record<number, string>>({});
-    const [cancelReasonDrafts, setCancelReasonDrafts] = useState<Record<number, string>>({});
+    const {
+        metrics,
+        pending_consultations,
+        recent_registrations,
+        duty_requests,
+    } = usePage<PageProps>().props;
+    const [rescheduleDrafts, setRescheduleDrafts] = useState<
+        Record<number, string>
+    >({});
+    const [cancelReasonDrafts, setCancelReasonDrafts] = useState<
+        Record<number, string>
+    >({});
 
     function approveConsultation(consultationId: number) {
         router.patch(
@@ -169,7 +180,10 @@ export default function MedicalStaffDashboardPage() {
         );
     }
 
-    function reviewDutyRequest(requestId: number, decision: 'approved' | 'rejected') {
+    function reviewDutyRequest(
+        requestId: number,
+        decision: 'approved' | 'rejected',
+    ) {
         router.patch(
             `/doctor-duty-requests/${requestId}/review`,
             {
@@ -195,7 +209,8 @@ export default function MedicalStaffDashboardPage() {
                                 Medical Staff Dashboard
                             </h1>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Registration, consultation scheduling, and care coordination workspace.
+                                Registration, consultation scheduling, and care
+                                coordination workspace.
                             </p>
                         </div>
 
@@ -241,9 +256,12 @@ export default function MedicalStaffDashboardPage() {
                 <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-lg font-semibold">Leave / Absence Requests</h2>
+                            <h2 className="text-lg font-semibold">
+                                Leave / Absence Requests
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                                Review doctor-submitted leave and absence requests here.
+                                Review doctor-submitted leave and absence
+                                requests here.
                             </p>
                         </div>
 
@@ -259,18 +277,36 @@ export default function MedicalStaffDashboardPage() {
                     ) : (
                         <div className="grid gap-3">
                             {duty_requests.map((request) => (
-                                <div key={request.id} className="rounded-xl border bg-background p-4 shadow-sm">
+                                <div
+                                    key={request.id}
+                                    className="rounded-xl border bg-background p-4 shadow-sm"
+                                >
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <div>
                                             <p className="text-sm font-semibold">
                                                 {request.doctor_name}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {DUTY_REQUEST_TYPE_LABELS[request.request_type]} · {request.start_date}
-                                                {request.end_date && request.end_date !== request.start_date ? ` to ${request.end_date}` : ''}
+                                                {
+                                                    DUTY_REQUEST_TYPE_LABELS[
+                                                        request.request_type
+                                                    ]
+                                                }{' '}
+                                                · {request.start_date}
+                                                {request.end_date &&
+                                                request.end_date !==
+                                                    request.start_date
+                                                    ? ` to ${request.end_date}`
+                                                    : ''}
                                             </p>
                                         </div>
-                                        <Badge variant={DUTY_REQUEST_STATUS_VARIANT[request.status]}>
+                                        <Badge
+                                            variant={
+                                                DUTY_REQUEST_STATUS_VARIANT[
+                                                    request.status
+                                                ]
+                                            }
+                                        >
                                             {request.status}
                                         </Badge>
                                     </div>
@@ -286,22 +322,35 @@ export default function MedicalStaffDashboardPage() {
                                             <Button
                                                 size="sm"
                                                 className="bg-emerald-600 hover:bg-emerald-700"
-                                                onClick={() => reviewDutyRequest(request.id, 'approved')}
+                                                onClick={() =>
+                                                    reviewDutyRequest(
+                                                        request.id,
+                                                        'approved',
+                                                    )
+                                                }
                                             >
                                                 Approve
                                             </Button>
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                onClick={() => reviewDutyRequest(request.id, 'rejected')}
+                                                onClick={() =>
+                                                    reviewDutyRequest(
+                                                        request.id,
+                                                        'rejected',
+                                                    )
+                                                }
                                             >
                                                 Reject
                                             </Button>
                                         </div>
                                     ) : (
                                         <p className="mt-3 text-xs text-muted-foreground">
-                                            Reviewed by {request.reviewed_by ?? 'N/A'}
-                                            {request.reviewed_at ? ` on ${new Date(request.reviewed_at).toLocaleString()}` : ''}
+                                            Reviewed by{' '}
+                                            {request.reviewed_by ?? 'N/A'}
+                                            {request.reviewed_at
+                                                ? ` on ${new Date(request.reviewed_at).toLocaleString()}`
+                                                : ''}
                                         </p>
                                     )}
                                 </div>
@@ -316,10 +365,13 @@ export default function MedicalStaffDashboardPage() {
                             <ClipboardList className="h-4 w-4" />
                             Patient Registry
                         </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
                             Register new patients and maintain demographics.
                         </p>
-                        <Button asChild className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700">
+                        <Button
+                            asChild
+                            className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700"
+                        >
                             <Link href="/staff/patients/create">
                                 Register Patient
                             </Link>
@@ -340,11 +392,14 @@ export default function MedicalStaffDashboardPage() {
                             <ContactRound className="h-4 w-4" />
                             Consultation Desk
                         </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
                             Manage scheduling and pending consultation
                             approvals.
                         </p>
-                        <Button asChild className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700">
+                        <Button
+                            asChild
+                            className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700"
+                        >
                             <Link href="/consultations">
                                 Open Consultations
                             </Link>
@@ -365,7 +420,7 @@ export default function MedicalStaffDashboardPage() {
                             <CalendarDays className="h-4 w-4" />
                             Care Coordination
                         </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-sm leading-relaxed text-muted-foreground">
                             Monitor today's load and prioritize pending
                             operations.
                         </p>
@@ -407,14 +462,11 @@ export default function MedicalStaffDashboardPage() {
                                         Doctor: {consultation.doctor_name}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {consultation.type === 'in_person'
-                                            ? 'In Person'
-                                            : 'Teleconsultation'}
-                                        {' · '}
+                                        Teleconsultation{' · '}
                                         {consultation.scheduled_at
                                             ? new Date(
-                                                consultation.scheduled_at,
-                                            ).toLocaleString()
+                                                  consultation.scheduled_at,
+                                              ).toLocaleString()
                                             : 'No schedule yet'}
                                     </p>
 
@@ -423,7 +475,7 @@ export default function MedicalStaffDashboardPage() {
                                             <div className="grid gap-1">
                                                 <Label
                                                     htmlFor={`reschedule-${consultation.id}`}
-                                                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                                 >
                                                     New Schedule
                                                 </Label>
@@ -431,14 +483,22 @@ export default function MedicalStaffDashboardPage() {
                                                     id={`reschedule-${consultation.id}`}
                                                     type="datetime-local"
                                                     value={
-                                                        rescheduleDrafts[consultation.id] ??
-                                                        toDatetimeLocal(consultation.scheduled_at)
+                                                        rescheduleDrafts[
+                                                            consultation.id
+                                                        ] ??
+                                                        toDatetimeLocal(
+                                                            consultation.scheduled_at,
+                                                        )
                                                     }
                                                     onChange={(e) =>
-                                                        setRescheduleDrafts((current) => ({
-                                                            ...current,
-                                                            [consultation.id]: e.target.value,
-                                                        }))
+                                                        setRescheduleDrafts(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [consultation.id]:
+                                                                    e.target
+                                                                        .value,
+                                                            }),
+                                                        )
                                                     }
                                                     className="h-10 rounded-lg"
                                                 />
@@ -460,19 +520,27 @@ export default function MedicalStaffDashboardPage() {
                                             <div className="grid gap-1">
                                                 <Label
                                                     htmlFor={`cancel-${consultation.id}`}
-                                                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                                 >
                                                     Cancellation Reason
                                                 </Label>
                                                 <Input
                                                     id={`cancel-${consultation.id}`}
                                                     placeholder="Enter reason"
-                                                    value={cancelReasonDrafts[consultation.id] ?? ''}
+                                                    value={
+                                                        cancelReasonDrafts[
+                                                            consultation.id
+                                                        ] ?? ''
+                                                    }
                                                     onChange={(e) =>
-                                                        setCancelReasonDrafts((current) => ({
-                                                            ...current,
-                                                            [consultation.id]: e.target.value,
-                                                        }))
+                                                        setCancelReasonDrafts(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [consultation.id]:
+                                                                    e.target
+                                                                        .value,
+                                                            }),
+                                                        )
                                                     }
                                                     className="h-10 rounded-lg"
                                                 />
@@ -481,7 +549,9 @@ export default function MedicalStaffDashboardPage() {
                                                 size="sm"
                                                 variant="outline"
                                                 onClick={() =>
-                                                    cancelConsultation(consultation)
+                                                    cancelConsultation(
+                                                        consultation,
+                                                    )
                                                 }
                                             >
                                                 Cancel
@@ -545,8 +615,8 @@ export default function MedicalStaffDashboardPage() {
                                         Registered:{' '}
                                         {patient.registered_at
                                             ? new Date(
-                                                patient.registered_at,
-                                            ).toLocaleString()
+                                                  patient.registered_at,
+                                              ).toLocaleString()
                                             : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">

@@ -10,6 +10,7 @@ use App\Models\Patient;
 use App\Models\PatientPhoto;
 use App\Models\User;
 use App\Services\DeepfakeEscalationService;
+use Illuminate\Support\Facades\Http;
 
 function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-secret'): array
 {
@@ -24,6 +25,7 @@ function pipelineSignedHeaders(string $body, string $secret = 'pipeline-test-sec
 beforeEach(function () {
     config()->set('services.livekit.api_key', 'test-key');
     config()->set('services.livekit.api_secret', 'test-api-secret');
+    config()->set('services.livekit.url', 'https://livekit.test');
     config()->set('services.livekit.ws_url', 'wss://livekit.test');
     config()->set('services.pipeline.secret', 'pipeline-test-secret');
     config()->set('services.pipeline.microcheck_min_interval_seconds', 1);
@@ -58,7 +60,19 @@ it('returns active teleconsultation rooms for the pipeline', function () {
         'livekit_room_status' => 'ended',
     ]);
 
-    Consultation::factory()->create(['type' => 'in_person']);
+    Consultation::factory()->create(['type' => 'teleconsultation']);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/ListRooms' => Http::response([
+            'rooms' => [
+                [
+                    'name' => 'consultation-10-readyroom',
+                    'sid' => 'RM_readyroom',
+                    'num_participants' => 2,
+                ],
+            ],
+        ], 200),
+    ]);
 
     // getJson sends json_encode([]) = '[]' as the request body — sign against that exact string
     $response = $this->withHeaders(pipelineSignedHeaders('[]'))
@@ -68,8 +82,52 @@ it('returns active teleconsultation rooms for the pipeline', function () {
 
     expect($response->json('0.consultation_id'))->toBe($ready->id);
     expect($response->json('0.room_name'))->toBe('consultation-10-readyroom');
+    expect($response->json('0.participant_count'))->toBe(2);
     expect($response->json('0.ws_url'))->toBe('wss://livekit.test');
     expect($response->json('0.pipeline_token'))->not->toBeNull();
+});
+
+it('returns only LiveKit-open rooms with visible participants for the pipeline', function () {
+    $occupied = Consultation::factory()->teleconsultation()->create([
+        'livekit_room_name' => 'consultation-20-occupied',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    Consultation::factory()->teleconsultation()->create([
+        'livekit_room_name' => 'consultation-21-empty',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    Consultation::factory()->teleconsultation()->create([
+        'livekit_room_name' => 'consultation-22-not-open',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/ListRooms' => Http::response([
+            'rooms' => [
+                [
+                    'name' => 'consultation-20-occupied',
+                    'sid' => 'RM_occupied',
+                    'num_participants' => 1,
+                ],
+                [
+                    'name' => 'consultation-21-empty',
+                    'sid' => 'RM_empty',
+                    'num_participants' => 0,
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $response = $this->withHeaders(pipelineSignedHeaders('[]'))
+        ->getJson(route('pipeline.rooms'))
+        ->assertOk()
+        ->assertJsonCount(1);
+
+    expect($response->json('0.consultation_id'))->toBe($occupied->id);
+    expect($response->json('0.room_name'))->toBe('consultation-20-occupied');
+    expect($response->json('0.participant_count'))->toBe(1);
 });
 
 // ── Pipeline scan results endpoint ────────────────────────────────────────────

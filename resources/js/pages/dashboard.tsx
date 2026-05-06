@@ -2,8 +2,8 @@ import { Head, usePage } from '@inertiajs/react';
 import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
-import type { Auth } from '@/types/auth';
 import type { BreadcrumbItem } from '@/types';
+import type { Auth } from '@/types/auth';
 
 const breadcrumbs: BreadcrumbItem[] = [
     {

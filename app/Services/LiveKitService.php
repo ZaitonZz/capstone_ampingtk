@@ -6,6 +6,7 @@ use App\Models\Consultation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class LiveKitService
@@ -95,6 +96,76 @@ class LiveKitService
                 'recorder' => true,
             ],
         ]);
+    }
+
+    /**
+     * @param  array<int, string>  $roomNames
+     * @return array<string, int>
+     */
+    public function activeRoomParticipantCounts(array $roomNames): array
+    {
+        $roomNames = array_values(array_unique(array_filter(
+            array_map(fn (string $roomName): string => trim($roomName), $roomNames),
+            fn (string $roomName): bool => $roomName !== ''
+        )));
+
+        if ($roomNames === []) {
+            return [];
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueJwt([
+            'sub' => 'consultation-room-lister',
+            'nbf' => now()->timestamp,
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes(5)->timestamp,
+            'video' => [
+                'roomList' => true,
+            ],
+        ]);
+
+        $participantCounts = [];
+
+        foreach (array_chunk($roomNames, 100) as $roomNameChunk) {
+            $response = Http::acceptJson()
+                ->withToken($serverToken)
+                ->asJson()
+                ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/ListRooms', [
+                    'names' => $roomNameChunk,
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('LiveKit room listing failed for pipeline room discovery.', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+
+                throw new RuntimeException(
+                    sprintf('LiveKit room listing failed [%d]: %s', $response->status(), $response->body())
+                );
+            }
+
+            foreach ((array) $response->json('rooms', []) as $room) {
+                if (! is_array($room)) {
+                    continue;
+                }
+
+                $name = (string) ($room['name'] ?? '');
+
+                if ($name === '') {
+                    continue;
+                }
+
+                $participantCounts[$name] = (int) ($room['num_participants'] ?? 0);
+            }
+        }
+
+        return $participantCounts;
     }
 
     public function removeParticipantFromConsultation(Consultation $consultation, User $user): void

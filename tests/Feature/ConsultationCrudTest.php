@@ -40,7 +40,7 @@ it('admin sees all consultations on the calendar', function () {
         ->assertInertia(fn ($page) => $page->has('events', 3));
 });
 
-it('doctor sees only their own scheduled consultations on the calendar', function () {
+it('doctor sees only their own doctor-visible consultations on the calendar', function () {
     $doctor = User::factory()->doctor()->create();
     $other = User::factory()->doctor()->create();
     Consultation::factory()->create([
@@ -50,7 +50,7 @@ it('doctor sees only their own scheduled consultations on the calendar', functio
     ]);
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
-        'status' => 'scheduled',
+        'status' => 'ongoing',
         'scheduled_at' => now()->addDay(),
     ]);
     Consultation::factory()->create([
@@ -70,18 +70,19 @@ it('doctor sees only their own scheduled consultations on the calendar', functio
         ->assertInertia(fn ($page) => $page->has('events', 2));
 });
 
-it('medical staff can access consultations index', function () {
+it('medical staff can access consultations index including pending consultations', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctorA = User::factory()->doctor()->create();
     $doctorB = User::factory()->doctor()->create();
 
-    Consultation::factory()->create(['doctor_id' => $doctorA->id]);
-    Consultation::factory()->create(['doctor_id' => $doctorB->id]);
+    Consultation::factory()->create(['doctor_id' => $doctorA->id, 'status' => 'scheduled']);
+    Consultation::factory()->create(['doctor_id' => $doctorB->id, 'status' => 'scheduled']);
+    Consultation::factory()->create(['doctor_id' => $doctorA->id, 'status' => 'pending']);
 
     $this->actingAs($medicalStaff)
         ->get(route('consultations.index'))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('consultations.data', 2));
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 3));
 });
 
 // ── Approve ───────────────────────────────────────────────────────────────────
@@ -89,19 +90,28 @@ it('medical staff can access consultations index', function () {
 it('approves a pending consultation and transitions it to scheduled', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
     ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
-        'duty_date' => $consultation->scheduled_at->toDateString(),
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
     ]);
 
-    $this->actingAs($medicalStaff)
-        ->patch(route('consultations.approve', $consultation))
-        ->assertRedirect();
+    $response = $this->actingAs($medicalStaff)
+        ->patch(route('consultations.approve', $consultation));
+
+    $response->assertRedirect();
+
+    // Redirect to show the consultation with flash message
+    $response->assertSessionHas('success', 'Appointment approved and scheduled.');
 
     expect($consultation->fresh()->status)->toBe('scheduled');
 });
@@ -125,22 +135,162 @@ it('cannot approve a pending consultation when assigned doctor is off duty', fun
     $consultation = Consultation::factory()->create([
         'doctor_id' => $doctor->id,
         'status' => 'pending',
+// ── Doctor Approval Logic ─────────────────────────────────────────────────────
+
+it('doctor can approve a pending consultation and assign themselves as doctor_id', function () {
+    $approverDoctor = User::factory()->doctor()->create();
+    $assignedDoctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $assignedDoctor->id,
+        'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $approverDoctor->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+    ]);
+
+    $this->actingAs($approverDoctor)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect();
+
+    $updated = $consultation->fresh();
+    expect($updated->status)->toBe('scheduled');
+    expect($updated->doctor_id)->toBe($approverDoctor->id);
+});
+
+it('doctor is rejected when approving a consultation while not on duty', function () {
+    $approverDoctor = User::factory()->doctor()->create();
+    $assignedDoctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $assignedDoctor->id,
+        'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    // No duty schedule created for the approver doctor at this time
+
+    $this->actingAs($approverDoctor)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect()
+        ->assertSessionHas('error', 'You are not on duty for the scheduled time.');
+
+    expect($consultation->fresh()->status)->toBe('pending');
+    expect($consultation->fresh()->doctor_id)->toBe($assignedDoctor->id);
+});
+
+it('doctor is rejected when approving without a scheduled time', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+        'scheduled_at' => null,
+    ]);
+
+    $this->actingAs($doctor)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Consultation must have a scheduled time before approval.');
+
+    expect($consultation->fresh()->status)->toBe('pending');
+});
+
+it('medical staff is rejected when assigned doctor is not on duty', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    // No duty schedule created for the assigned doctor at this time
+
+    $this->actingAs($medicalStaff)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Selected doctor is not on duty for the scheduled appointment. Change the assigned doctor before approving.');
+
+    expect($consultation->fresh()->status)->toBe('pending');
+    expect($consultation->fresh()->doctor_id)->toBe($doctor->id);
+});
+
+it('medical staff can approve when assigned doctor is on duty', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
     ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
-        'duty_date' => $consultation->scheduled_at->toDateString(),
+        'duty_date' => $scheduledAt->toDateString(),
         'start_time' => '08:00',
-        'end_time' => '12:00',
-        'status' => 'on_duty',
+        'end_time' => '17:00',
     ]);
 
     $this->actingAs($medicalStaff)
         ->patch(route('consultations.approve', $consultation))
-        ->assertRedirect(route('consultations.show', $consultation))
-        ->assertSessionHas('error');
+        ->assertRedirect();
 
-    expect($consultation->fresh()->status)->toBe(Consultation::STATUS_PENDING);
+    $updated = $consultation->fresh();
+    expect($updated->status)->toBe('scheduled');
+    expect($updated->doctor_id)->toBe($doctor->id); // Should remain unchanged for staff approval
+});
+
+it('handles race condition when two approvals happen simultaneously', function () {
+    $medicalStaffA = User::factory()->medicalStaff()->create();
+    $medicalStaffB = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $patient = Patient::factory()->create();
+    $scheduledAt = now()->addDay()->setHour(10)->setMinute(0)->setSecond(0);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+    ]);
+
+    // First approval succeeds
+    $this->actingAs($medicalStaffA)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($consultation->fresh()->status)->toBe('scheduled');
+
+    // Second approval on the now-scheduled consultation returns 422 (not pending anymore)
+    $this->actingAs($medicalStaffB)
+        ->patch(route('consultations.approve', $consultation->fresh()))
+        ->assertStatus(422);
+
+    expect($consultation->fresh()->status)->toBe('scheduled');
 });
 
 it('flagged participant can verify OTP and resume a paused consultation', function () {
@@ -442,17 +592,19 @@ it('patient can submit an appointment request which creates a pending consultati
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id, 'registered_by' => $user->id]);
     $doctor = User::factory()->doctor()->create();
-    $scheduledAt = now()->addDays(3);
+    $scheduledAt = now()->addDays(3)->setHour(10)->setMinute(0)->setSecond(0);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
         'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
     ]);
 
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
             'chief_complaint' => 'Routine check-up',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
@@ -462,6 +614,16 @@ it('patient can submit an appointment request which creates a pending consultati
     expect($consultation)->not->toBeNull();
     expect($consultation->status)->toBe('pending');
     expect($consultation->doctor_id)->toBe($doctor->id);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 0));
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.calendar'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('events', 0));
 });
 
 it('patient appointment request requires a future scheduled_at', function () {
@@ -472,7 +634,8 @@ it('patient appointment request requires a future scheduled_at', function () {
     $this->actingAsVerified($user)
         ->post(route('patient.consultations.request'), [
             'doctor_id' => $doctor->id,
-            'type' => 'in_person',
+            'type' => 'teleconsultation',
+            'chief_complaint' => 'Routine check-up',
             'scheduled_at' => now()->subDay()->toDateTimeString(),
         ])
         ->assertSessionHasErrors(['scheduled_at']);

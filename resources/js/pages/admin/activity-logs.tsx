@@ -1,14 +1,15 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { Filter, History } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import * as AdminActivityLogsRoute from '@/routes/admin/activity-logs';
 import type { BreadcrumbItem } from '@/types';
+import * as AdminActivityLogsRoute from '@/routes/admin/activity-logs';
 
 type ActivityLogItem = {
     id: number;
