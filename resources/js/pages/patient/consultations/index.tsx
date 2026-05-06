@@ -167,84 +167,82 @@ export default function PatientConsultationsIndex({
                                     </td>
                                 </tr>
                             )}
-                                                        {consultations.data
-                                                            .slice()
-                                                            .sort((a, b) => {
-                                                                const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-                                                                const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
-                                                                return aDate - bDate;
-                                                        })
+                            {consultations.data
+                                .slice()
+                                .sort((a, b) => {
+                                    const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+                                    const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+                                    return aDate - bDate;
+                                })
                                 .map((c) => {
-                                const isFinalStatus =
-                                    c.status === 'completed' ||
-                                    c.status === 'cancelled' ||
-                                    c.status === 'no_show';
-                                const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
+                                    const isFinalStatus =
+                                        c.status === 'completed' ||
+                                        c.status === 'cancelled' ||
+                                        c.status === 'no_show';
+                                    const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
 
-                                return (
-                                <tr
-                                    key={c.id}
-                                    className={
-                                        isToday
-                                            ? 'border-l-4 border-l-blue-500 bg-blue-50/60 hover:bg-blue-100/70 dark:border-l-blue-400 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
-                                            : 'hover:bg-muted/30'
-                                    }
-                                >
-                                    <td className="px-4 py-3 font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <span>Dr. {c.doctor?.name ?? '—'}</span>
-                                            {isToday && (
-                                                <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-                                                    Today
-                                                </Badge>
-                                            )}
-                                        </div>
-                                                .map((c) => {
-                                                    const isFinalStatus =
-                                    </td>
-                                    <td className="px-4 py-3 capitalize">
-                                        Teleconsultation
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Badge
-                                            variant="outline"
+                                    return (
+                                        <tr
+                                            key={c.id}
                                             className={
-                                                STATUS_BADGE_CLASSES[c.status]
+                                                isToday
+                                                    ? 'border-l-4 border-l-blue-500 bg-blue-50/60 hover:bg-blue-100/70 dark:border-l-blue-400 dark:bg-blue-950/20 dark:hover:bg-blue-950/30'
+                                                    : 'hover:bg-muted/30'
                                             }
                                         >
-                                            {STATUS_LABELS[c.status]}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-3 text-muted-foreground">
-                                        {c.scheduled_at
-                                            ? new Date(
-                                                  c.scheduled_at,
-                                              ).toLocaleString()
-                                            : '—'}
-                                    </td>
-                                    <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
-                                        {c.chief_complaint ?? '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={PatientConsultationController.show.url(
-                                                        c.id,
+                                            <td className="px-4 py-3 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <span>Dr. {c.doctor?.name ?? '—'}</span>
+                                                    {isToday && (
+                                                        <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                                                            Today
+                                                        </Badge>
                                                     )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 capitalize">
+                                                Teleconsultation
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={
+                                                        STATUS_BADGE_CLASSES[c.status]
+                                                    }
                                                 >
-                                                    View
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                );
-                            })}
+                                                    {STATUS_LABELS[c.status]}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {c.scheduled_at
+                                                    ? new Date(
+                                                          c.scheduled_at,
+                                                      ).toLocaleString()
+                                                    : '—'}
+                                            </td>
+                                            <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
+                                                {c.chief_complaint ?? '—'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={PatientConsultationController.show.url(
+                                                                c.id,
+                                                            )}
+                                                        >
+                                                            View
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 </div>
