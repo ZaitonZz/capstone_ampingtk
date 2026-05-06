@@ -26,8 +26,9 @@ class ConsultationSessionController extends Controller
             abort(404);
         }
 
+        $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
+
         $consultation->load(['patient', 'doctor']);
-        $consultation = $this->deepfakeDetectionService->enforceOrCancel($consultation);
 
         $isConsultationDoctor = $user !== null && $consultation->doctor_id === $user->id;
         $isConsultationPatient = $user !== null && $consultation->patient()->where('user_id', $user->id)->exists();

@@ -142,10 +142,7 @@ it('stores deepfake detection runtime status posted by the pipeline', function (
         'status' => 'running',
         'room_name' => 'consultation-30-runtime',
         'guidance' => [
-            'low_light' => true,
-            'too_far' => true,
-            'face_area_ratio' => 0.012,
-            'brightness' => 0.14,
+            'no_face_detected' => true,
             'participant_identity' => 'user-22',
             'role' => 'patient',
         ],
@@ -156,8 +153,8 @@ it('stores deepfake detection runtime status posted by the pipeline', function (
         ->postJson(route('pipeline.consultations.status.store', $consultation), $data)
         ->assertOk()
         ->assertJsonPath('deepfake_detection.state', 'running')
-        ->assertJsonPath('deepfake_detection.guidance.low_light', true)
-        ->assertJsonPath('deepfake_detection.guidance.too_far', true)
+        ->assertJsonPath('deepfake_detection.guidance.no_face_detected', true)
+        ->assertJsonPath('deepfake_detection.no_face_timeout_seconds', 30)
         ->assertJsonMissingPath('deepfake_detection.last_error')
         ->assertJsonMissingPath('deepfake_detection.guidance.participant_identity')
         ->assertJsonMissingPath('deepfake_detection.guidance.role');
@@ -166,7 +163,42 @@ it('stores deepfake detection runtime status posted by the pipeline', function (
 
     expect($consultation->pipeline_detection_status)->toBe('running');
     expect($consultation->pipeline_last_heartbeat_at)->not->toBeNull();
-    expect($consultation->pipeline_guidance['brightness'])->toBe(0.14);
+    expect($consultation->pipeline_guidance['no_face_detected'])->toBeTrue();
+    expect($consultation->pipeline_guidance['no_face_detected_since'])->not->toBeNull();
+});
+
+it('cancels consultation when pipeline reports no face past timeout', function () {
+    config()->set('services.pipeline.no_face_timeout_seconds', 30);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
+    ]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'livekit_room_name' => 'consultation-31-no-face-timeout',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $data = [
+        'status' => 'running',
+        'room_name' => 'consultation-31-no-face-timeout',
+        'guidance' => [
+            'no_face_detected' => true,
+            'no_face_detected_since' => now()->subSeconds(31)->toIso8601String(),
+        ],
+    ];
+    $body = json_encode($data);
+
+    $this->withHeaders(pipelineSignedHeaders($body))
+        ->postJson(route('pipeline.consultations.status.store', $consultation), $data)
+        ->assertOk()
+        ->assertJsonPath('deepfake_detection.state', 'cancelled')
+        ->assertJsonPath('deepfake_detection.guidance.no_face_detected', true);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe('cancelled');
+    expect($consultation->livekit_room_status)->toBe('ended');
 });
 
 it('rejects deepfake detection runtime status without signature', function () {

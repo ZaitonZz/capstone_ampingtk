@@ -167,19 +167,19 @@ function DeepfakeDetectionIndicator({
                 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
             icon: AlertTriangle,
         },
+        cancelled: {
+            label: 'Consultation cancelled',
+            text: `No face was detected for ${detection?.no_face_timeout_seconds ?? 30} seconds, so the consultation was cancelled.`,
+            className:
+                'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200',
+            icon: AlertTriangle,
+        },
         unavailable: {
             label: 'Detection unavailable',
             text: 'Deepfake monitoring starts after the video room is ready.',
             className:
                 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200',
             icon: Shield,
-        },
-        cancelled: {
-            label: 'Consultation cancelled',
-            text: 'This consultation was cancelled because deepfake detection was not running.',
-            className:
-                'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200',
-            icon: AlertTriangle,
         },
     }[state];
     const Icon = config.icon;
@@ -284,7 +284,8 @@ export default function ConsultationLobbyPage({
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
     const hasJoinPermission = isConsentConfirmed || isAdminUser;
-    const canJoinSession = hasJoinPermission && !isPaused;
+    const canJoinSession =
+        hasJoinPermission && !isPaused && consultation.status !== 'cancelled';
     const isLiveKitEnabled = livekit?.enabled === true;
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;

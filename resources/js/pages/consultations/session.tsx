@@ -136,14 +136,14 @@ function DetectionStatusPanel({
         starting: 'Waiting for the pipeline to confirm monitoring.',
         delayed: `No active heartbeat within ${detection?.timeout_seconds ?? 60} seconds.`,
         unavailable: 'Monitoring starts when the room and pipeline are ready.',
-        cancelled: 'Deepfake detection was not running, so the consultation was cancelled.',
+        cancelled: `No face was detected for ${detection?.no_face_timeout_seconds ?? 30} seconds, so the consultation was cancelled.`,
     }[state];
     const tone =
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-              ? 'border-rose-200 bg-rose-50 text-rose-800'
-              : state === 'delayed'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : state === 'delayed'
                 ? 'border-amber-200 bg-amber-50 text-amber-800'
                 : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
@@ -165,30 +165,20 @@ function DetectionStatusPanel({
     );
 }
 
-function GuidancePanel({
+function FaceDetectionPanel({
     detection,
 }: {
     detection?: ConsultationDeepfakeDetectionState;
 }) {
-    const guidance = detection?.guidance;
-    const notices = [
-        guidance?.too_far
-            ? 'Move closer to the camera so your face is easier to verify.'
-            : null,
-        guidance?.low_light
-            ? 'Increase lighting in your environment so detection remains reliable.'
-            : null,
-    ].filter(Boolean);
-
-    if (notices.length === 0) {
+    if (detection?.guidance?.no_face_detected !== true) {
         return (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 shadow-sm">
                 <div className="mb-1 flex items-center gap-2 font-semibold">
                     <CheckCircle2 className="h-4 w-4" />
-                    Camera guidance clear
+                    Face detected
                 </div>
                 <p className="text-sm">
-                    The pipeline has no current distance or lighting warning.
+                    The pipeline can currently see a face in the camera feed.
                 </p>
             </div>
         );
@@ -198,13 +188,14 @@ function GuidancePanel({
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 shadow-sm">
             <div className="mb-2 flex items-center gap-2 font-semibold">
                 <AlertTriangle className="h-4 w-4" />
-                Camera guidance
+                No face detected
             </div>
-            <div className="space-y-2 text-sm">
-                {notices.map((notice) => (
-                    <p key={notice}>{notice}</p>
-                ))}
-            </div>
+            <p className="text-sm">
+                Keep your face visible in the camera frame so deepfake
+                monitoring can continue. If no face is detected for{' '}
+                {detection?.no_face_timeout_seconds ?? 30} seconds, the
+                consultation will be cancelled.
+            </p>
         </div>
     );
 }
@@ -323,10 +314,10 @@ export default function ConsultationSessionPage({
     const serverUrl = payload?.ws_url ?? livekit.ws_url;
     const canStartCall = Boolean(
         livekit.enabled &&
+        consultation.status !== 'cancelled' &&
         payload?.participant_token &&
         payload?.room_name &&
-        serverUrl &&
-        consultation.status !== 'cancelled',
+        serverUrl,
     );
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -482,7 +473,7 @@ export default function ConsultationSessionPage({
                     <div className="space-y-4">
                         <DetectionStatusPanel detection={effectiveDetection} />
 
-                        <GuidancePanel detection={effectiveDetection} />
+                        <FaceDetectionPanel detection={effectiveDetection} />
 
                         <div className="rounded-2xl border bg-card p-4 shadow-sm">
                             <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">

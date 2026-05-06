@@ -19,10 +19,8 @@ class PipelineConsultationStatusController extends Controller
             'last_scan_at' => ['nullable', 'date', 'before_or_equal:now'],
             'error' => ['nullable', 'string', 'max:1000'],
             'guidance' => ['nullable', 'array'],
-            'guidance.low_light' => ['nullable', 'boolean'],
-            'guidance.too_far' => ['nullable', 'boolean'],
-            'guidance.face_area_ratio' => ['nullable', 'numeric', 'min:0', 'max:1'],
-            'guidance.brightness' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'guidance.no_face_detected' => ['nullable', 'boolean'],
+            'guidance.no_face_detected_since' => ['nullable', 'date'],
             'guidance.participant_identity' => ['nullable', 'string', 'max:255'],
             'guidance.role' => ['nullable', 'string', 'in:patient,doctor,unknown'],
         ]);

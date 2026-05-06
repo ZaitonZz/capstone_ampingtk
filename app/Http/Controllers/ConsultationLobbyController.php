@@ -34,8 +34,9 @@ class ConsultationLobbyController extends Controller
             return redirect()->route('consultations.consent.show', $consultation);
         }
 
+        $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
+
         $consultation->load(['patient', 'doctor']);
-        $consultation = $this->deepfakeDetectionService->enforceOrCancel($consultation);
 
         $consent = $consultation->consentForUser($currentUser);
 

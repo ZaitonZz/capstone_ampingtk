@@ -125,16 +125,15 @@ export interface Consultation {
 }
 
 export interface ConsultationDeepfakeGuidance {
-    low_light: boolean;
-    too_far: boolean;
-    face_area_ratio: number | null;
-    brightness: number | null;
+    no_face_detected: boolean;
+    no_face_detected_since: string | null;
 }
 
 export interface ConsultationDeepfakeDetectionState {
     state: 'starting' | 'running' | 'delayed' | 'unavailable' | 'cancelled';
     status: string | null;
     timeout_seconds: number;
+    no_face_timeout_seconds: number;
     last_heartbeat_at: string | null;
     last_heartbeat_age_seconds: number | null;
     started_at: string | null;

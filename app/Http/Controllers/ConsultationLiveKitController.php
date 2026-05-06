@@ -42,7 +42,9 @@ class ConsultationLiveKitController extends Controller
 
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json([
-                'message' => 'This consultation is no longer active.',
+                'message' => $this->deepfakeDetectionService->isNoFaceCancellation($consultation)
+                    ? $this->deepfakeDetectionService->noFaceCancellationMessage()
+                    : 'This consultation is no longer active.',
             ], 409);
         }
 
@@ -87,12 +89,11 @@ class ConsultationLiveKitController extends Controller
         }
 
         $consultation = $this->liveKitService->ensureRoomForConsultation($consultation);
-        $consultation = $this->deepfakeDetectionService->enforceOrCancel($consultation);
+        $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
 
-        if ($consultation->status === Consultation::STATUS_CANCELLED) {
+        if ($this->deepfakeDetectionService->isNoFaceCancellation($consultation)) {
             return response()->json([
-                'message' => $consultation->cancellation_reason
-                    ?? 'Consultation cancelled because deepfake detection was not running.',
+                'message' => $this->deepfakeDetectionService->noFaceCancellationMessage(),
                 'status' => Consultation::STATUS_CANCELLED,
             ], 409);
         }
