@@ -4,12 +4,10 @@ import {
     CalendarPlus,
     ChevronLeft,
     ChevronRight,
-    ClipboardCheck,
-    Clock3,
     Info,
     Pencil,
     RotateCcw,
-    ShieldCheck,
+    Trash2,
     X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -24,7 +22,8 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 type DutyStatus = 'on_duty' | 'off_duty' | 'absent' | 'on_leave';
-type ScheduleMode = 'single' | 'multiple_dates' | 'recurring_weekly';
+type ScheduleMode = 'multiple_dates' | 'recurring_weekly';
+type CalendarView = 'month' | 'week' | 'day';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 interface SpecificDateEntry {
@@ -54,6 +53,7 @@ interface DutySchedule {
 }
 
 interface CalendarSelection {
+    date: string;
     title: string;
     subtitle: string;
     schedules: DutySchedule[];
@@ -147,6 +147,15 @@ const STATUS_DOT_CLASSES: Record<DutyStatus, string> = {
 };
 
 const MODE_OPTIONS: ScheduleMode[] = ['multiple_dates', 'recurring_weekly'];
+const CALENDAR_VIEW_LABELS: Record<CalendarView, string> = {
+    month: 'Month',
+    week: 'Week',
+    day: 'Day',
+};
+const DEFAULT_DUTY_START_TIME = '08:00';
+const DEFAULT_DUTY_END_TIME = '17:00';
+const DEFAULT_DUTY_STATUS: DutyStatus = 'on_duty';
+const TABLE_PAGE_SIZE = 10;
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Doctor Duty Calendar', href: '/doctor-duty-schedules' },
@@ -204,6 +213,13 @@ function buildInputDate(date: Date) {
     ].join('-');
 }
 
+function startOfDay(date: Date) {
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+
+    return dayStart;
+}
+
 function startOfWeek(date: Date) {
     const weekStart = new Date(date);
     weekStart.setHours(0, 0, 0, 0);
@@ -212,9 +228,26 @@ function startOfWeek(date: Date) {
     return weekStart;
 }
 
+function startOfMonth(date: Date) {
+    const monthStart = new Date(date);
+    monthStart.setHours(0, 0, 0, 0);
+    monthStart.setDate(1);
+
+    return monthStart;
+}
+
 function addDays(date: Date, days: number) {
     const nextDate = new Date(date);
     nextDate.setDate(nextDate.getDate() + days);
+
+    return nextDate;
+}
+
+function addMonths(date: Date, months: number) {
+    const nextDate = new Date(date);
+    nextDate.setDate(1);
+    nextDate.setMonth(nextDate.getMonth() + months);
+    nextDate.setHours(0, 0, 0, 0);
 
     return nextDate;
 }
@@ -247,6 +280,44 @@ function formatWeekRange(startDate: Date, endDate: Date) {
     });
 
     return `${startFormat.format(startDate)} - ${endFormat.format(endDate)}`;
+}
+
+function formatMonthTitle(date: Date) {
+    return new Intl.DateTimeFormat('en', {
+        month: 'long',
+        year: 'numeric',
+    }).format(date);
+}
+
+function formatDayTitle(date: Date) {
+    return new Intl.DateTimeFormat('en', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+    }).format(date);
+}
+
+function buildMonthGridDates(date: Date) {
+    const monthStart = startOfMonth(date);
+    const gridStart = startOfWeek(monthStart);
+
+    return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+}
+
+function sortDutySchedules(items: DutySchedule[]) {
+    return [...items].sort((a, b) =>
+        [a.duty_date, a.start_time, a.end_time, a.doctor_name ?? '']
+            .join('|')
+            .localeCompare(
+                [
+                    b.duty_date,
+                    b.start_time,
+                    b.end_time,
+                    b.doctor_name ?? '',
+                ].join('|'),
+            ),
+    );
 }
 
 function buildRecurringPreview(
@@ -295,6 +366,106 @@ function buildRecurringPreview(
     return dates;
 }
 
+function paginateItems<T>(items: T[], requestedPage: number) {
+    const total = items.length;
+    const lastPage = Math.max(1, Math.ceil(total / TABLE_PAGE_SIZE));
+    const currentPage = Math.min(Math.max(requestedPage, 1), lastPage);
+    const startIndex = (currentPage - 1) * TABLE_PAGE_SIZE;
+    const rows = items.slice(startIndex, startIndex + TABLE_PAGE_SIZE);
+
+    return {
+        rows,
+        currentPage,
+        lastPage,
+        from: total === 0 ? 0 : startIndex + 1,
+        to: Math.min(startIndex + rows.length, total),
+        total,
+    };
+}
+
+function getPaginationPages(currentPage: number, lastPage: number) {
+    const pageWindow = 5;
+    const halfWindow = Math.floor(pageWindow / 2);
+    const startPage = Math.max(
+        1,
+        Math.min(currentPage - halfWindow, lastPage - pageWindow + 1),
+    );
+    const endPage = Math.min(lastPage, startPage + pageWindow - 1);
+
+    return Array.from(
+        { length: endPage - startPage + 1 },
+        (_, index) => startPage + index,
+    );
+}
+
+function PaginationControls({
+    currentPage,
+    lastPage,
+    from,
+    to,
+    total,
+    onPageChange,
+}: {
+    currentPage: number;
+    lastPage: number;
+    from: number;
+    to: number;
+    total: number;
+    onPageChange: (page: number) => void;
+}) {
+    if (total <= TABLE_PAGE_SIZE) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-col gap-3 border-t bg-muted/10 px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-muted-foreground">
+                Showing {from} to {to} of {total}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={currentPage === 1}
+                    onClick={() => onPageChange(currentPage - 1)}
+                    aria-label="Previous page"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {getPaginationPages(currentPage, lastPage).map((page) => (
+                    <Button
+                        key={page}
+                        type="button"
+                        variant={page === currentPage ? 'default' : 'outline'}
+                        size="sm"
+                        className={
+                            page === currentPage
+                                ? 'h-8 w-8 bg-emerald-600 p-0 text-white hover:bg-emerald-700'
+                                : 'h-8 w-8 p-0'
+                        }
+                        onClick={() => onPageChange(page)}
+                    >
+                        {page}
+                    </Button>
+                ))}
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    disabled={currentPage === lastPage}
+                    onClick={() => onPageChange(currentPage + 1)}
+                    aria-label="Next page"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export default function DoctorDutySchedulesIndex({
     schedules,
     doctors,
@@ -308,13 +479,17 @@ export default function DoctorDutySchedulesIndex({
         useState<DutySchedule | null>(null);
     const [calendarSelection, setCalendarSelection] =
         useState<CalendarSelection | null>(null);
-    const [visibleWeekStart, setVisibleWeekStart] = useState(() =>
-        startOfWeek(new Date()),
+    const [calendarView, setCalendarView] = useState<CalendarView>('week');
+    const [visibleDate, setVisibleDate] = useState(() =>
+        startOfDay(new Date()),
     );
     const [draftDutyDate, setDraftDutyDate] = useState('');
     const [reviewerNotes, setReviewerNotes] = useState<Record<number, string>>(
         {},
     );
+    const [schedulePage, setSchedulePage] = useState(1);
+    const [pendingRequestsPage, setPendingRequestsPage] = useState(1);
+    const [requestHistoryPage, setRequestHistoryPage] = useState(1);
 
     const createForm = useForm({
         doctor_id: '',
@@ -323,18 +498,18 @@ export default function DoctorDutySchedulesIndex({
         recurring_start_date: '',
         recurring_end_date: '',
         recurring_weekdays: ['mon'] as Weekday[],
-        start_time: '08:00',
-        end_time: '17:00',
-        status: 'on_duty' as DutyStatus,
+        start_time: DEFAULT_DUTY_START_TIME,
+        end_time: DEFAULT_DUTY_END_TIME,
+        status: DEFAULT_DUTY_STATUS,
         remarks: '',
     });
 
     const editForm = useForm({
         doctor_id: '',
         duty_date: '',
-        start_time: '08:00',
-        end_time: '17:00',
-        status: 'on_duty' as DutyStatus,
+        start_time: DEFAULT_DUTY_START_TIME,
+        end_time: DEFAULT_DUTY_END_TIME,
+        status: DEFAULT_DUTY_STATUS,
         remarks: '',
     });
 
@@ -355,6 +530,11 @@ export default function DoctorDutySchedulesIndex({
         [doctors],
     );
 
+    const visibleWeekStart = useMemo(
+        () => startOfWeek(visibleDate),
+        [visibleDate],
+    );
+
     const currentWeekDates = useMemo(
         () =>
             Array.from({ length: 7 }, (_, index) =>
@@ -365,32 +545,42 @@ export default function DoctorDutySchedulesIndex({
 
     const visibleWeekEnd = currentWeekDates[6] ?? visibleWeekStart;
 
-    const schedulesByDate = useMemo(
-        () =>
-            currentWeekDates.reduce<Record<string, DutySchedule[]>>(
-                (lookup, date) => {
-                    const dateKey = buildInputDate(date);
-
-                    lookup[dateKey] = schedules
-                        .filter((schedule) => schedule.duty_date === dateKey)
-                        .sort((a, b) =>
-                            [a.start_time, a.end_time, a.doctor_name ?? '']
-                                .join('|')
-                                .localeCompare(
-                                    [
-                                        b.start_time,
-                                        b.end_time,
-                                        b.doctor_name ?? '',
-                                    ].join('|'),
-                                ),
-                        );
-
-                    return lookup;
-                },
-                {},
-            ),
-        [currentWeekDates, schedules],
+    const currentMonthDates = useMemo(
+        () => buildMonthGridDates(visibleDate),
+        [visibleDate],
     );
+
+    const currentDayDates = useMemo(
+        () => [startOfDay(visibleDate)],
+        [visibleDate],
+    );
+
+    const visibleCalendarDates = useMemo(() => {
+        if (calendarView === 'month') {
+            return currentMonthDates;
+        }
+
+        if (calendarView === 'day') {
+            return currentDayDates;
+        }
+
+        return currentWeekDates;
+    }, [calendarView, currentDayDates, currentMonthDates, currentWeekDates]);
+
+    const schedulesByDate = useMemo(() => {
+        const lookup: Record<string, DutySchedule[]> = {};
+
+        schedules.forEach((schedule) => {
+            lookup[schedule.duty_date] = lookup[schedule.duty_date] ?? [];
+            lookup[schedule.duty_date].push(schedule);
+        });
+
+        Object.keys(lookup).forEach((date) => {
+            lookup[date] = sortDutySchedules(lookup[date]);
+        });
+
+        return lookup;
+    }, [schedules]);
 
     const recurringPreviewDates = useMemo(
         () =>
@@ -409,27 +599,62 @@ export default function DoctorDutySchedulesIndex({
     const selectedDoctorName =
         doctorNameById[createForm.data.doctor_id] ?? 'Select a doctor';
 
-    const dashboardStats = useMemo(
-        () => [
-            {
-                label: 'Total Duty Entries',
-                value: schedules.length,
-                icon: CalendarDays,
-            },
-            {
-                label: 'On Duty',
-                value: schedules.filter(
-                    (schedule) => schedule.status === 'on_duty',
-                ).length,
-                icon: Clock3,
-            },
-            {
-                label: 'Pending Requests',
-                value: pending_duty_requests.length,
-                icon: ShieldCheck,
-            },
-        ],
-        [pending_duty_requests.length, schedules],
+    const selectedSpecificDates = useMemo(
+        () =>
+            new Set(
+                createForm.data.specific_date_entries.map(
+                    (entry) => entry.duty_date,
+                ),
+            ),
+        [createForm.data.specific_date_entries],
+    );
+
+    const defaultCalendarSelection = useMemo(() => {
+        const visibleDateKeys = visibleCalendarDates.map((date) =>
+            buildInputDate(date),
+        );
+        const todayKey = buildInputDate(new Date());
+        const selectedDate =
+            (visibleDateKeys.includes(todayKey) && todayKey) ||
+            visibleDateKeys.find(
+                (date) => (schedulesByDate[date] ?? []).length > 0,
+            ) ||
+            visibleDateKeys[0] ||
+            '';
+        const daySchedules = schedulesByDate[selectedDate] ?? [];
+
+        return {
+            date: selectedDate,
+            title: selectedDate ? formatLongScheduleDate(selectedDate) : '',
+            subtitle:
+                daySchedules.length > 0
+                    ? `${daySchedules.length} schedule ${daySchedules.length === 1 ? 'entry' : 'entries'} for this day`
+                    : 'No schedules for this day',
+            schedules: daySchedules,
+        };
+    }, [schedulesByDate, visibleCalendarDates]);
+
+    const displayedCalendarSelection =
+        calendarSelection ?? defaultCalendarSelection;
+
+    const calendarTitle =
+        calendarView === 'month'
+            ? formatMonthTitle(visibleDate)
+            : calendarView === 'day'
+              ? formatDayTitle(visibleDate)
+              : formatWeekRange(visibleWeekStart, visibleWeekEnd);
+
+    const paginatedSchedules = useMemo(
+        () => paginateItems(schedules, schedulePage),
+        [schedulePage, schedules],
+    );
+    const paginatedPendingRequests = useMemo(
+        () => paginateItems(pending_duty_requests, pendingRequestsPage),
+        [pendingRequestsPage, pending_duty_requests],
+    );
+    const paginatedDutyRequests = useMemo(
+        () => paginateItems(duty_requests, requestHistoryPage),
+        [duty_requests, requestHistoryPage],
     );
 
     const hasBothRequestPanels =
@@ -443,9 +668,10 @@ export default function DoctorDutySchedulesIndex({
         createForm.setData('recurring_start_date', '');
         createForm.setData('recurring_end_date', '');
         createForm.setData('recurring_weekdays', ['mon']);
-        createForm.setData('start_time', '08:00');
-        createForm.setData('end_time', '17:00');
-        createForm.setData('status', 'on_duty');
+        createForm.setData('start_time', DEFAULT_DUTY_START_TIME);
+        createForm.setData('end_time', DEFAULT_DUTY_END_TIME);
+        createForm.setData('status', DEFAULT_DUTY_STATUS);
+        createForm.setData('remarks', '');
     }
 
     function setScheduleMode(mode: ScheduleMode) {
@@ -467,6 +693,26 @@ export default function DoctorDutySchedulesIndex({
     function handleCreateSubmit(e: FormEvent) {
         e.preventDefault();
 
+        createForm.transform((data) =>
+            data.schedule_mode === 'multiple_dates'
+                ? {
+                      doctor_id: data.doctor_id,
+                      schedule_mode: data.schedule_mode,
+                      specific_date_entries: data.specific_date_entries,
+                  }
+                : {
+                      doctor_id: data.doctor_id,
+                      schedule_mode: data.schedule_mode,
+                      recurring_start_date: data.recurring_start_date,
+                      recurring_end_date: data.recurring_end_date,
+                      recurring_weekdays: data.recurring_weekdays,
+                      start_time: data.start_time,
+                      end_time: data.end_time,
+                      status: data.status,
+                      remarks: data.remarks,
+                  },
+        );
+
         createForm.post('/doctor-duty-schedules', {
             onSuccess: () => {
                 resetCreateForm();
@@ -478,6 +724,7 @@ export default function DoctorDutySchedulesIndex({
     function openEdit(schedule: DutySchedule) {
         setSelectedSchedule(schedule);
         setCalendarSelection({
+            date: schedule.duty_date,
             title: formatLongScheduleDate(schedule.duty_date),
             subtitle: `${formatTimeRange(schedule.start_time, schedule.end_time)} - ${STATUS_LABELS[schedule.status]}`,
             schedules: [schedule],
@@ -539,24 +786,25 @@ export default function DoctorDutySchedulesIndex({
         const normalizedDate = date.slice(0, 10);
         const currentEntries = createForm.data.specific_date_entries;
 
-        // Check if date already exists
-        if (currentEntries.some((entry) => entry.duty_date === normalizedDate)) {
+        if (
+            currentEntries.some((entry) => entry.duty_date === normalizedDate)
+        ) {
+            toast.info('That date is already selected.');
             return;
         }
 
-        // Add new entry with current default times
         const newEntry: SpecificDateEntry = {
             duty_date: normalizedDate,
-            start_time: createForm.data.start_time,
-            end_time: createForm.data.end_time,
-            status: createForm.data.status,
-            remarks: createForm.data.remarks,
+            start_time: DEFAULT_DUTY_START_TIME,
+            end_time: DEFAULT_DUTY_END_TIME,
+            status: DEFAULT_DUTY_STATUS,
+            remarks: '',
         };
 
         createForm.setData(
             'specific_date_entries',
-            [...currentEntries, newEntry].sort(
-                (a, b) => a.duty_date.localeCompare(b.duty_date),
+            [...currentEntries, newEntry].sort((a, b) =>
+                a.duty_date.localeCompare(b.duty_date),
             ),
         );
         setDraftDutyDate('');
@@ -571,10 +819,10 @@ export default function DoctorDutySchedulesIndex({
         );
     }
 
-    function updateDutyEntry(
+    function updateDutyEntry<K extends keyof SpecificDateEntry>(
         index: number,
-        field: keyof SpecificDateEntry,
-        value: string,
+        field: K,
+        value: SpecificDateEntry[K],
     ) {
         const updatedEntries = [...createForm.data.specific_date_entries];
         if (updatedEntries[index]) {
@@ -588,8 +836,14 @@ export default function DoctorDutySchedulesIndex({
 
     function selectDay(date: string) {
         const daySchedules = schedulesByDate[date] ?? [];
+        const parsedDate = new Date(`${date}T00:00:00`);
+
+        if (!Number.isNaN(parsedDate.getTime())) {
+            setVisibleDate(startOfDay(parsedDate));
+        }
 
         setCalendarSelection({
+            date,
             title: formatLongScheduleDate(date),
             subtitle:
                 daySchedules.length > 0
@@ -601,6 +855,13 @@ export default function DoctorDutySchedulesIndex({
 
     function handleBoardDayClick(date: string) {
         selectDay(date);
+
+        if (
+            can_manage_schedule &&
+            createForm.data.schedule_mode === 'multiple_dates'
+        ) {
+            addDutyDate(date);
+        }
     }
 
     function handleBoardAddDate(date: string) {
@@ -617,16 +878,32 @@ export default function DoctorDutySchedulesIndex({
         selectDay(schedule.duty_date);
     }
 
-    function goToPreviousWeek() {
-        setVisibleWeekStart((current) => addDays(current, -7));
+    function goToPreviousPeriod() {
+        setVisibleDate((current) =>
+            calendarView === 'month'
+                ? addMonths(current, -1)
+                : addDays(current, calendarView === 'day' ? -1 : -7),
+        );
+        setCalendarSelection(null);
     }
 
-    function goToNextWeek() {
-        setVisibleWeekStart((current) => addDays(current, 7));
+    function goToNextPeriod() {
+        setVisibleDate((current) =>
+            calendarView === 'month'
+                ? addMonths(current, 1)
+                : addDays(current, calendarView === 'day' ? 1 : 7),
+        );
+        setCalendarSelection(null);
     }
 
-    function goToCurrentWeek() {
-        setVisibleWeekStart(startOfWeek(new Date()));
+    function goToCurrentPeriod() {
+        setVisibleDate(startOfDay(new Date()));
+        setCalendarSelection(null);
+    }
+
+    function handleCalendarViewChange(view: CalendarView) {
+        setCalendarView(view);
+        setCalendarSelection(null);
     }
 
     function setRecurringWeekdays(nextWeekdays: string[]) {
@@ -672,56 +949,30 @@ export default function DoctorDutySchedulesIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Doctor Duty Calendar" />
 
-            <div className="mx-auto w-full max-w-[1380px] space-y-6 p-4 md:p-6">
-                <section className="rounded-2xl border border-emerald-100/70 bg-gradient-to-r from-emerald-50/80 via-background to-green-50/70 p-5 shadow-sm md:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                                Doctor Duty Calendar
-                            </h1>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Coordinate duty coverage, weekly recurring
-                                schedules, and leave requests in one dashboard.
-                            </p>
-                        </div>
-
-                        <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto lg:min-w-[520px]">
-                            {dashboardStats.map((stat) => (
-                                <div
-                                    key={stat.label}
-                                    className="rounded-xl border border-emerald-100 bg-background/80 px-3 py-2.5 shadow-sm"
-                                >
-                                    <div className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                        <stat.icon className="h-3.5 w-3.5 text-emerald-600" />
-                                        {stat.label}
-                                    </div>
-                                    <p className="mt-1 text-xl font-semibold text-foreground">
-                                        {stat.value}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+            <div className="mx-auto w-full max-w-[1600px] space-y-3 p-3 md:p-4">
+                <section className="rounded-xl border bg-card p-3 shadow-sm md:p-4">
                     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h2 className="text-lg font-semibold">
-                                Duty Calendar
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                Weekly coverage board. Select a day or duty row
-                                to review details below.
-                            </p>
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2 text-emerald-700">
+                                <CalendarDays className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-semibold tracking-tight">
+                                    Doctor Duty Calendar
+                                </h1>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Manage weekly doctor coverage and schedule
+                                    availability.
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-4 pt-1">
                             {(Object.keys(STATUS_COLORS) as DutyStatus[]).map(
                                 (status) => (
                                     <span
                                         key={status}
-                                        className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                                        className="inline-flex items-center gap-2 text-sm text-muted-foreground"
                                     >
                                         <span
                                             className="h-2.5 w-2.5 rounded-full"
@@ -737,15 +988,16 @@ export default function DoctorDutySchedulesIndex({
                         </div>
                     </div>
 
-                    <div className="rounded-xl border bg-background p-3 shadow-inner">
-                        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+                    <div className="rounded-lg border bg-background p-2">
+                        <div className="mb-3 grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
                             <div className="flex flex-wrap gap-2">
                                 <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={goToPreviousWeek}
-                                    aria-label="Previous week"
+                                    onClick={goToPreviousPeriod}
+                                    aria-label={`Previous ${calendarView}`}
+                                    className="h-9 w-9 p-0"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
@@ -753,8 +1005,9 @@ export default function DoctorDutySchedulesIndex({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={goToNextWeek}
-                                    aria-label="Next week"
+                                    onClick={goToNextPeriod}
+                                    aria-label={`Next ${calendarView}`}
+                                    className="h-9 w-9 border-emerald-200 p-0 text-emerald-700 hover:bg-emerald-50"
                                 >
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
@@ -762,33 +1015,62 @@ export default function DoctorDutySchedulesIndex({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={goToCurrentWeek}
+                                    onClick={goToCurrentPeriod}
+                                    className="h-9 px-5"
                                 >
                                     Today
                                 </Button>
                             </div>
 
-                            <div className="flex items-center justify-start gap-2 text-lg font-semibold lg:justify-center">
-                                <CalendarDays className="h-5 w-5 text-emerald-600" />
-                                {formatWeekRange(
-                                    visibleWeekStart,
-                                    visibleWeekEnd,
-                                )}
+                            <div className="flex items-center justify-start gap-2 text-xl font-semibold lg:justify-center">
+                                <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                                {calendarTitle}
                             </div>
 
-                            <div className="flex justify-start lg:justify-end">
-                                <Badge
-                                    variant="outline"
-                                    className="border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700"
-                                >
-                                    Week
-                                </Badge>
+                            <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
+                                <div className="grid grid-cols-3 rounded-lg border bg-muted/20 p-1">
+                                    {(
+                                        [
+                                            'month',
+                                            'week',
+                                            'day',
+                                        ] as CalendarView[]
+                                    ).map((view) => (
+                                        <Button
+                                            key={view}
+                                            type="button"
+                                            size="sm"
+                                            variant={
+                                                calendarView === view
+                                                    ? 'default'
+                                                    : 'ghost'
+                                            }
+                                            aria-pressed={calendarView === view}
+                                            className={
+                                                calendarView === view
+                                                    ? 'h-8 bg-emerald-600 px-4 text-white hover:bg-emerald-700'
+                                                    : 'h-8 px-4 text-muted-foreground hover:bg-background'
+                                            }
+                                            onClick={() =>
+                                                handleCalendarViewChange(view)
+                                            }
+                                        >
+                                            {CALENDAR_VIEW_LABELS[view]}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
                         </div>
 
                         <div className="overflow-x-auto">
-                            <div className="grid min-w-[1120px] grid-cols-7 gap-2">
-                                {currentWeekDates.map((date) => {
+                            <div
+                                className={
+                                    calendarView === 'day'
+                                        ? 'grid min-w-0 grid-cols-1 gap-2'
+                                        : 'grid min-w-[980px] grid-cols-7 gap-2'
+                                }
+                            >
+                                {visibleCalendarDates.map((date) => {
                                     const dateKey = buildInputDate(date);
                                     const daySchedules =
                                         schedulesByDate[dateKey] ?? [];
@@ -799,13 +1081,25 @@ export default function DoctorDutySchedulesIndex({
                                     const isToday =
                                         dateKey === buildInputDate(new Date());
                                     const isSelected =
-                                        calendarSelection?.title ===
-                                        formatLongScheduleDate(dateKey);
+                                        displayedCalendarSelection.date ===
+                                        dateKey;
+                                    const isDraftSelected =
+                                        selectedSpecificDates.has(dateKey);
+                                    const isOutsideMonth =
+                                        calendarView === 'month' &&
+                                        date.getMonth() !==
+                                            visibleDate.getMonth();
+                                    const calendarCellHeight =
+                                        calendarView === 'month'
+                                            ? 'h-[155px]'
+                                            : calendarView === 'day'
+                                              ? 'min-h-[280px]'
+                                              : 'h-[220px]';
 
                                     return (
                                         <div
                                             key={dateKey}
-                                            className={`flex h-[340px] flex-col rounded-lg border bg-card transition ${isToday ? 'border-emerald-200 bg-emerald-50/30' : ''} ${isSelected ? 'ring-2 ring-emerald-500/30' : ''}`}
+                                            className={`flex ${calendarCellHeight} flex-col rounded-lg border bg-card transition ${isOutsideMonth ? 'bg-muted/20 text-muted-foreground/80' : ''} ${isToday ? 'border-emerald-200 bg-emerald-50/30' : ''} ${isSelected ? 'border-emerald-200 bg-emerald-50/20 ring-1 ring-emerald-200' : ''} ${isDraftSelected ? 'border-emerald-300' : ''}`}
                                         >
                                             <button
                                                 type="button"
@@ -832,7 +1126,7 @@ export default function DoctorDutySchedulesIndex({
 
                                             <div className="min-h-0 flex-1 overflow-y-auto p-2">
                                                 {daySchedules.length > 0 ? (
-                                                    <div className="space-y-2">
+                                                    <div className="space-y-1.5">
                                                         {daySchedules.map(
                                                             (schedule) => (
                                                                 <button
@@ -845,7 +1139,7 @@ export default function DoctorDutySchedulesIndex({
                                                                             schedule,
                                                                         )
                                                                     }
-                                                                    className="w-full rounded-md border bg-background px-2.5 py-2 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
+                                                                    className="w-full rounded-md border bg-background px-2.5 py-1.5 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/40"
                                                                 >
                                                                     <span className="flex items-start gap-2">
                                                                         <span
@@ -877,9 +1171,9 @@ export default function DoctorDutySchedulesIndex({
                                                                 dateKey,
                                                             )
                                                         }
-                                                        className="flex min-h-36 w-full flex-col items-center justify-center rounded-md border border-dashed bg-muted/20 px-3 text-center text-sm text-muted-foreground hover:bg-muted/30"
+                                                        className="flex h-full min-h-0 w-full flex-col items-center justify-center rounded-md px-3 text-center text-sm text-muted-foreground hover:bg-muted/30"
                                                     >
-                                                        <CalendarDays className="mb-2 h-7 w-7 text-muted-foreground/50" />
+                                                        <CalendarDays className="mb-2 h-7 w-7 text-muted-foreground/40" />
                                                         No duty schedules
                                                     </button>
                                                 )}
@@ -888,7 +1182,7 @@ export default function DoctorDutySchedulesIndex({
                                             {can_manage_schedule &&
                                                 createForm.data
                                                     .schedule_mode ===
-                                                'multiple_dates' && (
+                                                    'multiple_dates' && (
                                                     <div className="border-t px-3 py-2">
                                                         <Button
                                                             type="button"
@@ -902,7 +1196,9 @@ export default function DoctorDutySchedulesIndex({
                                                             }
                                                         >
                                                             <CalendarPlus className="mr-2 h-4 w-4" />
-                                                            Add duty
+                                                            {isDraftSelected
+                                                                ? 'Selected'
+                                                                : 'Add duty'}
                                                         </Button>
                                                     </div>
                                                 )}
@@ -912,21 +1208,13 @@ export default function DoctorDutySchedulesIndex({
                             </div>
                         </div>
                     </div>
-
-                    {can_manage_schedule &&
-                        createForm.data.schedule_mode === 'multiple_dates' && (
-                            <p className="mt-3 rounded-lg border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                                Tip: while in Specific Dates mode, use Add duty
-                                on the weekly board to select dates instantly.
-                            </p>
-                        )}
                 </section>
 
                 {can_manage_schedule && (
-                    <section className="grid gap-4 xl:grid-cols-2">
+                    <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                         <form
                             onSubmit={handleCreateSubmit}
-                            className="rounded-2xl border bg-card p-4 shadow-sm md:p-5"
+                            className="min-w-0 rounded-2xl border bg-card p-4 shadow-sm md:p-5"
                         >
                             <div className="mb-4 flex items-center justify-between gap-2">
                                 <div>
@@ -946,7 +1234,7 @@ export default function DoctorDutySchedulesIndex({
                                 </Badge>
                             </div>
 
-                            <div className="grid gap-4">
+                            <div className="grid min-w-0 gap-4">
                                 <div className="flex flex-col gap-1.5">
                                     <Label
                                         htmlFor="doctor_id"
@@ -1018,461 +1306,540 @@ export default function DoctorDutySchedulesIndex({
 
                                 {createForm.data.schedule_mode ===
                                     'multiple_dates' && (
-                                        <div className="grid gap-3 rounded-xl border bg-muted/20 p-3">
-                                            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                                                <div className="flex gap-2">
-                                                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                                    <span>
-                                                        Each selected date can have its own start time, end time, status, and remarks. Edit times directly in the table below.
-                                                    </span>
-                                                </div>
+                                    <div className="grid min-w-0 gap-3 rounded-xl border bg-muted/20 p-3">
+                                        <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                                            <div className="flex gap-2">
+                                                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                                <span>
+                                                    Each selected date can have
+                                                    its own start time, end
+                                                    time, status, and remarks.
+                                                    Edit times directly in the
+                                                    table below.
+                                                </span>
                                             </div>
+                                        </div>
 
-                                            <div className="flex flex-wrap items-end gap-2">
-                                                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                        <div className="flex flex-wrap items-end gap-2">
+                                            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                <Label
+                                                    htmlFor="draft_duty_date"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                >
+                                                    Add Date
+                                                </Label>
+                                                <Input
+                                                    id="draft_duty_date"
+                                                    type="date"
+                                                    className="h-10 rounded-lg"
+                                                    value={draftDutyDate}
+                                                    onChange={(e) =>
+                                                        setDraftDutyDate(
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-10"
+                                                onClick={() =>
+                                                    addDutyDate(draftDutyDate)
+                                                }
+                                            >
+                                                <CalendarPlus className="mr-2 h-4 w-4" />
+                                                Add
+                                            </Button>
+                                        </div>
+
+                                        <div className="min-w-0 overflow-hidden rounded-lg border bg-background">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+                                                <div>
+                                                    <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                        Scheduled Dates
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {
+                                                            createForm.data
+                                                                .specific_date_entries
+                                                                .length
+                                                        }{' '}
+                                                        selected
+                                                    </p>
+                                                </div>
+                                                {createForm.data
+                                                    .specific_date_entries
+                                                    .length > 0 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 text-muted-foreground"
+                                                        onClick={() =>
+                                                            createForm.setData(
+                                                                'specific_date_entries',
+                                                                [],
+                                                            )
+                                                        }
+                                                    >
+                                                        Clear all
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            {createForm.data
+                                                .specific_date_entries.length >
+                                            0 ? (
+                                                <div className="max-h-[360px] overflow-auto border-t">
+                                                    <table className="w-full min-w-[760px] text-sm">
+                                                        <thead className="sticky top-0 z-10 bg-muted/50 text-left text-xs tracking-wide text-muted-foreground uppercase">
+                                                            <tr>
+                                                                <th className="px-3 py-2 font-medium">
+                                                                    Date
+                                                                </th>
+                                                                <th className="px-3 py-2 font-medium">
+                                                                    Start
+                                                                </th>
+                                                                <th className="px-3 py-2 font-medium">
+                                                                    End
+                                                                </th>
+                                                                <th className="px-3 py-2 font-medium">
+                                                                    Status
+                                                                </th>
+                                                                <th className="px-3 py-2 font-medium">
+                                                                    Remarks
+                                                                </th>
+                                                                <th className="px-3 py-2 text-right font-medium">
+                                                                    Remove
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y">
+                                                            {createForm.data.specific_date_entries.map(
+                                                                (
+                                                                    entry,
+                                                                    index,
+                                                                ) => (
+                                                                    <tr
+                                                                        key={
+                                                                            entry.duty_date
+                                                                        }
+                                                                        className="align-middle"
+                                                                    >
+                                                                        <td className="px-3 py-2 whitespace-nowrap">
+                                                                            <div className="font-medium">
+                                                                                {formatScheduleDate(
+                                                                                    entry.duty_date,
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="text-xs text-muted-foreground">
+                                                                                {
+                                                                                    entry.duty_date
+                                                                                }
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <Input
+                                                                                id={`specific_date_entries_${index}_start_time`}
+                                                                                type="time"
+                                                                                value={
+                                                                                    entry.start_time
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    updateDutyEntry(
+                                                                                        index,
+                                                                                        'start_time',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                className="h-8 w-28 rounded-md"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <Input
+                                                                                id={`specific_date_entries_${index}_end_time`}
+                                                                                type="time"
+                                                                                value={
+                                                                                    entry.end_time
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    updateDutyEntry(
+                                                                                        index,
+                                                                                        'end_time',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                className="h-8 w-28 rounded-md"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <select
+                                                                                id={`specific_date_entries_${index}_status`}
+                                                                                value={
+                                                                                    entry.status
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    updateDutyEntry(
+                                                                                        index,
+                                                                                        'status',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value as DutyStatus,
+                                                                                    )
+                                                                                }
+                                                                                className="h-8 w-36 rounded-md border border-input bg-background px-2 text-sm shadow-sm"
+                                                                            >
+                                                                                {(
+                                                                                    Object.keys(
+                                                                                        STATUS_LABELS,
+                                                                                    ) as DutyStatus[]
+                                                                                ).map(
+                                                                                    (
+                                                                                        status,
+                                                                                    ) => (
+                                                                                        <option
+                                                                                            key={
+                                                                                                status
+                                                                                            }
+                                                                                            value={
+                                                                                                status
+                                                                                            }
+                                                                                        >
+                                                                                            {
+                                                                                                STATUS_LABELS[
+                                                                                                    status
+                                                                                                ]
+                                                                                            }
+                                                                                        </option>
+                                                                                    ),
+                                                                                )}
+                                                                            </select>
+                                                                        </td>
+                                                                        <td className="px-3 py-2">
+                                                                            <Input
+                                                                                id={`specific_date_entries_${index}_remarks`}
+                                                                                value={
+                                                                                    entry.remarks
+                                                                                }
+                                                                                placeholder="Optional notes"
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    updateDutyEntry(
+                                                                                        index,
+                                                                                        'remarks',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                className="h-8 min-w-44 rounded-md"
+                                                                            />
+                                                                        </td>
+                                                                        <td className="px-3 py-2 text-right">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                                                                onClick={() =>
+                                                                                    removeDutyDate(
+                                                                                        index,
+                                                                                    )
+                                                                                }
+                                                                                aria-label={`Remove ${entry.duty_date}`}
+                                                                            >
+                                                                                <X className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ),
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <div className="border-t px-3 py-6 text-center text-sm text-muted-foreground">
+                                                    Add one or more dates to
+                                                    begin.
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {createForm.errors
+                                            .specific_date_entries && (
+                                            <p className="text-sm text-destructive">
+                                                {
+                                                    createForm.errors
+                                                        .specific_date_entries
+                                                }
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {createForm.data.schedule_mode ===
+                                    'recurring_weekly' && (
+                                    <div className="grid gap-4 rounded-xl border bg-muted/20 p-3">
+                                        <div>
+                                            <h3 className="text-sm font-semibold">
+                                                A. Recurrence Pattern
+                                            </h3>
+                                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                                <div className="flex flex-col gap-1.5">
                                                     <Label
-                                                        htmlFor="draft_duty_date"
+                                                        htmlFor="recurring_start_date"
                                                         className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                                                     >
-                                                        Add Date
+                                                        Start Date
                                                     </Label>
                                                     <Input
-                                                        id="draft_duty_date"
+                                                        id="recurring_start_date"
                                                         type="date"
                                                         className="h-10 rounded-lg"
-                                                        value={draftDutyDate}
+                                                        value={
+                                                            createForm.data
+                                                                .recurring_start_date
+                                                        }
                                                         onChange={(e) =>
-                                                            setDraftDutyDate(
+                                                            createForm.setData(
+                                                                'recurring_start_date',
                                                                 e.target.value,
                                                             )
                                                         }
                                                     />
                                                 </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="h-10"
-                                                    onClick={() =>
-                                                        addDutyDate(draftDutyDate)
-                                                    }
-                                                >
-                                                    <CalendarPlus className="mr-2 h-4 w-4" />
-                                                    Add
-                                                </Button>
-                                            </div>
-
-                                            <div className="rounded-lg border bg-background p-3">
-                                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                                        Scheduled Dates
-                                                    </div>
-                                                    {createForm.data.specific_date_entries
-                                                        .length > 0 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    createForm.setData(
-                                                                        'specific_date_entries',
-                                                                        [],
-                                                                    )
-                                                                }
-                                                                className="text-xs font-medium text-muted-foreground hover:text-foreground"
-                                                            >
-                                                                Clear all
-                                                            </button>
-                                                        )}
-                                                </div>
-                                                {createForm.data.specific_date_entries
-                                                    .length > 0 ? (
-                                                    <div className="space-y-2 overflow-x-auto">
-                                                        <div className="min-w-max rounded-lg border border-gray-200">
-                                                            <div className="grid grid-cols-[120px_80px_80px_100px_120px_40px] gap-2 border-b bg-muted/30 p-2 text-xs font-semibold">
-                                                                <div>Date</div>
-                                                                <div>Start</div>
-                                                                <div>End</div>
-                                                                <div>Status</div>
-                                                                <div>Remarks</div>
-                                                                <div />
-                                                            </div>
-                                                            {createForm.data.specific_date_entries.map(
-                                                                (entry, index) => (
-                                                                    <div
-                                                                        key={`${entry.duty_date}-${index}`}
-                                                                        className="grid grid-cols-[120px_80px_80px_100px_120px_40px] gap-2 border-b p-2 last:border-b-0"
-                                                                    >
-                                                                        <div className="flex items-center">
-                                                                            <span className="text-xs">
-                                                                                {formatScheduleDate(
-                                                                                    entry.duty_date,
-                                                                                )}
-                                                                            </span>
-                                                                        </div>
-                                                                        <Input
-                                                                            type="time"
-                                                                            value={
-                                                                                entry.start_time
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                updateDutyEntry(
-                                                                                    index,
-                                                                                    'start_time',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            className="h-9 rounded px-2 py-1 text-xs"
-                                                                        />
-                                                                        <Input
-                                                                            type="time"
-                                                                            value={
-                                                                                entry.end_time
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                updateDutyEntry(
-                                                                                    index,
-                                                                                    'end_time',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            className="h-9 rounded px-2 py-1 text-xs"
-                                                                        />
-                                                                        <select
-                                                                            value={
-                                                                                entry.status
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                updateDutyEntry(
-                                                                                    index,
-                                                                                    'status',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            className="h-9 rounded border border-input bg-background px-2 py-1 text-xs"
-                                                                        >
-                                                                            {(Object.keys(
-                                                                                STATUS_LABELS,
-                                                                            ) as DutyStatus[]).map(
-                                                                                (
-                                                                                    status,
-                                                                                ) => (
-                                                                                    <option
-                                                                                        key={
-                                                                                            status
-                                                                                        }
-                                                                                        value={
-                                                                                            status
-                                                                                        }
-                                                                                    >
-                                                                                        {
-                                                                                            STATUS_LABELS[
-                                                                                            status
-                                                                                            ]
-                                                                                        }
-                                                                                    </option>
-                                                                                ),
-                                                                            )}
-                                                                        </select>
-                                                                        <Input
-                                                                            type="text"
-                                                                            value={
-                                                                                entry.remarks
-                                                                            }
-                                                                            placeholder="Remarks..."
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                updateDutyEntry(
-                                                                                    index,
-                                                                                    'remarks',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            className="h-9 rounded px-2 py-1 text-xs"
-                                                                        />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() =>
-                                                                                removeDutyDate(
-                                                                                    index,
-                                                                                )
-                                                                            }
-                                                                            className="flex items-center justify-center text-muted-foreground hover:text-destructive"
-                                                                            aria-label={`Remove ${entry.duty_date}`}
-                                                                        >
-                                                                            <X className="h-4 w-4" />
-                                                                        </button>
-                                                                    </div>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Add one or more dates to
-                                                        begin.
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {createForm.errors.specific_date_entries && (
-                                                <p className="text-sm text-destructive">
-                                                    {createForm.errors
-                                                        .specific_date_entries}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-
-                                {createForm.data.schedule_mode ===
-                                    'recurring_weekly' && (
-                                        <div className="grid gap-4 rounded-xl border bg-muted/20 p-3">
-                                            <div>
-                                                <h3 className="text-sm font-semibold">
-                                                    A. Recurrence Pattern
-                                                </h3>
-                                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                                                    <div className="flex flex-col gap-1.5">
-                                                        <Label
-                                                            htmlFor="recurring_start_date"
-                                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                                        >
-                                                            Start Date
-                                                        </Label>
-                                                        <Input
-                                                            id="recurring_start_date"
-                                                            type="date"
-                                                            className="h-10 rounded-lg"
-                                                            value={
-                                                                createForm.data
-                                                                    .recurring_start_date
-                                                            }
-                                                            onChange={(e) =>
-                                                                createForm.setData(
-                                                                    'recurring_start_date',
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1.5">
-                                                        <Label
-                                                            htmlFor="recurring_end_date"
-                                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                                        >
-                                                            End Date
-                                                        </Label>
-                                                        <Input
-                                                            id="recurring_end_date"
-                                                            type="date"
-                                                            className="h-10 rounded-lg"
-                                                            value={
-                                                                createForm.data
-                                                                    .recurring_end_date
-                                                            }
-                                                            onChange={(e) =>
-                                                                createForm.setData(
-                                                                    'recurring_end_date',
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 flex flex-col gap-1.5">
-                                                    <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                                        Repeat On
+                                                <div className="flex flex-col gap-1.5">
+                                                    <Label
+                                                        htmlFor="recurring_end_date"
+                                                        className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                    >
+                                                        End Date
                                                     </Label>
-                                                    <ToggleGroup
-                                                        type="multiple"
+                                                    <Input
+                                                        id="recurring_end_date"
+                                                        type="date"
+                                                        className="h-10 rounded-lg"
                                                         value={
                                                             createForm.data
-                                                                .recurring_weekdays
+                                                                .recurring_end_date
                                                         }
-                                                        onValueChange={(value) =>
-                                                            setRecurringWeekdays(
-                                                                value,
+                                                        onChange={(e) =>
+                                                            createForm.setData(
+                                                                'recurring_end_date',
+                                                                e.target.value,
                                                             )
                                                         }
-                                                        className="flex flex-wrap justify-start gap-2"
-                                                    >
-                                                        {WEEKDAYS.map((weekday) => (
-                                                            <ToggleGroupItem
-                                                                key={weekday}
-                                                                value={weekday}
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="min-w-12 rounded-md border-border/80 bg-background data-[state=on]:border-emerald-600 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
-                                                            >
-                                                                {
-                                                                    WEEKDAY_LABELS[
-                                                                    weekday
-                                                                    ]
-                                                                }
-                                                            </ToggleGroupItem>
-                                                        ))}
-                                                    </ToggleGroup>
+                                                    />
                                                 </div>
                                             </div>
-
-                                            {(createForm.errors
-                                                .recurring_start_date ||
-                                                createForm.errors
-                                                    .recurring_end_date ||
-                                                createForm.errors
-                                                    .recurring_weekdays) && (
-                                                    <p className="text-sm text-destructive">
-                                                        {createForm.errors
-                                                            .recurring_start_date ||
-                                                            createForm.errors
-                                                                .recurring_end_date ||
-                                                            createForm.errors
-                                                                .recurring_weekdays}
-                                                    </p>
-                                                )}
-                                        </div>
-                                    )}
-
-                                <div className="border-t pt-3">
-                                    <h3 className="text-sm font-semibold">
-                                        {createForm.data.schedule_mode ===
-                                            'recurring_weekly'
-                                            ? 'B. Duty Details'
-                                            : 'Shared Duty Details'}
-                                    </h3>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        These values apply to every schedule
-                                        created in this batch.
-                                    </p>
-                                </div>
-
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label
-                                            htmlFor="start_time"
-                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                        >
-                                            Start Time
-                                        </Label>
-                                        <Input
-                                            id="start_time"
-                                            type="time"
-                                            className="h-10 rounded-lg"
-                                            value={createForm.data.start_time}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'start_time',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label
-                                            htmlFor="end_time"
-                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                        >
-                                            End Time
-                                        </Label>
-                                        <Input
-                                            id="end_time"
-                                            type="time"
-                                            className="h-10 rounded-lg"
-                                            value={createForm.data.end_time}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'end_time',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                {(createForm.errors.start_time ||
-                                    createForm.errors.end_time) && (
-                                        <p className="text-sm text-destructive">
-                                            {createForm.errors.start_time ||
-                                                createForm.errors.end_time}
-                                        </p>
-                                    )}
-
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label
-                                            htmlFor="status"
-                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                        >
-                                            Status
-                                        </Label>
-                                        <select
-                                            id="status"
-                                            value={createForm.data.status}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'status',
-                                                    e.target
-                                                        .value as DutyStatus,
-                                                )
-                                            }
-                                            className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm"
-                                        >
-                                            {(
-                                                Object.keys(
-                                                    STATUS_LABELS,
-                                                ) as DutyStatus[]
-                                            ).map((status) => (
-                                                <option
-                                                    key={status}
-                                                    value={status}
+                                            <div className="mt-3 flex flex-col gap-1.5">
+                                                <Label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                                                    Repeat On
+                                                </Label>
+                                                <ToggleGroup
+                                                    type="multiple"
+                                                    value={
+                                                        createForm.data
+                                                            .recurring_weekdays
+                                                    }
+                                                    onValueChange={(value) =>
+                                                        setRecurringWeekdays(
+                                                            value,
+                                                        )
+                                                    }
+                                                    className="flex flex-wrap justify-start gap-2"
                                                 >
-                                                    {STATUS_LABELS[status]}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {createForm.errors.status && (
+                                                    {WEEKDAYS.map((weekday) => (
+                                                        <ToggleGroupItem
+                                                            key={weekday}
+                                                            value={weekday}
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="min-w-12 rounded-md border-border/80 bg-background data-[state=on]:border-emerald-600 data-[state=on]:bg-emerald-600 data-[state=on]:text-white"
+                                                        >
+                                                            {
+                                                                WEEKDAY_LABELS[
+                                                                    weekday
+                                                                ]
+                                                            }
+                                                        </ToggleGroupItem>
+                                                    ))}
+                                                </ToggleGroup>
+                                            </div>
+                                        </div>
+
+                                        {(createForm.errors
+                                            .recurring_start_date ||
+                                            createForm.errors
+                                                .recurring_end_date ||
+                                            createForm.errors
+                                                .recurring_weekdays) && (
                                             <p className="text-sm text-destructive">
-                                                {createForm.errors.status}
+                                                {createForm.errors
+                                                    .recurring_start_date ||
+                                                    createForm.errors
+                                                        .recurring_end_date ||
+                                                    createForm.errors
+                                                        .recurring_weekdays}
                                             </p>
                                         )}
                                     </div>
-
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label
-                                            htmlFor="remarks"
-                                            className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
-                                        >
-                                            Remarks
-                                        </Label>
-                                        <textarea
-                                            id="remarks"
-                                            value={createForm.data.remarks}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'remarks',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={2}
-                                            className="rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                            placeholder="Optional notes for this duty schedule"
-                                        />
-                                    </div>
-                                </div>
+                                )}
 
                                 {createForm.data.schedule_mode ===
                                     'recurring_weekly' && (
+                                    <>
+                                        <div className="border-t pt-3">
+                                            <h3 className="text-sm font-semibold">
+                                                B. Duty Details
+                                            </h3>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                These values apply to every
+                                                schedule generated by this
+                                                weekly recurrence.
+                                            </p>
+                                        </div>
+
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label
+                                                    htmlFor="start_time"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                >
+                                                    Start Time
+                                                </Label>
+                                                <Input
+                                                    id="start_time"
+                                                    type="time"
+                                                    className="h-10 rounded-lg"
+                                                    value={
+                                                        createForm.data
+                                                            .start_time
+                                                    }
+                                                    onChange={(e) =>
+                                                        createForm.setData(
+                                                            'start_time',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label
+                                                    htmlFor="end_time"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                >
+                                                    End Time
+                                                </Label>
+                                                <Input
+                                                    id="end_time"
+                                                    type="time"
+                                                    className="h-10 rounded-lg"
+                                                    value={
+                                                        createForm.data.end_time
+                                                    }
+                                                    onChange={(e) =>
+                                                        createForm.setData(
+                                                            'end_time',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                        {(createForm.errors.start_time ||
+                                            createForm.errors.end_time) && (
+                                            <p className="text-sm text-destructive">
+                                                {createForm.errors.start_time ||
+                                                    createForm.errors.end_time}
+                                            </p>
+                                        )}
+
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label
+                                                    htmlFor="status"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                >
+                                                    Status
+                                                </Label>
+                                                <select
+                                                    id="status"
+                                                    value={
+                                                        createForm.data.status
+                                                    }
+                                                    onChange={(e) =>
+                                                        createForm.setData(
+                                                            'status',
+                                                            e.target
+                                                                .value as DutyStatus,
+                                                        )
+                                                    }
+                                                    className="h-10 rounded-lg border border-input bg-background px-3 text-sm shadow-sm"
+                                                >
+                                                    {(
+                                                        Object.keys(
+                                                            STATUS_LABELS,
+                                                        ) as DutyStatus[]
+                                                    ).map((status) => (
+                                                        <option
+                                                            key={status}
+                                                            value={status}
+                                                        >
+                                                            {
+                                                                STATUS_LABELS[
+                                                                    status
+                                                                ]
+                                                            }
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {createForm.errors.status && (
+                                                    <p className="text-sm text-destructive">
+                                                        {
+                                                            createForm.errors
+                                                                .status
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label
+                                                    htmlFor="remarks"
+                                                    className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                                                >
+                                                    Remarks
+                                                </Label>
+                                                <textarea
+                                                    id="remarks"
+                                                    value={
+                                                        createForm.data.remarks
+                                                    }
+                                                    onChange={(e) =>
+                                                        createForm.setData(
+                                                            'remarks',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    rows={2}
+                                                    className="rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                                    placeholder="Optional notes for this recurrence"
+                                                />
+                                            </div>
+                                        </div>
+
                                         <div className="rounded-lg border bg-background p-3">
                                             <h3 className="text-sm font-semibold">
                                                 C. Preview Summary
@@ -1506,8 +1873,8 @@ export default function DoctorDutySchedulesIndex({
                                                     <dd className="font-medium">
                                                         {createForm.data
                                                             .recurring_start_date &&
-                                                            createForm.data
-                                                                .recurring_end_date
+                                                        createForm.data
+                                                            .recurring_end_date
                                                             ? `${formatScheduleDate(createForm.data.recurring_start_date)} - ${formatScheduleDate(createForm.data.recurring_end_date)}`
                                                             : 'Choose a start and end date'}
                                                     </dd>
@@ -1528,7 +1895,7 @@ export default function DoctorDutySchedulesIndex({
                                                     Generated Dates
                                                 </div>
                                                 {recurringPreviewDates.length >
-                                                    0 ? (
+                                                0 ? (
                                                     <div className="flex flex-wrap gap-2">
                                                         {recurringPreviewDates
                                                             .slice(0, 8)
@@ -1544,24 +1911,25 @@ export default function DoctorDutySchedulesIndex({
                                                             ))}
                                                         {recurringPreviewDates.length >
                                                             8 && (
-                                                                <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground">
-                                                                    +
-                                                                    {recurringPreviewDates.length -
-                                                                        8}{' '}
-                                                                    more
-                                                                </span>
-                                                            )}
+                                                            <span className="rounded-md border bg-muted px-2 py-1 text-xs text-muted-foreground">
+                                                                +
+                                                                {recurringPreviewDates.length -
+                                                                    8}{' '}
+                                                                more
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <p className="text-xs text-muted-foreground">
-                                                        The preview appears after
-                                                        choosing a date range and
-                                                        repeat days.
+                                                        The preview appears
+                                                        after choosing a date
+                                                        range and repeat days.
                                                     </p>
                                                 )}
                                             </div>
                                         </div>
-                                    )}
+                                    </>
+                                )}
 
                                 {createForm.errors.schedule_mode && (
                                     <p className="text-sm text-destructive">
@@ -1591,169 +1959,161 @@ export default function DoctorDutySchedulesIndex({
                             </div>
                         </form>
 
-                        <div className="grid gap-4">
-                            <div className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+                        <div className="grid min-w-0 gap-3">
+                            <div className="rounded-xl border bg-card p-4 shadow-sm">
                                 <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                                     <div>
                                         <h2 className="text-lg font-semibold">
-                                            Selected Schedule Details
+                                            Selected Day Details
                                         </h2>
-                                        <p className="text-xs text-muted-foreground">
-                                            Click a day or duty row to review
-                                            every schedule for that date.
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Showing schedules for{' '}
+                                            <span className="font-medium text-emerald-700">
+                                                {
+                                                    displayedCalendarSelection.title
+                                                }
+                                            </span>
                                         </p>
                                     </div>
-                                    {calendarSelection && (
-                                        <Badge variant="outline">
-                                            {calendarSelection.schedules.length}{' '}
-                                            {calendarSelection.schedules
-                                                .length === 1
-                                                ? 'entry'
-                                                : 'entries'}
-                                        </Badge>
-                                    )}
+                                    {can_manage_schedule &&
+                                        displayedCalendarSelection.date && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                                onClick={() =>
+                                                    handleBoardAddDate(
+                                                        displayedCalendarSelection.date,
+                                                    )
+                                                }
+                                            >
+                                                <CalendarPlus className="mr-2 h-4 w-4" />
+                                                Add Duty
+                                            </Button>
+                                        )}
                                 </div>
 
-                                {calendarSelection ? (
-                                    <div className="grid gap-3">
-                                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
-                                            <p className="text-sm font-semibold">
-                                                {calendarSelection.title}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {calendarSelection.subtitle}
-                                            </p>
-                                        </div>
-
-                                        {calendarSelection.schedules.length >
-                                            0 ? (
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full min-w-[520px] text-sm">
-                                                    <thead className="bg-muted/40">
-                                                        <tr className="text-left text-muted-foreground">
-                                                            <th className="px-3 py-2">
-                                                                Doctor
-                                                            </th>
-                                                            <th className="px-3 py-2">
-                                                                Time
-                                                            </th>
-                                                            <th className="px-3 py-2">
-                                                                Status
-                                                            </th>
-                                                            <th className="px-3 py-2">
-                                                                Remarks
-                                                            </th>
+                                {displayedCalendarSelection.schedules.length >
+                                0 ? (
+                                    <div className="overflow-x-auto rounded-lg border">
+                                        <table className="w-full min-w-[560px] text-sm">
+                                            <thead className="bg-muted/40">
+                                                <tr className="text-left text-muted-foreground">
+                                                    <th className="px-3 py-2.5">
+                                                        Doctor
+                                                    </th>
+                                                    <th className="px-3 py-2.5">
+                                                        Time
+                                                    </th>
+                                                    <th className="px-3 py-2.5">
+                                                        Status
+                                                    </th>
+                                                    <th className="px-3 py-2.5">
+                                                        Remarks
+                                                    </th>
+                                                    {can_manage_schedule && (
+                                                        <th className="px-3 py-2.5 text-right">
+                                                            Action
+                                                        </th>
+                                                    )}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {displayedCalendarSelection.schedules.map(
+                                                    (schedule) => (
+                                                        <tr
+                                                            key={schedule.id}
+                                                            className="border-t"
+                                                        >
+                                                            <td className="px-3 py-2.5 font-medium">
+                                                                <span className="inline-flex items-center gap-2">
+                                                                    <span
+                                                                        className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[schedule.status]}`}
+                                                                    />
+                                                                    {
+                                                                        schedule.doctor_name
+                                                                    }
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-2.5">
+                                                                {formatTimeRange(
+                                                                    schedule.start_time,
+                                                                    schedule.end_time,
+                                                                )}
+                                                            </td>
+                                                            <td className="px-3 py-2.5">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={
+                                                                        STATUS_BADGE_CLASSES[
+                                                                            schedule
+                                                                                .status
+                                                                        ]
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        STATUS_LABELS[
+                                                                            schedule
+                                                                                .status
+                                                                        ]
+                                                                    }
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="px-3 py-2.5 text-muted-foreground">
+                                                                {schedule.remarks ||
+                                                                    '-'}
+                                                            </td>
                                                             {can_manage_schedule && (
-                                                                <th className="px-3 py-2 text-right">
-                                                                    Action
-                                                                </th>
+                                                                <td className="px-3 py-2.5 text-right">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="text-emerald-700 hover:text-emerald-800"
+                                                                        onClick={() =>
+                                                                            openEdit(
+                                                                                schedule,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Edit
+                                                                    </Button>
+                                                                </td>
                                                             )}
                                                         </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {calendarSelection.schedules.map(
-                                                            (schedule) => (
-                                                                <tr
-                                                                    key={
-                                                                        schedule.id
-                                                                    }
-                                                                    className="border-t"
-                                                                >
-                                                                    <td className="px-3 py-2 font-medium">
-                                                                        <span className="inline-flex items-center gap-2">
-                                                                            <span
-                                                                                className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[schedule.status]}`}
-                                                                            />
-                                                                            {
-                                                                                schedule.doctor_name
-                                                                            }
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-3 py-2">
-                                                                        {formatTimeRange(
-                                                                            schedule.start_time,
-                                                                            schedule.end_time,
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="px-3 py-2">
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className={
-                                                                                STATUS_BADGE_CLASSES[
-                                                                                schedule
-                                                                                    .status
-                                                                                ]
-                                                                            }
-                                                                        >
-                                                                            {
-                                                                                STATUS_LABELS[
-                                                                                schedule
-                                                                                    .status
-                                                                                ]
-                                                                            }
-                                                                        </Badge>
-                                                                    </td>
-                                                                    <td className="px-3 py-2 text-muted-foreground">
-                                                                        {schedule.remarks ||
-                                                                            '-'}
-                                                                    </td>
-                                                                    {can_manage_schedule && (
-                                                                        <td className="px-3 py-2 text-right">
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                onClick={() =>
-                                                                                    openEdit(
-                                                                                        schedule,
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                                                                Edit
-                                                                            </Button>
-                                                                        </td>
-                                                                    )}
-                                                                </tr>
-                                                            ),
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center text-sm text-muted-foreground">
-                                                No schedules are recorded for
-                                                the selected day.
-                                            </div>
-                                        )}
+                                                    ),
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 ) : (
-                                    <div className="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center">
-                                        <CalendarDays className="h-8 w-8 text-emerald-600" />
-                                        <p className="mt-3 text-sm font-medium text-foreground">
-                                            Select a day
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Select a day or duty row from the
-                                            weekly board.
-                                        </p>
+                                    <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed bg-muted/20 px-5 text-center text-sm text-muted-foreground">
+                                        No schedules are recorded for this day.
                                     </div>
                                 )}
+
+                                <div className="mt-3 rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                    Click a day in the calendar above to view
+                                    its schedules.
+                                </div>
                             </div>
 
-                            <div
-                                className={`rounded-2xl border bg-card p-4 shadow-sm transition-all md:p-5 ${selectedSchedule ? 'border-emerald-300 bg-emerald-50/30 shadow-md' : ''}`}
-                                data-edit-form="duty-schedule"
-                            >
-                                <h2 className="mb-1 text-lg font-semibold">
-                                    Edit Duty Schedule
-                                </h2>
-                                <p className="mb-4 text-xs text-muted-foreground">
-                                    {selectedSchedule
-                                        ? `Editing: ${selectedSchedule.doctor_name} on ${formatScheduleDate(selectedSchedule.duty_date)}`
-                                        : 'Use Edit in selected details or the schedule list below to update one entry.'}
-                                </p>
+                            {selectedSchedule ? (
+                                <div
+                                    className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm"
+                                    data-edit-form="duty-schedule"
+                                >
+                                    <h2 className="mb-1 text-lg font-semibold">
+                                        Edit Duty Schedule
+                                    </h2>
+                                    <p className="mb-4 text-xs text-muted-foreground">
+                                        Editing: {selectedSchedule.doctor_name}{' '}
+                                        on{' '}
+                                        {formatScheduleDate(
+                                            selectedSchedule.duty_date,
+                                        )}
+                                    </p>
 
-                                {selectedSchedule ? (
                                     <form
                                         onSubmit={handleEditSubmit}
                                         className="grid gap-3"
@@ -1869,15 +2229,15 @@ export default function DoctorDutySchedulesIndex({
                                             editForm.errors.start_time ||
                                             editForm.errors.end_time ||
                                             editForm.errors.status) && (
-                                                <p className="text-sm text-destructive">
-                                                    {editForm.errors.doctor_id ||
-                                                        editForm.errors.duty_date ||
-                                                        editForm.errors
-                                                            .start_time ||
-                                                        editForm.errors.end_time ||
-                                                        editForm.errors.status}
-                                                </p>
-                                            )}
+                                            <p className="text-sm text-destructive">
+                                                {editForm.errors.doctor_id ||
+                                                    editForm.errors.duty_date ||
+                                                    editForm.errors
+                                                        .start_time ||
+                                                    editForm.errors.end_time ||
+                                                    editForm.errors.status}
+                                            </p>
+                                        )}
 
                                         <div className="flex flex-wrap gap-2 border-t pt-3">
                                             <Button
@@ -1911,22 +2271,206 @@ export default function DoctorDutySchedulesIndex({
                                             </Button>
                                         </div>
                                     </form>
-                                ) : (
-                                    <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center">
-                                        <ClipboardCheck className="h-8 w-8 text-emerald-600" />
-                                        <p className="mt-3 text-sm font-medium text-foreground">
+                                </div>
+                            ) : (
+                                <div
+                                    className="rounded-xl border bg-card p-4 shadow-sm"
+                                    data-edit-form="duty-schedule"
+                                >
+                                    <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 px-6 py-8 text-center">
+                                        <div className="rounded-full border border-emerald-100 bg-emerald-50 p-3 text-emerald-700">
+                                            <Pencil className="h-5 w-5" />
+                                        </div>
+                                        <h2 className="mt-4 text-lg font-semibold">
+                                            Edit Duty Schedule
+                                        </h2>
+                                        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                                            Select a schedule from the selected
+                                            day details or the duty schedule
+                                            list to load it here for editing.
+                                        </p>
+                                        <Badge
+                                            variant="outline"
+                                            className="mt-4 border-slate-200 bg-background text-muted-foreground"
+                                        >
                                             No schedule selected
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Use Edit from selected details or
-                                            the schedule list below.
-                                        </p>
+                                        </Badge>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </section>
                 )}
+
+                <section className="rounded-xl border bg-card p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-lg font-semibold">
+                                Duty Schedule List
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                All scheduled duty entries.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Badge
+                                variant="outline"
+                                className="border-slate-200 bg-background text-muted-foreground"
+                            >
+                                {schedules.length} entries
+                            </Badge>
+                            <Badge
+                                variant="outline"
+                                className="border-emerald-100 bg-emerald-50 text-emerald-700"
+                            >
+                                10 rows per page
+                            </Badge>
+                        </div>
+                    </div>
+                    {schedules.length === 0 ? (
+                        <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground">
+                            No duty schedules in the selected range.
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden rounded-lg border">
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[980px] text-sm">
+                                    <thead className="bg-muted/40">
+                                        <tr className="text-left text-muted-foreground">
+                                            <th className="px-3 py-2.5">
+                                                Date
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                Doctor
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                Start Time
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                End Time
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                Status
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                Remarks
+                                            </th>
+                                            <th className="px-3 py-2.5">
+                                                Created By
+                                            </th>
+                                            {can_manage_schedule && (
+                                                <th className="px-3 py-2.5 text-right">
+                                                    Actions
+                                                </th>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedSchedules.rows.map(
+                                            (schedule) => (
+                                                <tr
+                                                    key={schedule.id}
+                                                    className="border-t align-top hover:bg-muted/20"
+                                                >
+                                                    <td className="px-3 py-2.5">
+                                                        {formatScheduleDate(
+                                                            schedule.duty_date,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 font-medium">
+                                                        <span className="inline-flex items-center gap-2">
+                                                            <span
+                                                                className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[schedule.status]}`}
+                                                            />
+                                                            {
+                                                                schedule.doctor_name
+                                                            }
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        {formatTime(
+                                                            schedule.start_time,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        {formatTime(
+                                                            schedule.end_time,
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                STATUS_BADGE_CLASSES[
+                                                                    schedule
+                                                                        .status
+                                                                ]
+                                                            }
+                                                        >
+                                                            {
+                                                                STATUS_LABELS[
+                                                                    schedule
+                                                                        .status
+                                                                ]
+                                                            }
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        {schedule.remarks ||
+                                                            '-'}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        -
+                                                    </td>
+                                                    {can_manage_schedule && (
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <div className="inline-flex items-center justify-end gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0"
+                                                                    onClick={() =>
+                                                                        openEdit(
+                                                                            schedule,
+                                                                        )
+                                                                    }
+                                                                    aria-label={`Edit ${schedule.doctor_name ?? 'schedule'}`}
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                                                    onClick={() =>
+                                                                        handleDelete(
+                                                                            schedule.id,
+                                                                        )
+                                                                    }
+                                                                    aria-label={`Delete ${schedule.doctor_name ?? 'schedule'}`}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            ),
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <PaginationControls
+                                currentPage={paginatedSchedules.currentPage}
+                                lastPage={paginatedSchedules.lastPage}
+                                from={paginatedSchedules.from}
+                                to={paginatedSchedules.to}
+                                total={paginatedSchedules.total}
+                                onPageChange={setSchedulePage}
+                            />
+                        </div>
+                    )}
+                </section>
 
                 {(can_submit_duty_requests || can_review_duty_requests) && (
                     <section
@@ -1981,13 +2525,13 @@ export default function DoctorDutySchedulesIndex({
                                         </select>
                                         {dutyRequestForm.errors
                                             .request_type && (
-                                                <p className="text-sm text-destructive">
-                                                    {
-                                                        dutyRequestForm.errors
-                                                            .request_type
-                                                    }
-                                                </p>
-                                            )}
+                                            <p className="text-sm text-destructive">
+                                                {
+                                                    dutyRequestForm.errors
+                                                        .request_type
+                                                }
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="flex flex-col gap-1.5">
@@ -2093,9 +2637,23 @@ export default function DoctorDutySchedulesIndex({
 
                         {can_review_duty_requests && (
                             <div className="w-full rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-                                <h2 className="mb-3 text-lg font-semibold">
-                                    Pending Leave / Absence Requests
-                                </h2>
+                                <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <h2 className="text-lg font-semibold">
+                                            Pending Leave / Absence Requests
+                                        </h2>
+                                        <p className="text-xs text-muted-foreground">
+                                            Review incoming duty changes without
+                                            stretching the page.
+                                        </p>
+                                    </div>
+                                    <Badge
+                                        variant="outline"
+                                        className="border-emerald-100 bg-emerald-50 text-emerald-700"
+                                    >
+                                        10 rows per page
+                                    </Badge>
+                                </div>
 
                                 {pending_duty_requests.length === 0 ? (
                                     <div className="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center">
@@ -2108,106 +2666,153 @@ export default function DoctorDutySchedulesIndex({
                                         </p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-3">
-                                        {pending_duty_requests.map(
-                                            (request) => (
-                                                <div
-                                                    key={request.id}
-                                                    className="rounded-xl border bg-background p-3.5 shadow-sm"
-                                                >
-                                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                                        <div className="font-medium">
-                                                            {
-                                                                request.doctor_name
-                                                            }{' '}
-                                                            -{' '}
-                                                            {
-                                                                REQUEST_TYPE_LABELS[
-                                                                request
-                                                                    .request_type
-                                                                ]
-                                                            }
-                                                        </div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                REQUEST_STATUS_BADGE_CLASSES[
-                                                                request
-                                                                    .status
-                                                                ]
-                                                            }
-                                                        >
-                                                            {
-                                                                REQUEST_STATUS_LABELS[
-                                                                request
-                                                                    .status
-                                                                ]
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        {request.start_date} to{' '}
-                                                        {request.end_date}
-                                                    </p>
-                                                    {request.remarks && (
-                                                        <p className="mt-2 text-sm">
-                                                            {request.remarks}
-                                                        </p>
+                                    <div className="overflow-hidden rounded-lg border">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full min-w-[920px] text-sm">
+                                                <thead className="bg-muted/40">
+                                                    <tr className="text-left text-muted-foreground">
+                                                        <th className="px-3 py-2.5">
+                                                            Doctor
+                                                        </th>
+                                                        <th className="px-3 py-2.5">
+                                                            Request
+                                                        </th>
+                                                        <th className="px-3 py-2.5">
+                                                            Date Range
+                                                        </th>
+                                                        <th className="px-3 py-2.5">
+                                                            Reason
+                                                        </th>
+                                                        <th className="px-3 py-2.5">
+                                                            Review
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {paginatedPendingRequests.rows.map(
+                                                        (request) => (
+                                                            <tr
+                                                                key={request.id}
+                                                                className="border-t align-top hover:bg-muted/20"
+                                                            >
+                                                                <td className="px-3 py-2.5 font-medium">
+                                                                    {
+                                                                        request.doctor_name
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2.5">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={
+                                                                            REQUEST_STATUS_BADGE_CLASSES[
+                                                                                request
+                                                                                    .status
+                                                                            ]
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            REQUEST_TYPE_LABELS[
+                                                                                request
+                                                                                    .request_type
+                                                                            ]
+                                                                        }
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                                                                    {
+                                                                        request.start_date
+                                                                    }{' '}
+                                                                    to{' '}
+                                                                    {
+                                                                        request.end_date
+                                                                    }
+                                                                </td>
+                                                                <td className="max-w-[240px] px-3 py-2.5 text-muted-foreground">
+                                                                    <span className="line-clamp-2">
+                                                                        {request.remarks ||
+                                                                            '-'}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-3 py-2.5">
+                                                                    <div className="grid min-w-64 gap-2">
+                                                                        <Input
+                                                                            placeholder="Reviewer notes (optional)"
+                                                                            value={
+                                                                                reviewerNotes[
+                                                                                    request
+                                                                                        .id
+                                                                                ] ??
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                setReviewerNotes(
+                                                                                    (
+                                                                                        current,
+                                                                                    ) => ({
+                                                                                        ...current,
+                                                                                        [request.id]:
+                                                                                            e
+                                                                                                .target
+                                                                                                .value,
+                                                                                    }),
+                                                                                )
+                                                                            }
+                                                                            className="h-9"
+                                                                        />
+                                                                        <div className="flex gap-2">
+                                                                            <Button
+                                                                                type="button"
+                                                                                size="sm"
+                                                                                className="bg-emerald-600 hover:bg-emerald-700"
+                                                                                onClick={() =>
+                                                                                    reviewDutyRequest(
+                                                                                        request.id,
+                                                                                        'approved',
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Approve
+                                                                            </Button>
+                                                                            <Button
+                                                                                type="button"
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={() =>
+                                                                                    reviewDutyRequest(
+                                                                                        request.id,
+                                                                                        'rejected',
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Reject
+                                                                            </Button>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ),
                                                     )}
-                                                    <div className="mt-3 grid gap-2">
-                                                        <Input
-                                                            placeholder="Reviewer notes (optional)"
-                                                            value={
-                                                                reviewerNotes[
-                                                                request.id
-                                                                ] ?? ''
-                                                            }
-                                                            onChange={(e) =>
-                                                                setReviewerNotes(
-                                                                    (
-                                                                        current,
-                                                                    ) => ({
-                                                                        ...current,
-                                                                        [request.id]:
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                    }),
-                                                                )
-                                                            }
-                                                        />
-                                                        <div className="flex gap-2">
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                className="bg-emerald-600 hover:bg-emerald-700"
-                                                                onClick={() =>
-                                                                    reviewDutyRequest(
-                                                                        request.id,
-                                                                        'approved',
-                                                                    )
-                                                                }
-                                                            >
-                                                                Approve
-                                                            </Button>
-                                                            <Button
-                                                                type="button"
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    reviewDutyRequest(
-                                                                        request.id,
-                                                                        'rejected',
-                                                                    )
-                                                                }
-                                                            >
-                                                                Reject
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ),
-                                        )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <PaginationControls
+                                            currentPage={
+                                                paginatedPendingRequests.currentPage
+                                            }
+                                            lastPage={
+                                                paginatedPendingRequests.lastPage
+                                            }
+                                            from={paginatedPendingRequests.from}
+                                            to={paginatedPendingRequests.to}
+                                            total={
+                                                paginatedPendingRequests.total
+                                            }
+                                            onPageChange={
+                                                setPendingRequestsPage
+                                            }
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -2217,181 +2822,115 @@ export default function DoctorDutySchedulesIndex({
 
                 {(can_submit_duty_requests || can_review_duty_requests) && (
                     <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-                        <h2 className="mb-3 text-lg font-semibold">
-                            Duty Request History
-                        </h2>
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <h2 className="text-lg font-semibold">
+                                    Duty Request History
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Recent leave and absence requests.
+                                </p>
+                            </div>
+                            <Badge
+                                variant="outline"
+                                className="border-emerald-100 bg-emerald-50 text-emerald-700"
+                            >
+                                10 rows per page
+                            </Badge>
+                        </div>
                         {duty_requests.length === 0 ? (
                             <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground">
                                 No duty requests recorded yet.
                             </div>
                         ) : (
-                            <div className="overflow-x-auto rounded-lg border">
-                                <table className="w-full min-w-[760px] text-sm">
-                                    <thead className="bg-muted/40">
-                                        <tr className="text-left text-muted-foreground">
-                                            <th className="px-3 py-2.5">
-                                                Doctor
-                                            </th>
-                                            <th className="px-3 py-2.5">
-                                                Type
-                                            </th>
-                                            <th className="px-3 py-2.5">
-                                                Date Range
-                                            </th>
-                                            <th className="px-3 py-2.5">
-                                                Status
-                                            </th>
-                                            <th className="px-3 py-2.5">
-                                                Remarks
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {duty_requests.map((request) => (
-                                            <tr
-                                                key={request.id}
-                                                className="border-t align-top hover:bg-muted/20"
-                                            >
-                                                <td className="px-3 py-2.5">
-                                                    {request.doctor_name}
-                                                </td>
-                                                <td className="px-3 py-2.5">
-                                                    {
-                                                        REQUEST_TYPE_LABELS[
-                                                        request.request_type
-                                                        ]
-                                                    }
-                                                </td>
-                                                <td className="px-3 py-2.5">
-                                                    {request.start_date} -{' '}
-                                                    {request.end_date}
-                                                </td>
-                                                <td className="px-3 py-2.5">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            REQUEST_STATUS_BADGE_CLASSES[
-                                                            request.status
-                                                            ]
-                                                        }
-                                                    >
-                                                        {
-                                                            REQUEST_STATUS_LABELS[
-                                                            request.status
-                                                            ]
-                                                        }
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-3 py-2.5">
-                                                    {request.remarks || '-'}
-                                                </td>
+                            <div className="overflow-hidden rounded-lg border">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[760px] text-sm">
+                                        <thead className="bg-muted/40">
+                                            <tr className="text-left text-muted-foreground">
+                                                <th className="px-3 py-2.5">
+                                                    Doctor
+                                                </th>
+                                                <th className="px-3 py-2.5">
+                                                    Type
+                                                </th>
+                                                <th className="px-3 py-2.5">
+                                                    Date Range
+                                                </th>
+                                                <th className="px-3 py-2.5">
+                                                    Status
+                                                </th>
+                                                <th className="px-3 py-2.5">
+                                                    Remarks
+                                                </th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {paginatedDutyRequests.rows.map(
+                                                (request) => (
+                                                    <tr
+                                                        key={request.id}
+                                                        className="border-t align-top hover:bg-muted/20"
+                                                    >
+                                                        <td className="px-3 py-2.5">
+                                                            {
+                                                                request.doctor_name
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            {
+                                                                REQUEST_TYPE_LABELS[
+                                                                    request
+                                                                        .request_type
+                                                                ]
+                                                            }
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            {request.start_date}{' '}
+                                                            - {request.end_date}
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={
+                                                                    REQUEST_STATUS_BADGE_CLASSES[
+                                                                        request
+                                                                            .status
+                                                                    ]
+                                                                }
+                                                            >
+                                                                {
+                                                                    REQUEST_STATUS_LABELS[
+                                                                        request
+                                                                            .status
+                                                                    ]
+                                                                }
+                                                            </Badge>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            {request.remarks ||
+                                                                '-'}
+                                                        </td>
+                                                    </tr>
+                                                ),
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <PaginationControls
+                                    currentPage={
+                                        paginatedDutyRequests.currentPage
+                                    }
+                                    lastPage={paginatedDutyRequests.lastPage}
+                                    from={paginatedDutyRequests.from}
+                                    to={paginatedDutyRequests.to}
+                                    total={paginatedDutyRequests.total}
+                                    onPageChange={setRequestHistoryPage}
+                                />
                             </div>
                         )}
                     </section>
                 )}
-
-                <section className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <h2 className="text-lg font-semibold">
-                                Duty Schedule List
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                Full detail view for review, edits, and schedule
-                                audit.
-                            </p>
-                        </div>
-                    </div>
-                    {schedules.length === 0 ? (
-                        <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed bg-muted/20 px-4 text-center text-sm text-muted-foreground">
-                            No duty schedules in the selected range.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto rounded-lg border">
-                            <table className="w-full min-w-[720px] text-sm">
-                                <thead className="bg-muted/40">
-                                    <tr className="text-left text-muted-foreground">
-                                        <th className="px-3 py-2.5">Date</th>
-                                        <th className="px-3 py-2.5">Doctor</th>
-                                        <th className="px-3 py-2.5">Time</th>
-                                        <th className="px-3 py-2.5">Status</th>
-                                        <th className="px-3 py-2.5">Remarks</th>
-                                        {can_manage_schedule && (
-                                            <th className="px-3 py-2.5 text-right">
-                                                Actions
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {schedules.map((schedule) => (
-                                        <tr
-                                            key={schedule.id}
-                                            className="border-t align-top hover:bg-muted/20"
-                                        >
-                                            <td className="px-3 py-2.5">
-                                                {formatScheduleDate(
-                                                    schedule.duty_date,
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2.5 font-medium">
-                                                <span className="inline-flex items-center gap-2">
-                                                    <span
-                                                        className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASSES[schedule.status]}`}
-                                                    />
-                                                    {schedule.doctor_name}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2.5">
-                                                {formatTimeRange(
-                                                    schedule.start_time,
-                                                    schedule.end_time,
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2.5">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        STATUS_BADGE_CLASSES[
-                                                        schedule.status
-                                                        ]
-                                                    }
-                                                >
-                                                    {
-                                                        STATUS_LABELS[
-                                                        schedule.status
-                                                        ]
-                                                    }
-                                                </Badge>
-                                            </td>
-                                            <td className="px-3 py-2.5">
-                                                {schedule.remarks || '-'}
-                                            </td>
-                                            {can_manage_schedule && (
-                                                <td className="px-3 py-2.5 text-right">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openEdit(schedule)
-                                                        }
-                                                    >
-                                                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                                        Edit
-                                                    </Button>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </section>
             </div>
         </AppLayout>
     );
