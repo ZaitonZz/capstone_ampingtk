@@ -3,9 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\DoctorDutyAvailabilityService;
-use App\Models\DoctorDutySchedule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -38,16 +36,8 @@ class RequestAppointmentRequest extends FormRequest
 
             $availabilityService = app(DoctorDutyAvailabilityService::class);
 
-            $isAvailableAtTime = $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt);
-
-            // Allow if doctor is available at the exact time, or has a duty schedule on that date
-            $scheduledDate = Carbon::parse($scheduledAt)->toDateString();
-            $hasScheduleOnDate = DoctorDutySchedule::query()
-                ->where('doctor_id', $doctorId)
-                ->whereDate('duty_date', $scheduledDate)
-                ->exists();
-
-            if (! $isAvailableAtTime && ! $hasScheduleOnDate) {
+            // For patient requests, require exact time availability
+            if (! $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt)) {
                 $validator->errors()->add('doctor_id', 'Selected doctor is not on duty for the specified appointment schedule.');
             }
         });
