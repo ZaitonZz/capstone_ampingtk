@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import {
+    AlertTriangle,
     Calendar,
     CheckCircle2,
     LoaderCircle,
