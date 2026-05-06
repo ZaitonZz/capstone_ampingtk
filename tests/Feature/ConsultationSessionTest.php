@@ -164,6 +164,11 @@ it('includes deepfake detection status in session payload', function () {
         ->assertInertia(
             fn ($page) => $page
                 ->component('consultations/session')
-                ->where('deepfake_detection.state', 'running'),
+                ->where('deepfake_detection.state', 'running')
+                ->missing('consultation.pipeline_last_error')
+                ->missing('consultation.pipeline_guidance')
+                ->missing('deepfake_detection.last_error')
+                ->missing('deepfake_detection.guidance.participant_identity')
+                ->missing('deepfake_detection.guidance.role'),
         );
 });

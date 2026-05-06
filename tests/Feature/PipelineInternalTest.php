@@ -157,7 +157,10 @@ it('stores deepfake detection runtime status posted by the pipeline', function (
         ->assertOk()
         ->assertJsonPath('deepfake_detection.state', 'running')
         ->assertJsonPath('deepfake_detection.guidance.low_light', true)
-        ->assertJsonPath('deepfake_detection.guidance.too_far', true);
+        ->assertJsonPath('deepfake_detection.guidance.too_far', true)
+        ->assertJsonMissingPath('deepfake_detection.last_error')
+        ->assertJsonMissingPath('deepfake_detection.guidance.participant_identity')
+        ->assertJsonMissingPath('deepfake_detection.guidance.role');
 
     $consultation->refresh();
 
