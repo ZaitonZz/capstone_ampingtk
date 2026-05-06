@@ -29,6 +29,10 @@ type DutyStatus = 'on_duty' | 'off_duty' | 'absent' | 'on_leave';
 type RequestStatus = 'pending' | 'approved' | 'rejected';
 type RequestType = 'absent' | 'on_leave';
 type ScheduleMode = 'multiple_dates' | 'recurring_weekly';
+type DutyCalendarTab =
+    | 'calendar_overview'
+    | 'manage_schedules'
+    | 'records_requests';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 type StatusFilter = 'all' | DutyStatus;
 
@@ -83,6 +87,28 @@ interface Props {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Doctor Duty Calendar', href: '/doctor-duty-schedules' },
+];
+
+const DUTY_CALENDAR_TABS: {
+    id: DutyCalendarTab;
+    label: string;
+    description: string;
+}[] = [
+    {
+        id: 'calendar_overview',
+        label: 'Calendar Overview',
+        description: 'Month view and selected day details',
+    },
+    {
+        id: 'manage_schedules',
+        label: 'Manage Schedules',
+        description: 'Create schedules and edit selected records',
+    },
+    {
+        id: 'records_requests',
+        label: 'Records & Requests',
+        description: 'Schedule history and leave requests',
+    },
 ];
 
 const DUTY_STATUSES: DutyStatus[] = [
@@ -485,6 +511,8 @@ export default function DoctorDutySchedulesIndex({
     const [visibleDate, setVisibleDate] = useState(() =>
         startOfDay(new Date()),
     );
+    const [activeTab, setActiveTab] =
+        useState<DutyCalendarTab>('calendar_overview');
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [activeScheduleId, setActiveScheduleId] = useState<number | null>(
         null,
@@ -715,6 +743,7 @@ export default function DoctorDutySchedulesIndex({
 
     function openEdit(schedule: DutySchedule) {
         setSelectedSchedule(schedule);
+        setActiveTab('manage_schedules');
         selectCalendarDate(schedule.duty_date, schedule.id);
         editForm.setData({
             doctor_id: String(schedule.doctor_id),
@@ -913,7 +942,59 @@ export default function DoctorDutySchedulesIndex({
                             </div>
                         </div>
                     </div>
+                </section>
 
+                <div className="rounded-lg border bg-background p-1 shadow-sm">
+                    <div
+                        role="tablist"
+                        aria-label="Doctor duty calendar sections"
+                        className="grid gap-1 md:grid-cols-3"
+                    >
+                        {DUTY_CALENDAR_TABS.map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            const tabDomId = `${tab.id.replaceAll('_', '-')}-tab`;
+                            const panelDomId = `${tab.id.replaceAll('_', '-')}-panel`;
+
+                            return (
+                                <button
+                                    key={tab.id}
+                                    id={tabDomId}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={isActive}
+                                    aria-controls={panelDomId}
+                                    className={`rounded-md px-4 py-3 text-left transition focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:outline-none ${
+                                        isActive
+                                            ? 'bg-slate-900 text-white shadow-sm'
+                                            : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                                    }`}
+                                    onClick={() => setActiveTab(tab.id)}
+                                >
+                                    <span className="block text-sm font-semibold">
+                                        {tab.label}
+                                    </span>
+                                    <span
+                                        className={`mt-0.5 block text-xs ${
+                                            isActive
+                                                ? 'text-slate-200'
+                                                : 'text-muted-foreground'
+                                        }`}
+                                    >
+                                        {tab.description}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <section
+                    id="calendar-overview-panel"
+                    role="tabpanel"
+                    aria-labelledby="calendar-overview-tab"
+                    hidden={activeTab !== 'calendar_overview'}
+                    className="space-y-4 border-b pb-7"
+                >
                     <div>
                         <h2 className="text-xl font-semibold">Duty Calendar</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -1081,674 +1162,716 @@ export default function DoctorDutySchedulesIndex({
                     </div>
                 </section>
 
-                {can_manage_schedule && (
-                    <section className="space-y-4 border-b pb-7">
-                        <div>
-                            <h2 className="text-xl font-semibold">
-                                Add Duty Schedule
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Create schedules for specific dates or weekly
-                                recurring duty blocks.
-                            </p>
-                        </div>
+                <section
+                    id="manage-schedules-panel"
+                    role="tabpanel"
+                    aria-labelledby="manage-schedules-tab"
+                    hidden={activeTab !== 'manage_schedules'}
+                    className="space-y-4 border-b pb-7"
+                >
+                    {can_manage_schedule ? (
+                        <>
+                            <div>
+                                <h2 className="text-xl font-semibold">
+                                    Add Duty Schedule
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Create schedules for specific dates or
+                                    weekly recurring duty blocks.
+                                </p>
+                            </div>
 
-                        <form
-                            onSubmit={handleCreateSubmit}
-                            className="rounded-lg border bg-background p-4 shadow-sm"
-                        >
-                            <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
-                                <div className="space-y-4">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="doctor_id">
-                                            Doctor
-                                        </Label>
-                                        <select
-                                            id="doctor_id"
-                                            value={createForm.data.doctor_id}
-                                            onChange={(event) =>
-                                                createForm.setData(
-                                                    'doctor_id',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                        >
-                                            <option value="">
-                                                Select doctor...
-                                            </option>
-                                            {doctors.map((doctor) => (
-                                                <option
-                                                    key={doctor.id}
-                                                    value={doctor.id}
-                                                >
-                                                    {doctor.name}
+                            <form
+                                onSubmit={handleCreateSubmit}
+                                className="rounded-lg border bg-background p-4 shadow-sm"
+                            >
+                                <div className="grid gap-4 lg:grid-cols-[minmax(220px,280px)_1fr]">
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="doctor_id">
+                                                Doctor
+                                            </Label>
+                                            <select
+                                                id="doctor_id"
+                                                value={
+                                                    createForm.data.doctor_id
+                                                }
+                                                onChange={(event) =>
+                                                    createForm.setData(
+                                                        'doctor_id',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                            >
+                                                <option value="">
+                                                    Select doctor...
                                                 </option>
-                                            ))}
-                                        </select>
-                                        <FieldError
-                                            message={
-                                                createForm.errors.doctor_id
-                                            }
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label>Mode</Label>
-                                        <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/30 p-1">
-                                            {(
-                                                [
-                                                    'multiple_dates',
-                                                    'recurring_weekly',
-                                                ] as ScheduleMode[]
-                                            ).map((mode) => (
-                                                <Button
-                                                    key={mode}
-                                                    type="button"
-                                                    size="sm"
-                                                    variant={
-                                                        createForm.data
-                                                            .schedule_mode ===
-                                                        mode
-                                                            ? 'default'
-                                                            : 'ghost'
-                                                    }
-                                                    className={
-                                                        createForm.data
-                                                            .schedule_mode ===
-                                                        mode
-                                                            ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                                            : 'text-muted-foreground hover:bg-background'
-                                                    }
-                                                    onClick={() =>
-                                                        setScheduleMode(mode)
-                                                    }
-                                                >
-                                                    {MODE_LABELS[mode]}
-                                                </Button>
-                                            ))}
+                                                {doctors.map((doctor) => (
+                                                    <option
+                                                        key={doctor.id}
+                                                        value={doctor.id}
+                                                    >
+                                                        {doctor.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <FieldError
+                                                message={
+                                                    createForm.errors.doctor_id
+                                                }
+                                            />
                                         </div>
-                                        <FieldError
-                                            message={
-                                                createForm.errors.schedule_mode
-                                            }
-                                        />
-                                    </div>
-                                </div>
 
-                                <div className="min-w-0 space-y-4">
-                                    {createForm.data.schedule_mode ===
-                                    'multiple_dates' ? (
-                                        <div className="space-y-4">
-                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                                <div className="min-w-0 flex-1 space-y-1.5">
-                                                    <Label htmlFor="draft_date">
-                                                        Add specific date
-                                                    </Label>
-                                                    <Input
-                                                        id="draft_date"
-                                                        type="date"
-                                                        value={draftDate}
-                                                        onChange={(event) =>
-                                                            setDraftDate(
-                                                                event.target
-                                                                    .value,
+                                        <div className="space-y-1.5">
+                                            <Label>Mode</Label>
+                                            <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/30 p-1">
+                                                {(
+                                                    [
+                                                        'multiple_dates',
+                                                        'recurring_weekly',
+                                                    ] as ScheduleMode[]
+                                                ).map((mode) => (
+                                                    <Button
+                                                        key={mode}
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={
+                                                            createForm.data
+                                                                .schedule_mode ===
+                                                            mode
+                                                                ? 'default'
+                                                                : 'ghost'
+                                                        }
+                                                        className={
+                                                            createForm.data
+                                                                .schedule_mode ===
+                                                            mode
+                                                                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                                                : 'text-muted-foreground hover:bg-background'
+                                                        }
+                                                        onClick={() =>
+                                                            setScheduleMode(
+                                                                mode,
                                                             )
                                                         }
-                                                    />
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    className="h-10"
-                                                    onClick={() =>
-                                                        addSpecificDate(
-                                                            draftDate,
-                                                        )
-                                                    }
-                                                >
-                                                    <CalendarPlus className="mr-2 h-4 w-4" />
-                                                    Add date
-                                                </Button>
-                                            </div>
-
-                                            <div className="overflow-hidden rounded-lg border">
-                                                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">
-                                                    <div>
-                                                        <p className="text-sm font-medium">
-                                                            Specific Dates
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            Each selected date
-                                                            keeps its own time
-                                                            in, time out,
-                                                            status, and remarks.
-                                                        </p>
-                                                    </div>
-                                                    {createForm.data
-                                                        .specific_date_entries
-                                                        .length > 0 && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                createForm.setData(
-                                                                    'specific_date_entries',
-                                                                    [],
-                                                                )
-                                                            }
-                                                        >
-                                                            Clear all
-                                                        </Button>
-                                                    )}
-                                                </div>
-
-                                                {createForm.data
-                                                    .specific_date_entries
-                                                    .length > 0 ? (
-                                                    <div className="overflow-x-auto">
-                                                        <table className="w-full min-w-[860px] text-sm">
-                                                            <thead className="bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
-                                                                <tr>
-                                                                    <th className="px-3 py-2 font-medium">
-                                                                        Date
-                                                                    </th>
-                                                                    <th className="px-3 py-2 font-medium">
-                                                                        Time in
-                                                                    </th>
-                                                                    <th className="px-3 py-2 font-medium">
-                                                                        Time out
-                                                                    </th>
-                                                                    <th className="px-3 py-2 font-medium">
-                                                                        Status
-                                                                    </th>
-                                                                    <th className="px-3 py-2 font-medium">
-                                                                        Remarks
-                                                                    </th>
-                                                                    <th className="px-3 py-2 text-right font-medium">
-                                                                        Remove
-                                                                    </th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y">
-                                                                {createForm.data.specific_date_entries.map(
-                                                                    (
-                                                                        entry,
-                                                                        index,
-                                                                    ) => (
-                                                                        <tr
-                                                                            key={
-                                                                                entry.duty_date
-                                                                            }
-                                                                        >
-                                                                            <td className="px-3 py-2 whitespace-nowrap">
-                                                                                <div className="font-medium">
-                                                                                    {formatDate(
-                                                                                        entry.duty_date,
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="text-xs text-muted-foreground">
-                                                                                    {
-                                                                                        entry.duty_date
-                                                                                    }
-                                                                                </div>
-                                                                            </td>
-                                                                            <td className="px-3 py-2">
-                                                                                <Input
-                                                                                    type="time"
-                                                                                    value={
-                                                                                        entry.start_time
-                                                                                    }
-                                                                                    className="h-9 w-28"
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updateSpecificDateEntry(
-                                                                                            index,
-                                                                                            'start_time',
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                            </td>
-                                                                            <td className="px-3 py-2">
-                                                                                <Input
-                                                                                    type="time"
-                                                                                    value={
-                                                                                        entry.end_time
-                                                                                    }
-                                                                                    className="h-9 w-28"
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updateSpecificDateEntry(
-                                                                                            index,
-                                                                                            'end_time',
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                            </td>
-                                                                            <td className="px-3 py-2">
-                                                                                <select
-                                                                                    value={
-                                                                                        entry.status
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updateSpecificDateEntry(
-                                                                                            index,
-                                                                                            'status',
-                                                                                            event
-                                                                                                .target
-                                                                                                .value as DutyStatus,
-                                                                                        )
-                                                                                    }
-                                                                                    className="h-9 w-36 rounded-md border border-input bg-background px-2 text-sm shadow-sm"
-                                                                                >
-                                                                                    {DUTY_STATUSES.map(
-                                                                                        (
-                                                                                            status,
-                                                                                        ) => (
-                                                                                            <option
-                                                                                                key={
-                                                                                                    status
-                                                                                                }
-                                                                                                value={
-                                                                                                    status
-                                                                                                }
-                                                                                            >
-                                                                                                {
-                                                                                                    STATUS_LABELS[
-                                                                                                        status
-                                                                                                    ]
-                                                                                                }
-                                                                                            </option>
-                                                                                        ),
-                                                                                    )}
-                                                                                </select>
-                                                                            </td>
-                                                                            <td className="px-3 py-2">
-                                                                                <Input
-                                                                                    value={
-                                                                                        entry.remarks
-                                                                                    }
-                                                                                    placeholder="Optional"
-                                                                                    className="h-9 min-w-52"
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) =>
-                                                                                        updateSpecificDateEntry(
-                                                                                            index,
-                                                                                            'remarks',
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        )
-                                                                                    }
-                                                                                />
-                                                                            </td>
-                                                                            <td className="px-3 py-2 text-right">
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                                                                                    onClick={() =>
-                                                                                        removeSpecificDate(
-                                                                                            index,
-                                                                                        )
-                                                                                    }
-                                                                                    aria-label={`Remove ${entry.duty_date}`}
-                                                                                >
-                                                                                    <X className="h-4 w-4" />
-                                                                                </Button>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ),
-                                                                )}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                ) : (
-                                                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                                                        Use the date picker
-                                                        above to add specific
-                                                        duty dates.
-                                                    </div>
-                                                )}
+                                                    >
+                                                        {MODE_LABELS[mode]}
+                                                    </Button>
+                                                ))}
                                             </div>
                                             <FieldError
                                                 message={
                                                     createForm.errors
-                                                        .specific_date_entries
+                                                        .schedule_mode
                                                 }
                                             />
                                         </div>
-                                    ) : (
-                                        <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-                                            <div className="grid gap-4 sm:grid-cols-2">
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="recurring_start_date">
-                                                        Start date
-                                                    </Label>
-                                                    <Input
-                                                        id="recurring_start_date"
-                                                        type="date"
-                                                        value={
-                                                            createForm.data
-                                                                .recurring_start_date
-                                                        }
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'recurring_start_date',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .recurring_start_date
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="recurring_end_date">
-                                                        End date
-                                                    </Label>
-                                                    <Input
-                                                        id="recurring_end_date"
-                                                        type="date"
-                                                        value={
-                                                            createForm.data
-                                                                .recurring_end_date
-                                                        }
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'recurring_end_date',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .recurring_end_date
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5 sm:col-span-2">
-                                                    <Label>
-                                                        Repeat weekly on
-                                                    </Label>
-                                                    <ToggleGroup
-                                                        type="multiple"
-                                                        value={
-                                                            createForm.data
-                                                                .recurring_weekdays
-                                                        }
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            createForm.setData(
-                                                                'recurring_weekdays',
-                                                                value as Weekday[],
-                                                            )
-                                                        }
-                                                        className="flex flex-wrap justify-start gap-2"
-                                                    >
-                                                        {WEEKDAYS.map(
-                                                            (weekday) => (
-                                                                <ToggleGroupItem
-                                                                    key={
-                                                                        weekday
-                                                                    }
-                                                                    value={
-                                                                        weekday
-                                                                    }
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="min-w-12 rounded-md bg-background data-[state=on]:border-slate-900 data-[state=on]:bg-slate-900 data-[state=on]:text-white"
-                                                                >
-                                                                    {
-                                                                        WEEKDAY_LABELS[
-                                                                            weekday
-                                                                        ]
-                                                                    }
-                                                                </ToggleGroupItem>
-                                                            ),
-                                                        )}
-                                                    </ToggleGroup>
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .recurring_weekdays
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="start_time">
-                                                        Time in
-                                                    </Label>
-                                                    <Input
-                                                        id="start_time"
-                                                        type="time"
-                                                        value={
-                                                            createForm.data
-                                                                .start_time
-                                                        }
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'start_time',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .start_time
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="end_time">
-                                                        Time out
-                                                    </Label>
-                                                    <Input
-                                                        id="end_time"
-                                                        type="time"
-                                                        value={
-                                                            createForm.data
-                                                                .end_time
-                                                        }
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'end_time',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                    />
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .end_time
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="status">
-                                                        Status
-                                                    </Label>
-                                                    <select
-                                                        id="status"
-                                                        value={
-                                                            createForm.data
-                                                                .status
-                                                        }
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'status',
-                                                                event.target
-                                                                    .value as DutyStatus,
-                                                            )
-                                                        }
-                                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
-                                                    >
-                                                        {DUTY_STATUSES.map(
-                                                            (status) => (
-                                                                <option
-                                                                    key={status}
-                                                                    value={
-                                                                        status
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        STATUS_LABELS[
-                                                                            status
-                                                                        ]
-                                                                    }
-                                                                </option>
-                                                            ),
-                                                        )}
-                                                    </select>
-                                                    <FieldError
-                                                        message={
-                                                            createForm.errors
-                                                                .status
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="remarks">
-                                                        Remarks
-                                                    </Label>
-                                                    <textarea
-                                                        id="remarks"
-                                                        value={
-                                                            createForm.data
-                                                                .remarks
-                                                        }
-                                                        rows={2}
-                                                        onChange={(event) =>
-                                                            createForm.setData(
-                                                                'remarks',
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                                        placeholder="Optional"
-                                                    />
-                                                </div>
-                                            </div>
+                                    </div>
 
-                                            <div className="rounded-lg border bg-muted/20 p-3">
-                                                <p className="text-sm font-medium">
-                                                    Recurring Preview
-                                                </p>
-                                                <div className="mt-3 space-y-2 text-sm">
-                                                    <div className="flex justify-between gap-3">
-                                                        <span className="text-muted-foreground">
-                                                            Doctor
-                                                        </span>
-                                                        <span className="text-right font-medium">
-                                                            {doctorNameById[
-                                                                createForm.data
-                                                                    .doctor_id
-                                                            ] ??
-                                                                'Select doctor'}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between gap-3">
-                                                        <span className="text-muted-foreground">
-                                                            Entries
-                                                        </span>
-                                                        <span className="font-medium">
-                                                            {
-                                                                recurringPreviewDates.length
+                                    <div className="min-w-0 space-y-4">
+                                        {createForm.data.schedule_mode ===
+                                        'multiple_dates' ? (
+                                            <div className="space-y-4">
+                                                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                                                    <div className="min-w-0 flex-1 space-y-1.5">
+                                                        <Label htmlFor="draft_date">
+                                                            Add specific date
+                                                        </Label>
+                                                        <Input
+                                                            id="draft_date"
+                                                            type="date"
+                                                            value={draftDate}
+                                                            onChange={(event) =>
+                                                                setDraftDate(
+                                                                    event.target
+                                                                        .value,
+                                                                )
                                                             }
-                                                        </span>
+                                                        />
                                                     </div>
-                                                    <div className="flex justify-between gap-3">
-                                                        <span className="text-muted-foreground">
-                                                            Time
-                                                        </span>
-                                                        <span className="font-medium">
-                                                            {formatTimeRange(
-                                                                createForm.data
-                                                                    .start_time,
-                                                                createForm.data
-                                                                    .end_time,
-                                                            )}
-                                                        </span>
-                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="h-10"
+                                                        onClick={() =>
+                                                            addSpecificDate(
+                                                                draftDate,
+                                                            )
+                                                        }
+                                                    >
+                                                        <CalendarPlus className="mr-2 h-4 w-4" />
+                                                        Add date
+                                                    </Button>
                                                 </div>
-                                                <div className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
-                                                    {recurringPreviewDates
-                                                        .slice(0, 30)
-                                                        .map((date) => (
-                                                            <span
-                                                                key={date}
-                                                                className="rounded-md border bg-background px-2 py-1 text-xs"
+
+                                                <div className="overflow-hidden rounded-lg border">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2">
+                                                        <div>
+                                                            <p className="text-sm font-medium">
+                                                                Specific Dates
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Each selected
+                                                                date keeps its
+                                                                own time in,
+                                                                time out,
+                                                                status, and
+                                                                remarks.
+                                                            </p>
+                                                        </div>
+                                                        {createForm.data
+                                                            .specific_date_entries
+                                                            .length > 0 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    createForm.setData(
+                                                                        'specific_date_entries',
+                                                                        [],
+                                                                    )
+                                                                }
                                                             >
-                                                                {formatDate(
-                                                                    date,
-                                                                )}
-                                                            </span>
-                                                        ))}
-                                                    {recurringPreviewDates.length >
-                                                        30 && (
-                                                        <span className="rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground">
-                                                            +
-                                                            {recurringPreviewDates.length -
-                                                                30}{' '}
-                                                            more
-                                                        </span>
+                                                                Clear all
+                                                            </Button>
+                                                        )}
+                                                    </div>
+
+                                                    {createForm.data
+                                                        .specific_date_entries
+                                                        .length > 0 ? (
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full min-w-[860px] text-sm">
+                                                                <thead className="bg-muted/40 text-left text-xs tracking-wide text-muted-foreground uppercase">
+                                                                    <tr>
+                                                                        <th className="px-3 py-2 font-medium">
+                                                                            Date
+                                                                        </th>
+                                                                        <th className="px-3 py-2 font-medium">
+                                                                            Time
+                                                                            in
+                                                                        </th>
+                                                                        <th className="px-3 py-2 font-medium">
+                                                                            Time
+                                                                            out
+                                                                        </th>
+                                                                        <th className="px-3 py-2 font-medium">
+                                                                            Status
+                                                                        </th>
+                                                                        <th className="px-3 py-2 font-medium">
+                                                                            Remarks
+                                                                        </th>
+                                                                        <th className="px-3 py-2 text-right font-medium">
+                                                                            Remove
+                                                                        </th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y">
+                                                                    {createForm.data.specific_date_entries.map(
+                                                                        (
+                                                                            entry,
+                                                                            index,
+                                                                        ) => (
+                                                                            <tr
+                                                                                key={
+                                                                                    entry.duty_date
+                                                                                }
+                                                                            >
+                                                                                <td className="px-3 py-2 whitespace-nowrap">
+                                                                                    <div className="font-medium">
+                                                                                        {formatDate(
+                                                                                            entry.duty_date,
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="text-xs text-muted-foreground">
+                                                                                        {
+                                                                                            entry.duty_date
+                                                                                        }
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-3 py-2">
+                                                                                    <Input
+                                                                                        type="time"
+                                                                                        value={
+                                                                                            entry.start_time
+                                                                                        }
+                                                                                        className="h-9 w-28"
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            updateSpecificDateEntry(
+                                                                                                index,
+                                                                                                'start_time',
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2">
+                                                                                    <Input
+                                                                                        type="time"
+                                                                                        value={
+                                                                                            entry.end_time
+                                                                                        }
+                                                                                        className="h-9 w-28"
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            updateSpecificDateEntry(
+                                                                                                index,
+                                                                                                'end_time',
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2">
+                                                                                    <select
+                                                                                        value={
+                                                                                            entry.status
+                                                                                        }
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            updateSpecificDateEntry(
+                                                                                                index,
+                                                                                                'status',
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value as DutyStatus,
+                                                                                            )
+                                                                                        }
+                                                                                        className="h-9 w-36 rounded-md border border-input bg-background px-2 text-sm shadow-sm"
+                                                                                    >
+                                                                                        {DUTY_STATUSES.map(
+                                                                                            (
+                                                                                                status,
+                                                                                            ) => (
+                                                                                                <option
+                                                                                                    key={
+                                                                                                        status
+                                                                                                    }
+                                                                                                    value={
+                                                                                                        status
+                                                                                                    }
+                                                                                                >
+                                                                                                    {
+                                                                                                        STATUS_LABELS[
+                                                                                                            status
+                                                                                                        ]
+                                                                                                    }
+                                                                                                </option>
+                                                                                            ),
+                                                                                        )}
+                                                                                    </select>
+                                                                                </td>
+                                                                                <td className="px-3 py-2">
+                                                                                    <Input
+                                                                                        value={
+                                                                                            entry.remarks
+                                                                                        }
+                                                                                        placeholder="Optional"
+                                                                                        className="h-9 min-w-52"
+                                                                                        onChange={(
+                                                                                            event,
+                                                                                        ) =>
+                                                                                            updateSpecificDateEntry(
+                                                                                                index,
+                                                                                                'remarks',
+                                                                                                event
+                                                                                                    .target
+                                                                                                    .value,
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-3 py-2 text-right">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                                                                        onClick={() =>
+                                                                                            removeSpecificDate(
+                                                                                                index,
+                                                                                            )
+                                                                                        }
+                                                                                        aria-label={`Remove ${entry.duty_date}`}
+                                                                                    >
+                                                                                        <X className="h-4 w-4" />
+                                                                                    </Button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        ),
+                                                                    )}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                                            Use the date picker
+                                                            above to add
+                                                            specific duty dates.
+                                                        </div>
                                                     )}
                                                 </div>
+                                                <FieldError
+                                                    message={
+                                                        createForm.errors
+                                                            .specific_date_entries
+                                                    }
+                                                />
                                             </div>
-                                        </div>
-                                    )}
+                                        ) : (
+                                            <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="recurring_start_date">
+                                                            Start date
+                                                        </Label>
+                                                        <Input
+                                                            id="recurring_start_date"
+                                                            type="date"
+                                                            value={
+                                                                createForm.data
+                                                                    .recurring_start_date
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'recurring_start_date',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .recurring_start_date
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="recurring_end_date">
+                                                            End date
+                                                        </Label>
+                                                        <Input
+                                                            id="recurring_end_date"
+                                                            type="date"
+                                                            value={
+                                                                createForm.data
+                                                                    .recurring_end_date
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'recurring_end_date',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .recurring_end_date
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5 sm:col-span-2">
+                                                        <Label>
+                                                            Repeat weekly on
+                                                        </Label>
+                                                        <ToggleGroup
+                                                            type="multiple"
+                                                            value={
+                                                                createForm.data
+                                                                    .recurring_weekdays
+                                                            }
+                                                            onValueChange={(
+                                                                value,
+                                                            ) =>
+                                                                createForm.setData(
+                                                                    'recurring_weekdays',
+                                                                    value as Weekday[],
+                                                                )
+                                                            }
+                                                            className="flex flex-wrap justify-start gap-2"
+                                                        >
+                                                            {WEEKDAYS.map(
+                                                                (weekday) => (
+                                                                    <ToggleGroupItem
+                                                                        key={
+                                                                            weekday
+                                                                        }
+                                                                        value={
+                                                                            weekday
+                                                                        }
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="min-w-12 rounded-md bg-background data-[state=on]:border-slate-900 data-[state=on]:bg-slate-900 data-[state=on]:text-white"
+                                                                    >
+                                                                        {
+                                                                            WEEKDAY_LABELS[
+                                                                                weekday
+                                                                            ]
+                                                                        }
+                                                                    </ToggleGroupItem>
+                                                                ),
+                                                            )}
+                                                        </ToggleGroup>
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .recurring_weekdays
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="start_time">
+                                                            Time in
+                                                        </Label>
+                                                        <Input
+                                                            id="start_time"
+                                                            type="time"
+                                                            value={
+                                                                createForm.data
+                                                                    .start_time
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'start_time',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .start_time
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="end_time">
+                                                            Time out
+                                                        </Label>
+                                                        <Input
+                                                            id="end_time"
+                                                            type="time"
+                                                            value={
+                                                                createForm.data
+                                                                    .end_time
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'end_time',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .end_time
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="status">
+                                                            Status
+                                                        </Label>
+                                                        <select
+                                                            id="status"
+                                                            value={
+                                                                createForm.data
+                                                                    .status
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'status',
+                                                                    event.target
+                                                                        .value as DutyStatus,
+                                                                )
+                                                            }
+                                                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                                        >
+                                                            {DUTY_STATUSES.map(
+                                                                (status) => (
+                                                                    <option
+                                                                        key={
+                                                                            status
+                                                                        }
+                                                                        value={
+                                                                            status
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            STATUS_LABELS[
+                                                                                status
+                                                                            ]
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
+                                                        </select>
+                                                        <FieldError
+                                                            message={
+                                                                createForm
+                                                                    .errors
+                                                                    .status
+                                                            }
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="remarks">
+                                                            Remarks
+                                                        </Label>
+                                                        <textarea
+                                                            id="remarks"
+                                                            value={
+                                                                createForm.data
+                                                                    .remarks
+                                                            }
+                                                            rows={2}
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'remarks',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                                            placeholder="Optional"
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                    <div className="flex flex-wrap gap-2 border-t pt-4">
-                                        <Button
-                                            type="submit"
-                                            disabled={createForm.processing}
-                                            className="bg-slate-900 hover:bg-slate-800"
-                                        >
-                                            <CalendarPlus className="mr-2 h-4 w-4" />
-                                            {createForm.processing
-                                                ? 'Saving...'
-                                                : 'Save Duty Schedule'}
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={resetCreateForm}
-                                        >
-                                            <RefreshCcw className="mr-2 h-4 w-4" />
-                                            Reset
-                                        </Button>
+                                                <div className="rounded-lg border bg-muted/20 p-3">
+                                                    <p className="text-sm font-medium">
+                                                        Recurring Preview
+                                                    </p>
+                                                    <div className="mt-3 space-y-2 text-sm">
+                                                        <div className="flex justify-between gap-3">
+                                                            <span className="text-muted-foreground">
+                                                                Doctor
+                                                            </span>
+                                                            <span className="text-right font-medium">
+                                                                {doctorNameById[
+                                                                    createForm
+                                                                        .data
+                                                                        .doctor_id
+                                                                ] ??
+                                                                    'Select doctor'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between gap-3">
+                                                            <span className="text-muted-foreground">
+                                                                Entries
+                                                            </span>
+                                                            <span className="font-medium">
+                                                                {
+                                                                    recurringPreviewDates.length
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex justify-between gap-3">
+                                                            <span className="text-muted-foreground">
+                                                                Time
+                                                            </span>
+                                                            <span className="font-medium">
+                                                                {formatTimeRange(
+                                                                    createForm
+                                                                        .data
+                                                                        .start_time,
+                                                                    createForm
+                                                                        .data
+                                                                        .end_time,
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+                                                        {recurringPreviewDates
+                                                            .slice(0, 30)
+                                                            .map((date) => (
+                                                                <span
+                                                                    key={date}
+                                                                    className="rounded-md border bg-background px-2 py-1 text-xs"
+                                                                >
+                                                                    {formatDate(
+                                                                        date,
+                                                                    )}
+                                                                </span>
+                                                            ))}
+                                                        {recurringPreviewDates.length >
+                                                            30 && (
+                                                            <span className="rounded-md border bg-background px-2 py-1 text-xs text-muted-foreground">
+                                                                +
+                                                                {recurringPreviewDates.length -
+                                                                    30}{' '}
+                                                                more
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-wrap gap-2 border-t pt-4">
+                                            <Button
+                                                type="submit"
+                                                disabled={createForm.processing}
+                                                className="bg-slate-900 hover:bg-slate-800"
+                                            >
+                                                <CalendarPlus className="mr-2 h-4 w-4" />
+                                                {createForm.processing
+                                                    ? 'Saving...'
+                                                    : 'Save Duty Schedule'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={resetCreateForm}
+                                            >
+                                                <RefreshCcw className="mr-2 h-4 w-4" />
+                                                Reset
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </form>
-                    </section>
-                )}
+                            </form>
+                        </>
+                    ) : (
+                        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-12 text-center">
+                            <CalendarPlus className="mx-auto h-8 w-8 text-muted-foreground/50" />
+                            <p className="mt-3 text-sm font-medium">
+                                Schedule management is unavailable
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Your account can view duty coverage, but cannot
+                                create or edit duty schedules.
+                            </p>
+                        </div>
+                    )}
+                </section>
 
-                <section className="space-y-4 border-b pb-7">
+                <section
+                    hidden={activeTab !== 'calendar_overview'}
+                    className="space-y-4 border-b pb-7"
+                >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h2 className="text-xl font-semibold">
@@ -1891,172 +2014,192 @@ export default function DoctorDutySchedulesIndex({
                     )}
                 </section>
 
-                {can_manage_schedule && selectedSchedule && (
-                    <section
-                        id="edit-duty-schedule"
-                        className="space-y-4 border-b pb-7"
-                    >
-                        <div>
-                            <h2 className="text-xl font-semibold">
-                                Edit Duty Schedule
-                            </h2>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Update the selected duty date, time, status, and
-                                remarks.
-                            </p>
-                        </div>
-
-                        <form
-                            onSubmit={handleEditSubmit}
-                            className="rounded-lg border bg-background p-4 shadow-sm"
+                {can_manage_schedule &&
+                    selectedSchedule &&
+                    activeTab === 'manage_schedules' && (
+                        <section
+                            id="edit-duty-schedule"
+                            className="space-y-4 border-b pb-7"
                         >
-                            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-medium">
-                                        {selectedSchedule.doctor_name ??
-                                            'Doctor'}
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Editing schedule #{selectedSchedule.id}
-                                    </p>
-                                </div>
-                                <StatusBadge status={selectedSchedule.status} />
+                            <div>
+                                <h2 className="text-xl font-semibold">
+                                    Edit Duty Schedule
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Update the selected duty date, time, status,
+                                    and remarks.
+                                </p>
                             </div>
 
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="edit_duty_date">Date</Label>
-                                    <Input
-                                        id="edit_duty_date"
-                                        type="date"
-                                        value={editForm.data.duty_date}
-                                        onChange={(event) =>
-                                            editForm.setData(
-                                                'duty_date',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    <FieldError
-                                        message={editForm.errors.duty_date}
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="edit_start_time">
-                                        Time in
-                                    </Label>
-                                    <Input
-                                        id="edit_start_time"
-                                        type="time"
-                                        value={editForm.data.start_time}
-                                        onChange={(event) =>
-                                            editForm.setData(
-                                                'start_time',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    <FieldError
-                                        message={editForm.errors.start_time}
+                            <form
+                                onSubmit={handleEditSubmit}
+                                className="rounded-lg border bg-background p-4 shadow-sm"
+                            >
+                                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-medium">
+                                            {selectedSchedule.doctor_name ??
+                                                'Doctor'}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Editing schedule #
+                                            {selectedSchedule.id}
+                                        </p>
+                                    </div>
+                                    <StatusBadge
+                                        status={selectedSchedule.status}
                                     />
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="edit_end_time">
-                                        Time out
-                                    </Label>
-                                    <Input
-                                        id="edit_end_time"
-                                        type="time"
-                                        value={editForm.data.end_time}
-                                        onChange={(event) =>
-                                            editForm.setData(
-                                                'end_time',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    <FieldError
-                                        message={editForm.errors.end_time}
-                                    />
+
+                                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="edit_duty_date">
+                                            Date
+                                        </Label>
+                                        <Input
+                                            id="edit_duty_date"
+                                            type="date"
+                                            value={editForm.data.duty_date}
+                                            onChange={(event) =>
+                                                editForm.setData(
+                                                    'duty_date',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <FieldError
+                                            message={editForm.errors.duty_date}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="edit_start_time">
+                                            Time in
+                                        </Label>
+                                        <Input
+                                            id="edit_start_time"
+                                            type="time"
+                                            value={editForm.data.start_time}
+                                            onChange={(event) =>
+                                                editForm.setData(
+                                                    'start_time',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <FieldError
+                                            message={editForm.errors.start_time}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="edit_end_time">
+                                            Time out
+                                        </Label>
+                                        <Input
+                                            id="edit_end_time"
+                                            type="time"
+                                            value={editForm.data.end_time}
+                                            onChange={(event) =>
+                                                editForm.setData(
+                                                    'end_time',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <FieldError
+                                            message={editForm.errors.end_time}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="edit_status">
+                                            Status
+                                        </Label>
+                                        <select
+                                            id="edit_status"
+                                            value={editForm.data.status}
+                                            onChange={(event) =>
+                                                editForm.setData(
+                                                    'status',
+                                                    event.target
+                                                        .value as DutyStatus,
+                                                )
+                                            }
+                                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+                                        >
+                                            {DUTY_STATUSES.map((status) => (
+                                                <option
+                                                    key={status}
+                                                    value={status}
+                                                >
+                                                    {STATUS_LABELS[status]}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <FieldError
+                                            message={editForm.errors.status}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5 md:col-span-2 xl:col-span-4">
+                                        <Label htmlFor="edit_remarks">
+                                            Remarks
+                                        </Label>
+                                        <textarea
+                                            id="edit_remarks"
+                                            value={editForm.data.remarks}
+                                            rows={2}
+                                            onChange={(event) =>
+                                                editForm.setData(
+                                                    'remarks',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                            placeholder="Optional remarks"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="edit_status">Status</Label>
-                                    <select
-                                        id="edit_status"
-                                        value={editForm.data.status}
-                                        onChange={(event) =>
-                                            editForm.setData(
-                                                'status',
-                                                event.target
-                                                    .value as DutyStatus,
-                                            )
-                                        }
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+
+                                <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+                                    <Button
+                                        type="submit"
+                                        disabled={editForm.processing}
+                                        className="bg-slate-900 hover:bg-slate-800"
                                     >
-                                        {DUTY_STATUSES.map((status) => (
-                                            <option key={status} value={status}>
-                                                {STATUS_LABELS[status]}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <FieldError
-                                        message={editForm.errors.status}
-                                    />
-                                </div>
-                                <div className="space-y-1.5 md:col-span-2 xl:col-span-4">
-                                    <Label htmlFor="edit_remarks">
-                                        Remarks
-                                    </Label>
-                                    <textarea
-                                        id="edit_remarks"
-                                        value={editForm.data.remarks}
-                                        rows={2}
-                                        onChange={(event) =>
-                                            editForm.setData(
-                                                'remarks',
-                                                event.target.value,
-                                            )
+                                        <Check className="mr-2 h-4 w-4" />
+                                        {editForm.processing
+                                            ? 'Updating...'
+                                            : 'Update Schedule'}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() =>
+                                            handleDelete(selectedSchedule)
                                         }
-                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                                        placeholder="Optional remarks"
-                                    />
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() =>
+                                            setSelectedSchedule(null)
+                                        }
+                                    >
+                                        Cancel
+                                    </Button>
                                 </div>
-                            </div>
+                            </form>
+                        </section>
+                    )}
 
-                            <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-                                <Button
-                                    type="submit"
-                                    disabled={editForm.processing}
-                                    className="bg-slate-900 hover:bg-slate-800"
-                                >
-                                    <Check className="mr-2 h-4 w-4" />
-                                    {editForm.processing
-                                        ? 'Updating...'
-                                        : 'Update Schedule'}
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() =>
-                                        handleDelete(selectedSchedule)
-                                    }
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => setSelectedSchedule(null)}
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        </form>
-                    </section>
-                )}
-
-                <section className="space-y-4 border-b pb-7">
+                <section
+                    id="records-requests-panel"
+                    role="tabpanel"
+                    aria-labelledby="records-requests-tab"
+                    hidden={activeTab !== 'records_requests'}
+                    className="space-y-4 border-b pb-7"
+                >
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
                         <div>
                             <h2 className="text-xl font-semibold">
@@ -2135,12 +2278,15 @@ export default function DoctorDutySchedulesIndex({
                                                         <button
                                                             type="button"
                                                             className="text-left font-medium hover:text-sky-700"
-                                                            onClick={() =>
+                                                            onClick={() => {
                                                                 selectCalendarDate(
                                                                     schedule.duty_date,
                                                                     schedule.id,
-                                                                )
-                                                            }
+                                                                );
+                                                                setActiveTab(
+                                                                    'calendar_overview',
+                                                                );
+                                                            }}
                                                         >
                                                             {formatDate(
                                                                 schedule.duty_date,
@@ -2230,7 +2376,10 @@ export default function DoctorDutySchedulesIndex({
                     )}
                 </section>
 
-                <section className="space-y-4">
+                <section
+                    hidden={activeTab !== 'records_requests'}
+                    className="space-y-4"
+                >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h2 className="text-xl font-semibold">
