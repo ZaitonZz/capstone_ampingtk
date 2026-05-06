@@ -22,7 +22,7 @@ class StoreConsultationRequest extends FormRequest
             'doctor_id' => ['required', Rule::exists('users', 'id')->where('role', 'doctor')],
             'type' => ['required', 'in:teleconsultation'],
             'status' => ['sometimes', Rule::in(Consultation::STATUSES)],
-            'chief_complaint' => ['nullable', 'string'],
+            'chief_complaint' => ['required', 'string', 'min:1'],
             'scheduled_at' => ['required', 'date'],
             'cancellation_reason' => ['nullable', 'string'],
         ];
