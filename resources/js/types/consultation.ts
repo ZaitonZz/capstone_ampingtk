@@ -153,7 +153,7 @@ export interface Consultation {
     duration_minutes: number | null;
     patient?: PatientSummary;
     doctor?: DoctorSummary;
-    note?: PatientNote;
+    note?: PatientNote | null;
     prescriptions?: Prescription[];
     microchecks?: ConsultationMicrocheck[];
     deepfake_scan_logs?: DeepfakeScanLog[];
