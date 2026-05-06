@@ -286,6 +286,7 @@ export default function OtpVerification({ maskedEmail, expiresIn: initialExpires
             {/* Email Display */}
             <div className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-400">
                 <p>Verification code sent to: <span className="font-semibold">{maskedEmail}</span></p>
+                <p className="mt-1">Please check your email.</p>
             </div>
 
             {/* OTP Form */}

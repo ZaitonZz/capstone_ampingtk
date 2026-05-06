@@ -10,7 +10,7 @@ it('redirects guests to login', function () {
     $this->get(route('consultations.index'))->assertRedirect(route('login'));
 });
 
-it('renders all assigned consultations on the index for a doctor', function () {
+it('renders only doctor-visible consultations on the index for a doctor', function () {
     $doctor = User::factory()->doctor()->create();
     Consultation::factory()->create([
         'doctor_id' => $doctor->id,
@@ -34,8 +34,40 @@ it('renders all assigned consultations on the index for a doctor', function () {
         ->assertInertia(
             fn ($page) => $page
                 ->component('consultations/index')
-                ->has('consultations.data', 3)
+                ->has('consultations.data', 2)
         );
+});
+
+it('hides pending consultations from doctor index until medical staff approves', function () {
+    $doctor = User::factory()->doctor()->create();
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => Consultation::STATUS_PENDING,
+        'scheduled_at' => now()->addDay()->setHour(10)->setMinute(0)->setSecond(0),
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctor->id,
+        'duty_date' => $consultation->scheduled_at->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '17:00',
+        'status' => 'on_duty',
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 0));
+
+    $this->actingAs($medicalStaff)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect();
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 1));
 });
 
 it('filters consultations by patient_id', function () {
@@ -149,7 +181,7 @@ it('redirects consultation start directly to the lobby when consent is complete'
         ->assertRedirect(route('consultations.lobby.show', $consultation));
 });
 
-it('creates an in-person consultation and redirects', function () {
+it('creates an in-person consultation as pending and keeps it hidden from doctor until approval', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
     $patient = Patient::factory()->create(['registered_by' => $medicalStaff->id]);
@@ -173,7 +205,18 @@ it('creates an in-person consultation and redirects', function () {
         ])
         ->assertRedirect();
 
-    expect(Consultation::where('type', 'in_person')->where('patient_id', $patient->id)->exists())->toBeTrue();
+    $consultation = Consultation::query()
+        ->where('type', 'in_person')
+        ->where('patient_id', $patient->id)
+        ->first();
+
+    expect($consultation)->not->toBeNull();
+    expect($consultation->status)->toBe(Consultation::STATUS_PENDING);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('consultations.data', 0));
 });
 
 it('creates a teleconsultation and generates a session_token', function () {

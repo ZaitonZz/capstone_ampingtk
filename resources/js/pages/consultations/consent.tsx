@@ -1,5 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
+import { CheckCircle2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
@@ -298,115 +299,153 @@ export default function ConsultationConsentPage({
                                     onSubmit={handleSubmit}
                                     className="space-y-5"
                                 >
-                                    {/* Checkbox 1 */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-start gap-2.5">
-                                            <Checkbox
-                                                id="read_privacy_notice"
-                                                checked={
-                                                    data.read_privacy_notice
-                                                }
-                                                onCheckedChange={(checked) =>
-                                                    setData(
-                                                        'read_privacy_notice',
-                                                        checked === true,
-                                                    )
-                                                }
-                                            />
-                                            <Label
-                                                htmlFor="read_privacy_notice"
-                                                className="cursor-pointer text-sm leading-snug"
-                                            >
-                                                I have read and understood the
-                                                Privacy Notice.
-                                            </Label>
+                                    {/* Data Privacy Checklist - Highlighted Section */}
+                                    <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-5 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/30">
+                                        <div className="mb-5 flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                                                <ShieldCheck className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-base font-semibold text-emerald-950 dark:text-emerald-100">
+                                                    Data Privacy Checklist
+                                                </h3>
+                                                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                                                    Please confirm all items to proceed
+                                                </p>
+                                            </div>
                                         </div>
-                                        {errors.read_privacy_notice && (
-                                            <p className="pl-7 text-xs text-destructive">
-                                                {errors.read_privacy_notice}
-                                            </p>
-                                        )}
+
+                                        <div className="space-y-3">
+                                            {/* Checkbox 1 */}
+                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.read_privacy_notice ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-shrink-0">
+                                                        <Checkbox
+                                                            id="read_privacy_notice"
+                                                            checked={
+                                                                data.read_privacy_notice
+                                                            }
+                                                            onCheckedChange={(checked) =>
+                                                                setData(
+                                                                    'read_privacy_notice',
+                                                                    checked === true,
+                                                                )
+                                                            }
+                                                            className="h-5 w-5 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <Label
+                                                        htmlFor="read_privacy_notice"
+                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                    >
+                                                        I have read and understood the
+                                                        Privacy Notice.
+                                                    </Label>
+                                                </div>
+                                                {errors.read_privacy_notice && (
+                                                    <p className="pl-8 text-xs text-destructive">
+                                                        {errors.read_privacy_notice}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Checkbox 2 */}
+                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_identity_guard ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-shrink-0">
+                                                        <Checkbox
+                                                            id="agree_identity_guard"
+                                                            checked={
+                                                                data.agree_identity_guard
+                                                            }
+                                                            onCheckedChange={(checked) =>
+                                                                setData(
+                                                                    'agree_identity_guard',
+                                                                    Boolean(checked),
+                                                                )
+                                                            }
+                                                            className="h-5 w-5 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <Label
+                                                        htmlFor="agree_identity_guard"
+                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                    >
+                                                        I agree to Identity Guard
+                                                        verification checks during the
+                                                        consultation.
+                                                    </Label>
+                                                </div>
+                                                {errors.agree_identity_guard && (
+                                                    <p className="pl-8 text-xs text-destructive">
+                                                        {errors.agree_identity_guard}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Checkbox 3 */}
+                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_liveness_check ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-shrink-0">
+                                                        <Checkbox
+                                                            id="agree_liveness_check"
+                                                            checked={
+                                                                data.agree_liveness_check
+                                                            }
+                                                            onCheckedChange={(checked) =>
+                                                                setData(
+                                                                    'agree_liveness_check',
+                                                                    Boolean(checked),
+                                                                )
+                                                            }
+                                                            className="h-5 w-5 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                    <Label
+                                                        htmlFor="agree_liveness_check"
+                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                    >
+                                                        I consent to liveness/security
+                                                        checks (if applicable).
+                                                    </Label>
+                                                </div>
+                                                {errors.agree_liveness_check && (
+                                                    <p className="pl-8 text-xs text-destructive">
+                                                        {errors.agree_liveness_check}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Progress Indicator */}
+                                        <div className="mt-4 flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs dark:bg-white/10">
+                                            <CheckCircle2 className={`h-4 w-4 ${allChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
+                                            <span className={`font-medium ${allChecked ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
+                                                {allChecked ? 'All items confirmed ✓' : 'Confirm all items above'}
+                                            </span>
+                                        </div>
                                     </div>
 
-                                    {/* Checkbox 2 */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-start gap-2.5">
-                                            <Checkbox
-                                                id="agree_identity_guard"
-                                                checked={
-                                                    data.agree_identity_guard
-                                                }
-                                                onCheckedChange={(checked) =>
-                                                    setData(
-                                                        'agree_identity_guard',
-                                                        Boolean(checked),
-                                                    )
-                                                }
-                                            />
-                                            <Label
-                                                htmlFor="agree_identity_guard"
-                                                className="cursor-pointer text-sm leading-snug"
-                                            >
-                                                I agree to Identity Guard
-                                                verification checks during the
-                                                consultation.
-                                            </Label>
-                                        </div>
-                                        {errors.agree_identity_guard && (
-                                            <p className="pl-7 text-xs text-destructive">
-                                                {errors.agree_identity_guard}
-                                            </p>
-                                        )}
+                                    <div className="space-y-2">
+                                        <Button
+                                            type="submit"
+                                            className="w-full"
+                                            disabled={!allChecked || processing}
+                                        >
+                                            {processing
+                                                ? 'Confirming…'
+                                                : 'Agree & Confirm'}
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full"
+                                            disabled
+                                        >
+                                            Download Copy
+                                        </Button>
                                     </div>
-
-                                    {/* Checkbox 3 */}
-                                    <div className="space-y-1">
-                                        <div className="flex items-start gap-2.5">
-                                            <Checkbox
-                                                id="agree_liveness_check"
-                                                checked={
-                                                    data.agree_liveness_check
-                                                }
-                                                onCheckedChange={(checked) =>
-                                                    setData(
-                                                        'agree_liveness_check',
-                                                        Boolean(checked),
-                                                    )
-                                                }
-                                            />
-                                            <Label
-                                                htmlFor="agree_liveness_check"
-                                                className="cursor-pointer text-sm leading-snug"
-                                            >
-                                                I consent to liveness/security
-                                                checks (if applicable).
-                                            </Label>
-                                        </div>
-                                        {errors.agree_liveness_check && (
-                                            <p className="pl-7 text-xs text-destructive">
-                                                {errors.agree_liveness_check}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <Button
-                                        type="submit"
-                                        className="w-full"
-                                        disabled={!allChecked || processing}
-                                    >
-                                        {processing
-                                            ? 'Confirming…'
-                                            : 'Agree & Confirm'}
-                                    </Button>
-
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="w-full"
-                                        disabled
-                                    >
-                                        Download Copy
-                                    </Button>
 
                                     <div className="rounded-lg bg-muted px-4 py-3 text-xs text-muted-foreground">
                                         Consent is required before proceeding to
