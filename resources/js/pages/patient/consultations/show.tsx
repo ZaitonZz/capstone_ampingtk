@@ -7,7 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-import type { Consultation, ConsultationStatus } from '@/types/consultation';
+import type {
+    Consultation,
+    ConsultationStatus,
+    ConsultationType,
+} from '@/types/consultation';
 
 const STATUS_LABELS: Record<ConsultationStatus, string> = {
     pending: 'Pending',
@@ -17,6 +21,11 @@ const STATUS_LABELS: Record<ConsultationStatus, string> = {
     completed: 'Completed',
     cancelled: 'Cancelled',
     no_show: 'No Show',
+};
+
+const TYPE_LABELS: Record<ConsultationType, string> = {
+    in_person: 'In-Person',
+    teleconsultation: 'Teleconsultation',
 };
 
 const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
@@ -107,7 +116,10 @@ export default function PatientConsultationShow({ consultation }: Props) {
 
                 {/* Details card */}
                 <div className="grid grid-cols-2 gap-5 rounded-xl border p-5 md:grid-cols-3">
-                    <Field label="Type" value={'Teleconsultation'} />
+                    <Field
+                        label="Type"
+                        value={TYPE_LABELS[consultation.type]}
+                    />
                     <Field
                         label="Scheduled"
                         value={
