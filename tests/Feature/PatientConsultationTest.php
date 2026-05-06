@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\ConsultationConsent;
 use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\User;
@@ -34,6 +35,43 @@ it('allows a patient to view a specific consultation', function () {
             fn ($page) => $page
                 ->component('patient/consultations/show')
                 ->where('consultation.id', $consultation->id)
+        );
+});
+
+it('returns consent_completed as false when patient has not confirmed consent', function () {
+    $user = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $user->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
+
+    $this->actingAsVerified($user)
+        ->get(route('patient.consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('patient/consultations/show')
+                ->where('consent_completed', false)
+        );
+});
+
+it('returns consent_completed as true when patient has confirmed consent', function () {
+    $user = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $user->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $user->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAsVerified($user)
+        ->get(route('patient.consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('patient/consultations/show')
+                ->where('consent_completed', true)
         );
 });
 
@@ -125,7 +163,7 @@ it('returns only on-duty doctors for patient schedule selection', function () {
         ->assertJsonCount(1, 'doctors');
 });
 
-it('rejects patient appointment request when preferred doctor is off duty', function () {
+it('accepts patient appointment request when preferred doctor is off duty', function () {
     $user = User::factory()->patient()->create();
     $patient = Patient::factory()->create(['user_id' => $user->id]);
     $doctor = User::factory()->doctor()->create();
@@ -146,7 +184,11 @@ it('rejects patient appointment request when preferred doctor is off duty', func
             'chief_complaint' => 'Routine check-up',
             'scheduled_at' => $scheduledAt->toDateTimeString(),
         ])
-        ->assertSessionHasErrors('doctor_id');
+        ->assertRedirect();
 
-    expect(Consultation::where('patient_id', $patient->id)->exists())->toBeFalse();
+    $consultation = Consultation::where('patient_id', $patient->id)->latest('id')->first();
+
+    expect($consultation)->not->toBeNull();
+    expect($consultation->doctor_id)->toBe($doctor->id);
+    expect($consultation->status)->toBe(Consultation::STATUS_PENDING);
 });

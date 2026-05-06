@@ -42,6 +42,8 @@ class PatientConsultationController extends Controller
     {
         $this->authorize('view', $consultation);
 
+        $user = request()->user();
+
         $consultation->load([
             'patient',
             'doctor' => fn ($q) => $q->select('id', 'name')
@@ -52,6 +54,7 @@ class PatientConsultationController extends Controller
 
         return Inertia::render('patient/consultations/show', [
             'consultation' => $consultation,
+            'consent_completed' => ! $consultation->requiresConsentForUser($user),
         ]);
     }
 

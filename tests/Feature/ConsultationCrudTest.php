@@ -103,9 +103,10 @@ it('approves a pending consultation and transitions it to scheduled', function (
         'duty_date' => $scheduledAt->toDateString(),
         'start_time' => '08:00',
         'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
-    $response = $this->actingAs($medicalStaff)
+    $response = $this->actingAsVerified($medicalStaff)
         ->patch(route('consultations.approve', $consultation));
 
     $response->assertRedirect();
@@ -285,6 +286,22 @@ it('handles race condition when two approvals happen simultaneously', function (
         ->assertStatus(422);
 
     expect($consultation->fresh()->status)->toBe('scheduled');
+});
+
+it('cannot approve a pending consultation when assigned doctor is off duty', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->patch(route('consultations.approve', $consultation))
+        ->assertRedirect(route('consultations.show', $consultation))
+        ->assertSessionHas('error');
+
+    expect($consultation->fresh()->status)->toBe(Consultation::STATUS_PENDING);
 });
 
 it('flagged participant can verify OTP and resume a paused consultation', function () {
@@ -593,6 +610,7 @@ it('patient can submit an appointment request which creates a pending consultati
         'duty_date' => $scheduledAt->toDateString(),
         'start_time' => '08:00',
         'end_time' => '17:00',
+        'status' => 'on_duty',
     ]);
 
     $this->actingAsVerified($user)

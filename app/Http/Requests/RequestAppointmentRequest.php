@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests;
 
-use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class RequestAppointmentRequest extends FormRequest
 {
@@ -22,25 +20,6 @@ class RequestAppointmentRequest extends FormRequest
             'chief_complaint' => ['required', 'string', 'max:1000'],
             'scheduled_at' => ['required', 'date', 'after:now'],
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator): void {
-            if ($validator->errors()->isNotEmpty()) {
-                return;
-            }
-
-            $doctorId = (int) $this->input('doctor_id');
-            $scheduledAt = (string) $this->input('scheduled_at');
-
-            $availabilityService = app(DoctorDutyAvailabilityService::class);
-
-            // For patient requests, require exact time availability
-            if (! $availabilityService->isDoctorAvailableAt($doctorId, $scheduledAt)) {
-                $validator->errors()->add('doctor_id', 'Selected doctor is not on duty for the specified appointment schedule.');
-            }
-        });
     }
 
     public function messages(): array

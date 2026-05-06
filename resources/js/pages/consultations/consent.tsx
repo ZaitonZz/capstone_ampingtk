@@ -268,16 +268,16 @@ export default function ConsultationConsentPage({
 
                                     {consultation.type ===
                                         'teleconsultation' && (
-                                        <Button className="w-full" asChild>
-                                            <a
-                                                href={ConsultationLobbyController.show.url(
-                                                    consultation.id,
-                                                )}
-                                            >
-                                                Go to Lobby →
-                                            </a>
-                                        </Button>
-                                    )}
+                                            <Button className="w-full" asChild>
+                                                <a
+                                                    href={ConsultationLobbyController.show.url(
+                                                        consultation.id,
+                                                    )}
+                                                >
+                                                    Go to Lobby →
+                                                </a>
+                                            </Button>
+                                        )}
 
                                     <Button
                                         variant="outline"
