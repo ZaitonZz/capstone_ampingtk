@@ -106,10 +106,7 @@ it('approves a pending consultation and transitions it to scheduled', function (
         'status' => 'on_duty',
     ]);
 
-    $this->actingAsVerified($medicalStaff)
-        ->patch(route('consultations.approve', $consultation))
-        ->assertRedirect();
-   $response = $this->actingAsVerified($medicalStaff)
+    $response = $this->actingAsVerified($medicalStaff)
         ->patch(route('consultations.approve', $consultation));
 
     $response->assertRedirect();
