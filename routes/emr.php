@@ -40,12 +40,13 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     Route::patch('consultations/{consultation}/cancel', [ConsultationController::class, 'cancel'])->name('consultations.cancel');
     Route::resource('consultations', ConsultationController::class);
 
-    Route::get('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'index'])->name('doctor-duty-schedules.index');
-    Route::post('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'store'])->name('doctor-duty-schedules.store');
-    Route::patch('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'update'])->name('doctor-duty-schedules.update');
-    Route::delete('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'destroy'])->name('doctor-duty-schedules.destroy');
-    Route::post('doctor-duty-requests', [DoctorDutyRequestController::class, 'store'])->name('doctor-duty-requests.store');
-    Route::patch('doctor-duty-requests/{doctorDutyRequest}/review', [DoctorDutyRequestController::class, 'review'])->name('doctor-duty-requests.review');
+    Route::middleware('schedule.management')->group(function () {
+        Route::get('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'index'])->name('doctor-duty-schedules.index');
+        Route::post('doctor-duty-schedules', [DoctorDutyScheduleController::class, 'store'])->name('doctor-duty-schedules.store');
+        Route::patch('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'update'])->name('doctor-duty-schedules.update');
+        Route::delete('doctor-duty-schedules/{doctorDutySchedule}', [DoctorDutyScheduleController::class, 'destroy'])->name('doctor-duty-schedules.destroy');
+        Route::patch('doctor-duty-requests/{doctorDutyRequest}/review', [DoctorDutyRequestController::class, 'review'])->name('doctor-duty-requests.review');
+    });
 
     Route::prefix('consultations/{consultation}')->name('consultations.')->scopeBindings()->group(function () {
         Route::middleware('doctor.or.admin')->group(function () {

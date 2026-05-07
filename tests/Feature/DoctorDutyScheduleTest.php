@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\DoctorDutySchedule;
+use App\Models\DoctorDutyRequest;
 use App\Models\User;
 
 it('allows medical staff to create, update, and delete doctor duty schedules', function () {
@@ -276,9 +277,13 @@ it('rejects overlapping duty schedules for the same doctor and date', function (
         ->assertSessionHasErrors('specific_date_entries');
 });
 
-it('allows doctors to view duty calendar but not manage schedules', function () {
+it('allows doctors to view their own duty calendar but not the staff scheduler', function () {
     $doctor = User::factory()->doctor()->create();
     $otherDoctor = User::factory()->doctor()->create();
+    DoctorDutyRequest::factory()->create([
+        'doctor_id' => $doctor->id,
+        'status' => 'pending',
+    ]);
 
     DoctorDutySchedule::factory()->create([
         'doctor_id' => $doctor->id,
@@ -291,22 +296,35 @@ it('allows doctors to view duty calendar but not manage schedules', function () 
     ]);
 
     $this->actingAs($doctor)
-        ->get(route('doctor-duty-schedules.index'))
+        ->get(route('doctor-duty-calendar.index'))
         ->assertOk()
         ->assertInertia(
             fn ($page) => $page
-                ->component('doctor-duty-schedules/index')
-                ->where('can_manage_schedule', false)
+                ->component('doctor-duty-calendar/index')
                 ->has('schedules', 1)
+                ->has('duty_requests', 1)
+                ->where('schedules.0.doctor_id', $doctor->id)
+                ->where('duty_requests.0.doctor_id', $doctor->id)
         );
 
     $this->actingAs($doctor)
-        ->post(route('doctor-duty-schedules.store'), [
-            'doctor_id' => $doctor->id,
-            'duty_date' => now()->addDay()->toDateString(),
-            'start_time' => '08:00',
-            'end_time' => '12:00',
-            'status' => 'on_duty',
+        ->get(route('doctor-duty-schedules.index'))
+        ->assertForbidden();
+
+    $this->actingAs($doctor)
+        ->post(route('doctor-duty-requests.store'), [
+            'request_type' => 'on_leave',
+            'start_date' => now()->addDays(2)->toDateString(),
+            'end_date' => now()->addDays(3)->toDateString(),
+            'remarks' => 'Conference',
         ])
+        ->assertRedirect();
+});
+
+it('prevents staff members from entering the doctor duty calendar', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+
+    $this->actingAs($medicalStaff)
+        ->get(route('doctor-duty-calendar.index'))
         ->assertForbidden();
 });

@@ -14,6 +14,8 @@ use App\Http\Controllers\ConsultationLiveKitController;
 use App\Http\Controllers\ConsultationLiveKitWebhookController;
 use App\Http\Controllers\ConsultationLobbyController;
 use App\Http\Controllers\ConsultationSessionController;
+use App\Http\Controllers\DoctorDutyCalendarController;
+use App\Http\Controllers\DoctorDutyRequestController;
 use App\Http\Controllers\OtpVerificationController;
 use App\Http\Controllers\PatientConsultationController;
 use App\Http\Controllers\PipelineDoctorFaceEmbeddingController;
@@ -113,6 +115,12 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
         Route::get('doctor/dashboard', function () {
             return inertia('dashboard');
         })->name('doctor.dashboard');
+
+        Route::get('doctor-duty-calendar', [DoctorDutyCalendarController::class, 'index'])
+            ->name('doctor-duty-calendar.index');
+
+        Route::post('doctor-duty-requests', [DoctorDutyRequestController::class, 'store'])
+            ->name('doctor-duty-requests.store');
     });
 
     // Patient-specific dashboard

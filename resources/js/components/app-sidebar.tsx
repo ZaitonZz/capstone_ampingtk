@@ -57,10 +57,10 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
-    const isMedicalStaff =
-        user.role === 'doctor' ||
-        user.role === 'admin' ||
-        user.role === 'medicalstaff';
+    const isDoctor = user.role === 'doctor';
+    const isScheduleManager =
+        user.role === 'admin' || user.role === 'medicalstaff';
+    const isClinicalStaff = isDoctor || isScheduleManager;
     const isAdmin = user.role === 'admin';
     let dashboardHref = dashboard();
 
@@ -82,21 +82,32 @@ export function AppSidebar() {
         },
     ];
 
-    if (isMedicalStaff) {
+    if (isClinicalStaff) {
         mainNavItems.push({
             title: 'Patient List',
             href: patientsList(),
             icon: ClipboardList,
         });
         mainNavItems.push({
-            title: 'Doctor Duty Calendar',
-            href: '/doctor-duty-schedules',
-            icon: CalendarDays,
-        });
-        mainNavItems.push({
             title: 'Consultations',
             href: consultations(),
             icon: ContactRound,
+        });
+    }
+
+    if (isDoctor) {
+        mainNavItems.push({
+            title: 'Duty Calendar',
+            href: '/doctor-duty-calendar',
+            icon: CalendarDays,
+        });
+    }
+
+    if (isScheduleManager) {
+        mainNavItems.push({
+            title: 'Doctor Duty Calendar',
+            href: '/doctor-duty-schedules',
+            icon: CalendarDays,
         });
     }
 
