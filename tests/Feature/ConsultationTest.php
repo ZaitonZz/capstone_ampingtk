@@ -156,6 +156,38 @@ it('shows consent as completed on the consultation details page when confirmed',
         );
 });
 
+it('updates medical staff consultation details from the patient consent status', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $patientUser->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consent_completed', false)
+        );
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consent_completed', true)
+        );
+});
+
 it('redirects consultation start to consent when consent is incomplete', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);

@@ -1,6 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
 import { ShieldCheck, Video } from 'lucide-react';
-import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
@@ -104,18 +103,6 @@ export default function PatientConsultationShow({
                                 ? 'Consent Completed'
                                 : 'Consent Pending'}
                         </Badge>
-                        {!consent_completed && (
-                            <Button size="sm" variant="outline" asChild>
-                                <Link
-                                    href={ConsultationConsentController.show.url(
-                                        consultation.id,
-                                    )}
-                                >
-                                    <ShieldCheck className="mr-1 h-4 w-4" />
-                                    Complete Consent
-                                </Link>
-                            </Button>
-                        )}
                         {consultation.type === 'teleconsultation' && (
                             <Button size="sm" asChild>
                                 <Link

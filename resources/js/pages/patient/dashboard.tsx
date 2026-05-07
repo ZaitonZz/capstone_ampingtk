@@ -191,7 +191,12 @@ export default function PatientDashboardPage() {
                     </div>
                 </DashboardCard>
 
-                <NotificationList items={notifications} />
+                <NotificationList
+                    items={notifications.map((message, index) => ({
+                        id: index,
+                        message,
+                    }))}
+                />
             </div>
         </PatientWorkspaceLayout>
     );
