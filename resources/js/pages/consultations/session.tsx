@@ -13,7 +13,6 @@ import {
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
@@ -380,9 +379,9 @@ export default function ConsultationSessionPage({
         },
     ];
 
-    function clearStoredSession(): void {
+    const clearStoredSession = useCallback((): void => {
         window.sessionStorage.removeItem(storageKey);
-    }
+    }, [storageKey]);
 
     const redirectToLobby = useCallback(
         (url?: string): void => {
@@ -440,12 +439,12 @@ export default function ConsultationSessionPage({
         } catch {
             redirectToLobby(fallbackUrl);
         }
-    }, [consultation.id, redirectToLobby]);
+    }, [clearStoredSession, consultation.id, redirectToLobby]);
 
     const goBackToLobby = useCallback((): void => {
         clearStoredSession();
         redirectToLobby();
-    }, [redirectToLobby]);
+    }, [clearStoredSession, redirectToLobby]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
