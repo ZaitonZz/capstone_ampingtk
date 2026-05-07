@@ -37,7 +37,7 @@ class DoctorDutyCalendarController extends Controller
             ->map(fn (DoctorDutySchedule $schedule): array => [
                 'id' => $schedule->id,
                 'doctor_id' => $schedule->doctor_id,
-                'duty_date' => $schedule->duty_date?->toDateString(),
+                'date' => $schedule->duty_date?->toDateString(),
                 'start_time' => substr((string) $schedule->start_time, 0, 5),
                 'end_time' => substr((string) $schedule->end_time, 0, 5),
                 'status' => $schedule->status,

@@ -25,6 +25,7 @@ function RequestTypeBadge({ type }: { type: string }) {
 type DutySchedule = {
     id: number;
     date: string;
+    duty_date?: string | null;
     start_time: string;
     end_time: string;
     status: string;
@@ -123,7 +124,13 @@ export default function DoctorDutyCalendarIndex(props: {
     const schedulesByDate = useMemo(() => {
         const map: Record<string, DutySchedule[]> = {};
         schedules.forEach((s) => {
-            (map[s.date] ||= []).push(s);
+            const scheduleDate = s.date ?? s.duty_date;
+
+            if (!scheduleDate) {
+                return;
+            }
+
+            (map[scheduleDate] ||= []).push(s);
         });
         return map;
     }, [schedules]);
@@ -254,10 +261,14 @@ export default function DoctorDutyCalendarIndex(props: {
                                         const isToday = key === dateKey(new Date());
 
                                         return (
-                                            <button key={key} type="button" className={`min-h-36 border-r border-b p-2 text-left transition hover:bg-muted/40 ${isCurrentMonth ? 'bg-background text-foreground' : 'bg-muted/20 text-muted-foreground'} ${isSelected ? 'ring-2 ring-sky-500 ring-inset' : ''}`} onClick={() => setSelectedDate(key)}>
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                className={`min-h-36 border-r border-b p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${daySchedules.length > 0 ? 'bg-sky-50/60 hover:bg-sky-50/80' : 'bg-background hover:bg-muted/40'} ${isCurrentMonth ? 'text-foreground' : 'bg-muted/20 text-muted-foreground'} ${isSelected ? 'ring-2 ring-sky-500 ring-inset' : ''}`}
+                                                onClick={() => setSelectedDate(key)}
+                                            >
                                                 <div className="flex items-center justify-between gap-2">
                                                     <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-medium ${isToday ? 'bg-slate-900 text-white' : ''}`}>{date.getDate()}</span>
-                                                    {daySchedules.length > 0 && <span className="text-[11px] font-medium text-sky-700">{daySchedules.length} duty</span>}
                                                 </div>
 
                                                 <div className="mt-2 space-y-1.5">
