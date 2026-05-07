@@ -1,10 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
 import { ShieldCheck, Video } from 'lucide-react';
+import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -94,9 +96,11 @@ export default function PatientConsultationShow({
                         </Badge>
                         <Badge
                             variant="outline"
-                            className={consent_completed
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-amber-200 bg-amber-50 text-amber-700'}
+                            className={
+                                consent_completed
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                            }
                         >
                             <ShieldCheck className="mr-1 h-4 w-4" />
                             {consent_completed
@@ -106,7 +110,7 @@ export default function PatientConsultationShow({
                         {!consent_completed && (
                             <Button size="sm" variant="outline" asChild>
                                 <Link
-                                    href={PatientConsultationController.consent.url(
+                                    href={ConsultationConsentController.show.url(
                                         consultation.id,
                                     )}
                                 >
@@ -140,9 +144,9 @@ export default function PatientConsultationShow({
                         label="Scheduled"
                         value={
                             consultation.scheduled_at
-                                ? new Date(
+                                ? formatClinicDateTime(
                                       consultation.scheduled_at,
-                                  ).toLocaleString()
+                                  )
                                 : null
                         }
                     />
@@ -150,9 +154,7 @@ export default function PatientConsultationShow({
                         label="Started"
                         value={
                             consultation.started_at
-                                ? new Date(
-                                      consultation.started_at,
-                                  ).toLocaleString()
+                                ? formatClinicDateTime(consultation.started_at)
                                 : null
                         }
                     />
@@ -160,9 +162,7 @@ export default function PatientConsultationShow({
                         label="Ended"
                         value={
                             consultation.ended_at
-                                ? new Date(
-                                      consultation.ended_at,
-                                  ).toLocaleString()
+                                ? formatClinicDateTime(consultation.ended_at)
                                 : null
                         }
                     />

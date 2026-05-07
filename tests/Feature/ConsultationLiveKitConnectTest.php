@@ -98,6 +98,37 @@ it('returns connect credentials for a consenting consultation patient', function
         ]);
 });
 
+it('does not cancel a consultation on leave when no LiveKit room has been provisioned', function () {
+    config()->set('services.livekit.enabled', false);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => Consultation::STATUS_SCHEDULED,
+        'livekit_room_name' => null,
+        'ended_at' => null,
+        'cancellation_reason' => null,
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => Consultation::STATUS_SCHEDULED,
+            'cancelled' => false,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe(Consultation::STATUS_SCHEDULED);
+    expect($consultation->ended_at)->toBeNull();
+    expect($consultation->cancellation_reason)->toBeNull();
+    expect($consultation->livekit_room_name)->toBeNull();
+
+    Http::assertNothingSent();
+});
+
 it('allows admin audit connect without explicit consent', function () {
     $doctor = User::factory()->doctor()->create();
     $admin = User::factory()->admin()->create();
@@ -318,7 +349,7 @@ it('cancels the consultation when the last doctor or patient leaves', function (
         'https://livekit.test/twirp/livekit.RoomService/ListParticipants' => Http::response([
             'participants' => [
                 ['identity' => 'pipeline-bot-202'],
-                ['identity' => 'user-9999', 'metadata' => json_encode(['role' => 'admin'])],
+                ['identity' => 'user-9999', 'metadata' => json_encode(['role' => 'admin', 'audit_mode' => true])],
             ],
         ], 200),
         'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
@@ -338,39 +369,87 @@ it('cancels the consultation when the last doctor or patient leaves', function (
     expect($freshConsultation->status)->toBe('cancelled');
     expect($freshConsultation->livekit_room_status)->toBe('ended');
     expect($freshConsultation->ended_at)->not->toBeNull();
-    expect($freshConsultation->cancellation_reason)->toBe('Consultation cancelled because the last participant left the call.');
+    expect($freshConsultation->cancellation_reason)->toBe('Consultation cancelled because all participants left the LiveKit room.');
 });
 
-it('does not cancel a consultation when no LiveKit room has been provisioned', function () {
+it('returns accepted and records the LiveKit error when participant removal fails on leave', function () {
     $doctor = User::factory()->doctor()->create();
-
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
         'status' => 'ongoing',
-        'livekit_room_name' => null,
-        'livekit_room_status' => 'not_started',
+        'livekit_room_name' => 'consultation-206-remove-fails',
+        'livekit_room_status' => 'room_ready',
     ]);
 
     Http::fake([
-        'https://livekit.test/twirp/livekit.RoomService/*' => Http::response([], 200),
+        'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([
+            'code' => 'internal',
+            'msg' => 'temporary LiveKit failure',
+        ], 500),
+        'https://livekit.test/twirp/livekit.RoomService/ListParticipants' => Http::response([], 200),
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
     ]);
 
     $this->actingAs($doctor)
         ->postJson(route('consultations.livekit.leave', $consultation))
-        ->assertOk()
+        ->assertAccepted()
         ->assertJson([
+            'message' => 'Participant leave was accepted, but LiveKit removal could not be confirmed.',
             'status' => 'ongoing',
             'cancelled' => false,
             'redirect_url' => route('consultations.lobby.show', $consultation),
         ]);
 
-    Http::assertNothingSent();
+    Http::assertNotSent(fn ($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/ListParticipants');
 
     $freshConsultation = $consultation->fresh();
 
     expect($freshConsultation->status)->toBe('ongoing');
-    expect($freshConsultation->ended_at)->toBeNull();
-    expect($freshConsultation->cancellation_reason)->toBeNull();
+    expect(str_contains((string) $freshConsultation->livekit_last_error, 'LiveKit participant removal failed'))->toBeTrue();
+});
+
+it('still cancels the consultation when LiveKit room deletion fails after the last participant leaves', function () {
+    config()->set('services.livekit.url', 'https://livekit-delete-fails.test');
+
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'status' => 'ongoing',
+        'livekit_room_name' => 'consultation-207-delete-fails',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    Http::fake([
+        'https://livekit-delete-fails.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([], 200),
+        'https://livekit-delete-fails.test/twirp/livekit.RoomService/ListParticipants' => Http::response([
+            'participants' => [
+                ['identity' => 'pipeline-bot-207'],
+            ],
+        ], 200),
+        'https://livekit-delete-fails.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([
+            'code' => 'internal',
+            'msg' => 'delete failed',
+        ], 500),
+    ]);
+
+    $this->actingAs($patientUser)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => 'cancelled',
+            'cancelled' => true,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+
+    $freshConsultation = $consultation->fresh();
+
+    expect($freshConsultation->status)->toBe('cancelled');
+    expect($freshConsultation->ended_at)->not->toBeNull();
+    expect($freshConsultation->livekit_last_error)->not->toBeNull();
 });
 
 it('does not cancel when an admin audit user leaves', function () {
@@ -394,6 +473,7 @@ it('does not cancel when an admin audit user leaves', function () {
         ->assertJson([
             'status' => 'ongoing',
             'cancelled' => false,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
         ]);
 
     Http::assertNothingSent();

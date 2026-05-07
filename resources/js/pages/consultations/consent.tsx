@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type { Consultation, ConsultationConsent } from '@/types/consultation';
 
@@ -83,9 +84,7 @@ export default function ConsultationConsentPage({
                             {consent?.confirmed_at && (
                                 <span className="text-xs font-normal opacity-80">
                                     &nbsp;on{' '}
-                                    {new Date(
-                                        consent.confirmed_at,
-                                    ).toLocaleString()}
+                                    {formatClinicDateTime(consent.confirmed_at)}
                                 </span>
                             )}
                         </Badge>
@@ -259,25 +258,25 @@ export default function ConsultationConsentPage({
                                         {consent?.confirmed_at && (
                                             <p className="mt-1 text-xs opacity-80">
                                                 Confirmed on{' '}
-                                                {new Date(
+                                                {formatClinicDateTime(
                                                     consent.confirmed_at,
-                                                ).toLocaleString()}
+                                                )}
                                             </p>
                                         )}
                                     </div>
 
                                     {consultation.type ===
                                         'teleconsultation' && (
-                                            <Button className="w-full" asChild>
-                                                <a
-                                                    href={ConsultationLobbyController.show.url(
-                                                        consultation.id,
-                                                    )}
-                                                >
-                                                    Go to Lobby →
-                                                </a>
-                                            </Button>
-                                        )}
+                                        <Button className="w-full" asChild>
+                                            <a
+                                                href={ConsultationLobbyController.show.url(
+                                                    consultation.id,
+                                                )}
+                                            >
+                                                Go to Lobby →
+                                            </a>
+                                        </Button>
+                                    )}
 
                                     <Button
                                         variant="outline"
@@ -309,14 +308,17 @@ export default function ConsultationConsentPage({
                                                     Data Privacy Checklist
                                                 </h3>
                                                 <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                                                    Please confirm all items to proceed
+                                                    Please confirm all items to
+                                                    proceed
                                                 </p>
                                             </div>
                                         </div>
 
                                         <div className="space-y-3">
                                             {/* Checkbox 1 */}
-                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.read_privacy_notice ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                            <div
+                                                className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.read_privacy_notice ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex-shrink-0">
                                                         <Checkbox
@@ -324,10 +326,13 @@ export default function ConsultationConsentPage({
                                                             checked={
                                                                 data.read_privacy_notice
                                                             }
-                                                            onCheckedChange={(checked) =>
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
                                                                 setData(
                                                                     'read_privacy_notice',
-                                                                    checked === true,
+                                                                    checked ===
+                                                                        true,
                                                                 )
                                                             }
                                                             className="h-5 w-5 cursor-pointer"
@@ -335,21 +340,26 @@ export default function ConsultationConsentPage({
                                                     </div>
                                                     <Label
                                                         htmlFor="read_privacy_notice"
-                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                        className="flex-1 cursor-pointer text-sm leading-snug font-medium"
                                                     >
-                                                        I have read and understood the
-                                                        Privacy Notice.
+                                                        I have read and
+                                                        understood the Privacy
+                                                        Notice.
                                                     </Label>
                                                 </div>
                                                 {errors.read_privacy_notice && (
                                                     <p className="pl-8 text-xs text-destructive">
-                                                        {errors.read_privacy_notice}
+                                                        {
+                                                            errors.read_privacy_notice
+                                                        }
                                                     </p>
                                                 )}
                                             </div>
 
                                             {/* Checkbox 2 */}
-                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_identity_guard ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                            <div
+                                                className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_identity_guard ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex-shrink-0">
                                                         <Checkbox
@@ -357,10 +367,14 @@ export default function ConsultationConsentPage({
                                                             checked={
                                                                 data.agree_identity_guard
                                                             }
-                                                            onCheckedChange={(checked) =>
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
                                                                 setData(
                                                                     'agree_identity_guard',
-                                                                    Boolean(checked),
+                                                                    Boolean(
+                                                                        checked,
+                                                                    ),
                                                                 )
                                                             }
                                                             className="h-5 w-5 cursor-pointer"
@@ -368,22 +382,27 @@ export default function ConsultationConsentPage({
                                                     </div>
                                                     <Label
                                                         htmlFor="agree_identity_guard"
-                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                        className="flex-1 cursor-pointer text-sm leading-snug font-medium"
                                                     >
-                                                        I agree to Identity Guard
-                                                        verification checks during the
+                                                        I agree to Identity
+                                                        Guard verification
+                                                        checks during the
                                                         consultation.
                                                     </Label>
                                                 </div>
                                                 {errors.agree_identity_guard && (
                                                     <p className="pl-8 text-xs text-destructive">
-                                                        {errors.agree_identity_guard}
+                                                        {
+                                                            errors.agree_identity_guard
+                                                        }
                                                     </p>
                                                 )}
                                             </div>
 
                                             {/* Checkbox 3 */}
-                                            <div className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_liveness_check ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}>
+                                            <div
+                                                className={`space-y-1 rounded-lg border-2 p-4 transition-all ${data.agree_liveness_check ? 'border-emerald-400 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40' : 'border-gray-300 bg-white/70 dark:border-gray-700 dark:bg-white/10'}`}
+                                            >
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex-shrink-0">
                                                         <Checkbox
@@ -391,10 +410,14 @@ export default function ConsultationConsentPage({
                                                             checked={
                                                                 data.agree_liveness_check
                                                             }
-                                                            onCheckedChange={(checked) =>
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
                                                                 setData(
                                                                     'agree_liveness_check',
-                                                                    Boolean(checked),
+                                                                    Boolean(
+                                                                        checked,
+                                                                    ),
                                                                 )
                                                             }
                                                             className="h-5 w-5 cursor-pointer"
@@ -402,15 +425,18 @@ export default function ConsultationConsentPage({
                                                     </div>
                                                     <Label
                                                         htmlFor="agree_liveness_check"
-                                                        className="cursor-pointer flex-1 text-sm font-medium leading-snug"
+                                                        className="flex-1 cursor-pointer text-sm leading-snug font-medium"
                                                     >
-                                                        I consent to liveness/security
-                                                        checks (if applicable).
+                                                        I consent to
+                                                        liveness/security checks
+                                                        (if applicable).
                                                     </Label>
                                                 </div>
                                                 {errors.agree_liveness_check && (
                                                     <p className="pl-8 text-xs text-destructive">
-                                                        {errors.agree_liveness_check}
+                                                        {
+                                                            errors.agree_liveness_check
+                                                        }
                                                     </p>
                                                 )}
                                             </div>
@@ -418,9 +444,15 @@ export default function ConsultationConsentPage({
 
                                         {/* Progress Indicator */}
                                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-white/40 px-3 py-2 text-xs dark:bg-white/10">
-                                            <CheckCircle2 className={`h-4 w-4 ${allChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`} />
-                                            <span className={`font-medium ${allChecked ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
-                                                {allChecked ? 'All items confirmed ✓' : 'Confirm all items above'}
+                                            <CheckCircle2
+                                                className={`h-4 w-4 ${allChecked ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}
+                                            />
+                                            <span
+                                                className={`font-medium ${allChecked ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}
+                                            >
+                                                {allChecked
+                                                    ? 'All items confirmed ✓'
+                                                    : 'Confirm all items above'}
                                             </span>
                                         </div>
                                     </div>

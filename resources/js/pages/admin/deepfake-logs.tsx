@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import type { BreadcrumbItem } from '@/types';
 import * as AdminDeepfakeLogsRoute from '@/routes/admin/deepfake-logs';
@@ -95,7 +96,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const RESULT_VARIANT: Record<DeepfakeResult, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const RESULT_VARIANT: Record<
+    DeepfakeResult,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     real: 'secondary',
     fake: 'destructive',
     inconclusive: 'outline',
@@ -112,7 +116,7 @@ function formatDateTime(value: string | null): string {
         return '—';
     }
 
-    return new Date(value).toLocaleString();
+    return formatClinicDateTime(value);
 }
 
 function formatConfidence(value: number | null): string {
@@ -123,7 +127,9 @@ function formatConfidence(value: number | null): string {
     return `${(value * 100).toFixed(1)}%`;
 }
 
-function displayPersonName(person?: { first_name: string; last_name: string } | null): string {
+function displayPersonName(
+    person?: { first_name: string; last_name: string } | null,
+): string {
     if (!person) {
         return '—';
     }
@@ -138,7 +144,9 @@ export default function AdminDeepfakeLogs({
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [resultFilter, setResultFilter] = useState(filters.result ?? 'all');
-    const [flaggedFilter, setFlaggedFilter] = useState(filters.flagged ?? 'all');
+    const [flaggedFilter, setFlaggedFilter] = useState(
+        filters.flagged ?? 'all',
+    );
 
     function applyFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -181,7 +189,8 @@ export default function AdminDeepfakeLogs({
                 <div className="space-y-1">
                     <h1 className="text-2xl font-semibold">Deepfake Logs</h1>
                     <p className="text-sm text-muted-foreground">
-                        Scan results, confidence scores, review actions, and risk flags.
+                        Scan results, confidence scores, review actions, and
+                        risk flags.
                     </p>
                 </div>
 
@@ -202,20 +211,27 @@ export default function AdminDeepfakeLogs({
                         </div>
 
                         <div>
-                            <Label htmlFor="result_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="result_filter"
+                                className="mb-2 block"
+                            >
                                 Result
                             </Label>
                             <Select
                                 value={resultFilter}
                                 onValueChange={(value) =>
-                                    setResultFilter(value as DeepfakeResult | 'all')
+                                    setResultFilter(
+                                        value as DeepfakeResult | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="result_filter">
                                     <SelectValue placeholder="All results" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All results</SelectItem>
+                                    <SelectItem value="all">
+                                        All results
+                                    </SelectItem>
                                     {options.results.map((result) => (
                                         <SelectItem key={result} value={result}>
                                             {RESULT_LABEL[result]}
@@ -226,23 +242,32 @@ export default function AdminDeepfakeLogs({
                         </div>
 
                         <div>
-                            <Label htmlFor="flagged_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="flagged_filter"
+                                className="mb-2 block"
+                            >
                                 Flagged
                             </Label>
                             <Select
                                 value={flaggedFilter}
                                 onValueChange={(value) =>
-                                    setFlaggedFilter(value as FlaggedState | 'all')
+                                    setFlaggedFilter(
+                                        value as FlaggedState | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="flagged_filter">
                                     <SelectValue placeholder="All flags" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All flags</SelectItem>
+                                    <SelectItem value="all">
+                                        All flags
+                                    </SelectItem>
                                     {options.flagged_states.map((state) => (
                                         <SelectItem key={state} value={state}>
-                                            {state === 'flagged' ? 'Flagged' : 'Unflagged'}
+                                            {state === 'flagged'
+                                                ? 'Flagged'
+                                                : 'Unflagged'}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -265,14 +290,30 @@ export default function AdminDeepfakeLogs({
                             <table className="w-full text-sm">
                                 <thead className="border-b text-left">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">ID</th>
-                                        <th className="px-3 py-2 font-medium">Consultation / Microcheck</th>
-                                        <th className="px-3 py-2 font-medium">Patient</th>
-                                        <th className="px-3 py-2 font-medium">Detected User</th>
-                                        <th className="px-3 py-2 font-medium">Result</th>
-                                        <th className="px-3 py-2 font-medium">Confidence</th>
-                                        <th className="px-3 py-2 font-medium">Action / Risk</th>
-                                        <th className="px-3 py-2 font-medium">Created</th>
+                                        <th className="px-3 py-2 font-medium">
+                                            ID
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Consultation / Microcheck
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Patient
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Detected User
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Result
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Confidence
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Action / Risk
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Created
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -280,8 +321,8 @@ export default function AdminDeepfakeLogs({
                                         const actionLabel = log.reviewed_at
                                             ? `Reviewed by ${log.reviewer?.name ?? 'Unknown'}`
                                             : log.flagged
-                                                ? 'Flagged for review'
-                                                : 'Clear';
+                                              ? 'Flagged for review'
+                                              : 'Clear';
 
                                         return (
                                             <tr key={log.id}>
@@ -290,39 +331,70 @@ export default function AdminDeepfakeLogs({
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
                                                     <div className="space-y-1">
-                                                        <div>Consultation #{log.consultation_id}</div>
+                                                        <div>
+                                                            Consultation #
+                                                            {
+                                                                log.consultation_id
+                                                            }
+                                                        </div>
                                                         <div className="text-xs text-muted-foreground/80">
-                                                            Microcheck #{log.microcheck_id ?? '—'}
+                                                            Microcheck #
+                                                            {log.microcheck_id ??
+                                                                '—'}
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
-                                                    {displayPersonName(log.consultation?.patient)}
+                                                    {displayPersonName(
+                                                        log.consultation
+                                                            ?.patient,
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
-                                                    {log.detectedUser?.name ?? '—'}
+                                                    {log.detectedUser?.name ??
+                                                        '—'}
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <Badge variant={RESULT_VARIANT[log.result]}>
-                                                        {RESULT_LABEL[log.result]}
+                                                    <Badge
+                                                        variant={
+                                                            RESULT_VARIANT[
+                                                                log.result
+                                                            ]
+                                                        }
+                                                    >
+                                                        {
+                                                            RESULT_LABEL[
+                                                                log.result
+                                                            ]
+                                                        }
                                                     </Badge>
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
-                                                    {formatConfidence(log.confidence_score)}
+                                                    {formatConfidence(
+                                                        log.confidence_score,
+                                                    )}
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
                                                     <div className="space-y-1">
                                                         <div>{actionLabel}</div>
                                                         <div className="text-xs text-muted-foreground/80">
-                                                            {log.reviewer_notes ?? '—'}
+                                                            {log.reviewer_notes ??
+                                                                '—'}
                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2 text-muted-foreground">
                                                     <div className="space-y-1">
-                                                        <div>{formatDateTime(log.created_at)}</div>
+                                                        <div>
+                                                            {formatDateTime(
+                                                                log.created_at,
+                                                            )}
+                                                        </div>
                                                         <div className="text-xs text-muted-foreground/80">
-                                                            Scanned {formatDateTime(log.scanned_at)}
+                                                            Scanned{' '}
+                                                            {formatDateTime(
+                                                                log.scanned_at,
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -335,16 +407,18 @@ export default function AdminDeepfakeLogs({
                     )}
                 </div>
 
-                {deepfakeLogs.total > 0 && deepfakeLogs.from !== null && deepfakeLogs.to !== null && (
-                    <Pagination
-                        currentPage={deepfakeLogs.current_page}
-                        lastPage={deepfakeLogs.last_page}
-                        from={deepfakeLogs.from}
-                        to={deepfakeLogs.to}
-                        total={deepfakeLogs.total}
-                        onPageChange={handlePageChange}
-                    />
-                )}
+                {deepfakeLogs.total > 0 &&
+                    deepfakeLogs.from !== null &&
+                    deepfakeLogs.to !== null && (
+                        <Pagination
+                            currentPage={deepfakeLogs.current_page}
+                            lastPage={deepfakeLogs.last_page}
+                            from={deepfakeLogs.from}
+                            to={deepfakeLogs.to}
+                            total={deepfakeLogs.total}
+                            onPageChange={handlePageChange}
+                        />
+                    )}
             </div>
         </AppLayout>
     );

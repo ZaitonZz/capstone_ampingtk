@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import type { BreadcrumbItem } from '@/types';
 import * as AdminMicrocheckLogsRoute from '@/routes/admin/microcheck-logs';
@@ -79,7 +80,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
-const STATUS_VARIANT: Record<MicrocheckStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const STATUS_VARIANT: Record<
+    MicrocheckStatus,
+    'default' | 'secondary' | 'destructive' | 'outline'
+> = {
     pending: 'secondary',
     claimed: 'outline',
     completed: 'default',
@@ -103,7 +107,7 @@ function formatDateTime(value: string | null): string {
         return '—';
     }
 
-    return new Date(value).toLocaleString();
+    return formatClinicDateTime(value);
 }
 
 function formatLatency(value: number | null): string {
@@ -118,7 +122,9 @@ function formatLatency(value: number | null): string {
     return `${(value / 1000).toFixed(1)} s`;
 }
 
-function displayPersonName(person?: { first_name: string; last_name: string } | null): string {
+function displayPersonName(
+    person?: { first_name: string; last_name: string } | null,
+): string {
     if (!person) {
         return '—';
     }
@@ -176,7 +182,8 @@ export default function AdminMicrocheckLogs({
                 <div className="space-y-1">
                     <h1 className="text-2xl font-semibold">Microcheck Logs</h1>
                     <p className="text-sm text-muted-foreground">
-                        Audit trail of consultation microcheck claims, statuses, and latency.
+                        Audit trail of consultation microcheck claims, statuses,
+                        and latency.
                     </p>
                 </div>
 
@@ -201,20 +208,27 @@ export default function AdminMicrocheckLogs({
                         </div>
 
                         <div>
-                            <Label htmlFor="status_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="status_filter"
+                                className="mb-2 block"
+                            >
                                 Status
                             </Label>
                             <Select
                                 value={statusFilter}
                                 onValueChange={(value) =>
-                                    setStatusFilter(value as MicrocheckStatus | 'all')
+                                    setStatusFilter(
+                                        value as MicrocheckStatus | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="status_filter">
                                     <SelectValue placeholder="All statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All statuses</SelectItem>
+                                    <SelectItem value="all">
+                                        All statuses
+                                    </SelectItem>
                                     {options.statuses.map((status) => (
                                         <SelectItem key={status} value={status}>
                                             {STATUS_LABEL[status]}
@@ -231,14 +245,18 @@ export default function AdminMicrocheckLogs({
                             <Select
                                 value={roleFilter}
                                 onValueChange={(value) =>
-                                    setRoleFilter(value as MicrocheckTargetRole | 'all')
+                                    setRoleFilter(
+                                        value as MicrocheckTargetRole | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="role_filter">
                                     <SelectValue placeholder="All roles" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All roles</SelectItem>
+                                    <SelectItem value="all">
+                                        All roles
+                                    </SelectItem>
                                     {options.target_roles.map((role) => (
                                         <SelectItem key={role} value={role}>
                                             {ROLE_LABEL[role]}
@@ -264,14 +282,30 @@ export default function AdminMicrocheckLogs({
                             <table className="w-full text-sm">
                                 <thead className="border-b text-left">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">ID</th>
-                                        <th className="px-3 py-2 font-medium">Consultation / Cycle</th>
-                                        <th className="px-3 py-2 font-medium">Patient</th>
-                                        <th className="px-3 py-2 font-medium">Doctor</th>
-                                        <th className="px-3 py-2 font-medium">Target Role</th>
-                                        <th className="px-3 py-2 font-medium">Status</th>
-                                        <th className="px-3 py-2 font-medium">Latency</th>
-                                        <th className="px-3 py-2 font-medium">Created</th>
+                                        <th className="px-3 py-2 font-medium">
+                                            ID
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Consultation / Cycle
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Patient
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Doctor
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Target Role
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Latency
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Created
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -282,29 +316,48 @@ export default function AdminMicrocheckLogs({
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
                                                 <div className="space-y-1">
-                                                    <div>Consultation #{log.consultation_id}</div>
+                                                    <div>
+                                                        Consultation #
+                                                        {log.consultation_id}
+                                                    </div>
                                                     <div className="text-xs text-muted-foreground/80">
-                                                        Cycle {log.cycle_key ?? '—'}
+                                                        Cycle{' '}
+                                                        {log.cycle_key ?? '—'}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {displayPersonName(log.consultation?.patient)}
+                                                {displayPersonName(
+                                                    log.consultation?.patient,
+                                                )}
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {log.consultation?.doctor?.name ?? '—'}
+                                                {log.consultation?.doctor
+                                                    ?.name ?? '—'}
                                             </td>
                                             <td className="px-3 py-2">
                                                 {log.target_role ? (
                                                     <Badge variant="outline">
-                                                        {ROLE_LABEL[log.target_role]}
+                                                        {
+                                                            ROLE_LABEL[
+                                                                log.target_role
+                                                            ]
+                                                        }
                                                     </Badge>
                                                 ) : (
-                                                    <span className="text-muted-foreground">—</span>
+                                                    <span className="text-muted-foreground">
+                                                        —
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <Badge variant={STATUS_VARIANT[log.status]}>
+                                                <Badge
+                                                    variant={
+                                                        STATUS_VARIANT[
+                                                            log.status
+                                                        ]
+                                                    }
+                                                >
                                                     {STATUS_LABEL[log.status]}
                                                 </Badge>
                                             </td>
@@ -322,16 +375,18 @@ export default function AdminMicrocheckLogs({
                     )}
                 </div>
 
-                {microcheckLogs.total > 0 && microcheckLogs.from !== null && microcheckLogs.to !== null && (
-                    <Pagination
-                        currentPage={microcheckLogs.current_page}
-                        lastPage={microcheckLogs.last_page}
-                        from={microcheckLogs.from}
-                        to={microcheckLogs.to}
-                        total={microcheckLogs.total}
-                        onPageChange={handlePageChange}
-                    />
-                )}
+                {microcheckLogs.total > 0 &&
+                    microcheckLogs.from !== null &&
+                    microcheckLogs.to !== null && (
+                        <Pagination
+                            currentPage={microcheckLogs.current_page}
+                            lastPage={microcheckLogs.last_page}
+                            from={microcheckLogs.from}
+                            to={microcheckLogs.to}
+                            total={microcheckLogs.total}
+                            onPageChange={handlePageChange}
+                        />
+                    )}
             </div>
         </AppLayout>
     );

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime, toClinicDatetimeLocal } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 
 interface DashboardMetrics {
@@ -85,27 +86,6 @@ const DUTY_REQUEST_STATUS_VARIANT: Record<
     rejected: 'destructive',
 };
 
-function toDatetimeLocal(iso: string | null): string {
-    if (!iso) {
-        return '';
-    }
-
-    const date = new Date(iso);
-
-    return (
-        [
-            date.getFullYear(),
-            String(date.getMonth() + 1).padStart(2, '0'),
-            String(date.getDate()).padStart(2, '0'),
-        ].join('-') +
-        'T' +
-        [
-            String(date.getHours()).padStart(2, '0'),
-            String(date.getMinutes()).padStart(2, '0'),
-        ].join(':')
-    );
-}
-
 export default function MedicalStaffDashboardPage() {
     const {
         metrics,
@@ -133,7 +113,7 @@ export default function MedicalStaffDashboardPage() {
     function rescheduleConsultation(consultation: PendingConsultation) {
         const input =
             rescheduleDrafts[consultation.id] ??
-            toDatetimeLocal(consultation.scheduled_at);
+            toClinicDatetimeLocal(consultation.scheduled_at);
 
         if (!input) {
             toast.error('Enter a new schedule first.');
@@ -349,7 +329,7 @@ export default function MedicalStaffDashboardPage() {
                                             Reviewed by{' '}
                                             {request.reviewed_by ?? 'N/A'}
                                             {request.reviewed_at
-                                                ? ` on ${new Date(request.reviewed_at).toLocaleString()}`
+                                                ? ` on ${formatClinicDateTime(request.reviewed_at)}`
                                                 : ''}
                                         </p>
                                     )}
@@ -464,9 +444,9 @@ export default function MedicalStaffDashboardPage() {
                                     <p className="text-xs text-muted-foreground">
                                         Teleconsultation{' · '}
                                         {consultation.scheduled_at
-                                            ? new Date(
+                                            ? formatClinicDateTime(
                                                   consultation.scheduled_at,
-                                              ).toLocaleString()
+                                              )
                                             : 'No schedule yet'}
                                     </p>
 
@@ -486,7 +466,7 @@ export default function MedicalStaffDashboardPage() {
                                                         rescheduleDrafts[
                                                             consultation.id
                                                         ] ??
-                                                        toDatetimeLocal(
+                                                        toClinicDatetimeLocal(
                                                             consultation.scheduled_at,
                                                         )
                                                     }
@@ -614,9 +594,9 @@ export default function MedicalStaffDashboardPage() {
                                     <p className="text-xs text-muted-foreground">
                                         Registered:{' '}
                                         {patient.registered_at
-                                            ? new Date(
+                                            ? formatClinicDateTime(
                                                   patient.registered_at,
-                                              ).toLocaleString()
+                                              )
                                             : '—'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
