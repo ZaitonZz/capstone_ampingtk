@@ -2,6 +2,7 @@
 
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Models\Patient;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -95,6 +96,21 @@ it('renders the consent page for an admin', function () {
         ->assertOk();
 });
 
+it('renders the consent page for the consultation patient', function () {
+    $user = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $user->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
+
+    $this->actingAsVerified($user)
+        ->get(route('consultations.consent.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/consent')
+                ->where('consultation.id', $consultation->id)
+        );
+});
+
 // ── Store: validation ─────────────────────────────────────────────────────────
 
 it('requires all checkboxes on consent store', function () {
@@ -139,6 +155,21 @@ it('creates a consent record and redirects with success flash', function () use 
         'user_id' => $doctor->id,
         'consent_confirmed' => true,
     ]);
+});
+
+it('redirects patient in-person consent back to the patient consultation details page', function () use (&$validPayload) {
+    $user = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $user->id]);
+    $consultation = Consultation::factory()->create([
+        'patient_id' => $patient->id,
+        'type' => 'in_person',
+        'session_token' => null,
+    ]);
+
+    $this->actingAsVerified($user)
+        ->post(route('consultations.consent.store', $consultation), $validPayload)
+        ->assertRedirect(route('patient.consultations.show', $consultation))
+        ->assertSessionHas('success', 'Consent confirmed.');
 });
 
 it('upserts consent on a subsequent confirmation', function () use (&$validPayload) {

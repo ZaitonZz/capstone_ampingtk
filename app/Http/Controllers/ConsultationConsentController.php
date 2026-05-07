@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\ConfirmConsultationConsentRequest;
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Models\User;
 use App\Services\LiveKitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Log;
@@ -14,6 +15,13 @@ use Inertia\Response;
 class ConsultationConsentController extends Controller
 {
     public function __construct(private LiveKitService $liveKitService) {}
+
+    private function detailsRouteNameForUser(?User $user): string
+    {
+        return $user?->isPatient() === true
+            ? 'patient.consultations.show'
+            : 'consultations.show';
+    }
 
     public function show(Consultation $consultation): Response
     {
@@ -35,11 +43,12 @@ class ConsultationConsentController extends Controller
     public function store(ConfirmConsultationConsentRequest $request, Consultation $consultation): RedirectResponse
     {
         $this->authorize('view', $consultation);
+        $user = $request->user();
 
         ConsultationConsent::updateOrCreate(
             [
                 'consultation_id' => $consultation->id,
-                'user_id' => $request->user()->id,
+                'user_id' => $user->id,
             ],
             [
                 'consent_confirmed' => true,
@@ -64,7 +73,7 @@ class ConsultationConsentController extends Controller
 
         $redirectRoute = $consultation->type === 'teleconsultation'
             ? 'consultations.lobby.show'
-            : 'consultations.show';
+            : $this->detailsRouteNameForUser($user);
 
         return redirect()
             ->route($redirectRoute, $consultation)

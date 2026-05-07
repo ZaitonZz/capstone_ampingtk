@@ -182,21 +182,13 @@ export default function ConsultationShow({
                             </Badge>
                         )}
                         {consent_completed === false && (
-                            <Link
-                                href={ConsultationController.edit.url(
-                                    consultation.id,
-                                )}
-                                title="Open consultation to complete consent"
-                                aria-label="Open consultation to complete consent"
+                            <Badge
+                                variant="outline"
+                                className="border-amber-200 bg-amber-50 text-amber-700"
                             >
-                                <Badge
-                                    variant="outline"
-                                    className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                >
-                                    <ShieldCheck className="mr-1 h-4 w-4" />
-                                    Consent Pending
-                                </Badge>
-                            </Link>
+                                <ShieldCheck className="mr-1 h-4 w-4" />
+                                Consent Pending
+                            </Badge>
                         )}
                         {permissions.can_manage_schedule &&
                             consultation.status === 'pending' && (

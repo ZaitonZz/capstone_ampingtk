@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ShieldCheck, Video } from 'lucide-react';
+import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as PatientConsultationController from '@/actions/App/Http/Controllers/PatientConsultationController';
 import { Badge } from '@/components/ui/badge';
@@ -106,7 +107,7 @@ export default function PatientConsultationShow({
                         {!consent_completed && (
                             <Button size="sm" variant="outline" asChild>
                                 <Link
-                                    href={PatientConsultationController.consent.url(
+                                    href={ConsultationConsentController.show.url(
                                         consultation.id,
                                     )}
                                 >

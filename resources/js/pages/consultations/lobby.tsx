@@ -18,7 +18,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, ElementType, FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import * as ConsultationSessionController from '@/actions/App/Http/Controllers/ConsultationSessionController';
@@ -32,6 +31,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import {
+    consultationDetailsUrlForRole,
+    consultationIndexUrlForRole,
+} from '@/lib/consultation-navigation';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -301,6 +304,12 @@ export default function ConsultationLobbyPage({
         verification?.override_url &&
         page.props.auth?.user?.id === consultation.doctor_id,
     );
+    const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
+    const consultationDetailsUrl = consultationDetailsUrlForRole(
+        currentRole,
+        consultation.id,
+    );
 
     const connectEndpoint = useMemo(
         () =>
@@ -509,10 +518,10 @@ export default function ConsultationLobbyPage({
     }, [micOn, cameraOn]);
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Consultations', href: ConsultationController.index.url() },
+        { title: 'Consultations', href: consultationIndexUrl },
         {
             title: consultation.patient?.full_name ?? `#${consultation.id}`,
-            href: ConsultationController.show.url(consultation.id),
+            href: consultationDetailsUrl,
         },
         {
             title: 'Lobby',

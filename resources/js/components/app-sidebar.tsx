@@ -62,7 +62,7 @@ export function AppSidebar() {
         user.role === 'admin' || user.role === 'medicalstaff';
     const isClinicalStaff = isDoctor || isScheduleManager;
     const isAdmin = user.role === 'admin';
-    let dashboardHref = dashboard();
+    let dashboardHref: NavItem['href'] = dashboard();
 
     if (user.role === 'patient') {
         dashboardHref = patientDashboard();
