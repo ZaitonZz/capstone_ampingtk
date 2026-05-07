@@ -83,6 +83,42 @@ export interface ConsultationDeepfakeEscalation {
     updated_at: string;
 }
 
+export interface PatientNote {
+    id: number;
+    consultation_id: number;
+    patient_id: number;
+    doctor_id: number;
+    subjective: string | null;
+    objective: string | null;
+    assessment: string | null;
+    plan: string | null;
+    created_at: string;
+    updated_at: string;
+    doctor?: {
+        id: number;
+        name: string;
+    };
+}
+
+export interface Prescription {
+    id: number;
+    consultation_id: number;
+    patient_id: number;
+    doctor_id: number;
+    medication_name: string;
+    dosage: string | null;
+    frequency: string | null;
+    duration: string | null;
+    route: string | null;
+    instructions: string | null;
+    created_at: string;
+    updated_at: string;
+    doctor?: {
+        id: number;
+        name: string;
+    };
+}
+
 export interface Consultation {
     id: number;
     patient_id: number;
@@ -117,6 +153,8 @@ export interface Consultation {
     duration_minutes: number | null;
     patient?: PatientSummary;
     doctor?: DoctorSummary;
+    note?: PatientNote | null;
+    prescriptions?: Prescription[];
     microchecks?: ConsultationMicrocheck[];
     deepfake_scan_logs?: DeepfakeScanLog[];
     deepfake_escalations?: ConsultationDeepfakeEscalation[];
@@ -125,16 +163,15 @@ export interface Consultation {
 }
 
 export interface ConsultationDeepfakeGuidance {
-    low_light: boolean;
-    too_far: boolean;
-    face_area_ratio: number | null;
-    brightness: number | null;
+    no_face_detected: boolean;
+    no_face_detected_since: string | null;
 }
 
 export interface ConsultationDeepfakeDetectionState {
     state: 'starting' | 'running' | 'delayed' | 'unavailable' | 'cancelled';
     status: string | null;
     timeout_seconds: number;
+    no_face_timeout_seconds: number;
     last_heartbeat_at: string | null;
     last_heartbeat_age_seconds: number | null;
     started_at: string | null;

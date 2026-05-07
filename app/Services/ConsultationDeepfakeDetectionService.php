@@ -11,35 +11,25 @@ class ConsultationDeepfakeDetectionService
 {
     public function __construct(private LiveKitService $liveKitService) {}
 
-    public function enforceOrCancel(Consultation $consultation): Consultation
-    {
-        if (! $this->shouldMonitor($consultation)) {
-            return $consultation;
-        }
-
-        if (! $this->isTimedOut($consultation)) {
-            return $consultation;
-        }
-
-        return $this->cancelForMissingDetection($consultation);
-    }
-
     public function statusPayload(Consultation $consultation): array
     {
         $timeoutSeconds = $this->timeoutSeconds();
+        $noFaceTimeoutSeconds = $this->noFaceTimeoutSeconds();
         $heartbeatAt = $consultation->pipeline_last_heartbeat_at;
         $ageSeconds = $heartbeatAt === null ? null : max(0, now()->diffInSeconds($heartbeatAt));
+        $guidance = $this->publicGuidancePayload($consultation->pipeline_guidance);
         $state = $this->displayState($consultation);
 
         return [
             'state' => $state,
             'status' => $consultation->pipeline_detection_status,
             'timeout_seconds' => $timeoutSeconds,
+            'no_face_timeout_seconds' => $noFaceTimeoutSeconds,
             'last_heartbeat_at' => $heartbeatAt?->toIso8601String(),
             'last_heartbeat_age_seconds' => $ageSeconds,
             'started_at' => $consultation->pipeline_detection_started_at?->toIso8601String(),
             'last_scan_at' => $consultation->pipeline_last_scan_at?->toIso8601String(),
-            'guidance' => $this->publicGuidancePayload($consultation->pipeline_guidance),
+            'guidance' => $guidance,
         ];
     }
 
@@ -53,6 +43,13 @@ class ConsultationDeepfakeDetectionService
             $startedAt = $now;
         }
 
+        $guidance = array_key_exists('guidance', $payload)
+            ? $this->normalizeGuidance([
+                ...$this->normalizeGuidance($consultation->pipeline_guidance),
+                ...(is_array($payload['guidance']) ? $payload['guidance'] : []),
+            ])
+            : $this->normalizeGuidance($consultation->pipeline_guidance);
+
         $consultation->forceFill([
             'pipeline_detection_status' => $status,
             'pipeline_detection_started_at' => $startedAt,
@@ -61,17 +58,56 @@ class ConsultationDeepfakeDetectionService
                 ? Carbon::parse($payload['last_scan_at'])
                 : $consultation->pipeline_last_scan_at,
             'pipeline_last_error' => $payload['error'] ?? null,
-            'pipeline_guidance' => array_key_exists('guidance', $payload)
-                ? $this->normalizeGuidance($payload['guidance'])
-                : $this->normalizeGuidance($consultation->pipeline_guidance),
+            'pipeline_guidance' => $guidance,
+        ])->save();
+
+        return $this->enforceNoFaceOrCancel($consultation->fresh());
+    }
+
+    public function enforceNoFaceOrCancel(Consultation $consultation): Consultation
+    {
+        if (! $this->shouldMonitor($consultation) || ! $this->hasNoFaceTimedOut($consultation)) {
+            return $consultation;
+        }
+
+        try {
+            $this->liveKitService->deleteRoom($consultation);
+        } catch (RuntimeException $exception) {
+            Log::warning('Failed to delete LiveKit room after no-face timeout cancellation.', [
+                'consultation_id' => $consultation->id,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        $consultation->forceFill([
+            'status' => Consultation::STATUS_CANCELLED,
+            'ended_at' => now(),
+            'cancellation_reason' => $this->noFaceCancellationMessage(),
         ])->save();
 
         return $consultation->fresh();
     }
 
+    public function noFaceCancellationMessage(): string
+    {
+        return sprintf(
+            'Consultation cancelled because no face was detected for %d seconds.',
+            $this->noFaceTimeoutSeconds()
+        );
+    }
+
+    public function isNoFaceCancellation(Consultation $consultation): bool
+    {
+        return $consultation->status === Consultation::STATUS_CANCELLED
+            && str_contains(
+                strtolower((string) $consultation->cancellation_reason),
+                'no face was detected'
+            );
+    }
+
     private function displayState(Consultation $consultation): string
     {
-        if ($this->isDetectionCancellation($consultation)) {
+        if ($this->isNoFaceCancellation($consultation)) {
             return 'cancelled';
         }
 
@@ -98,15 +134,6 @@ class ConsultationDeepfakeDetectionService
             && in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true);
     }
 
-    private function isDetectionCancellation(Consultation $consultation): bool
-    {
-        return $consultation->status === Consultation::STATUS_CANCELLED
-            && str_contains(
-                strtolower((string) $consultation->cancellation_reason),
-                'deepfake detection'
-            );
-    }
-
     private function isTimedOut(Consultation $consultation): bool
     {
         if ($consultation->pipeline_detection_status === 'error') {
@@ -125,55 +152,38 @@ class ConsultationDeepfakeDetectionService
         return $referenceAt->lessThanOrEqualTo(now()->subSeconds($this->timeoutSeconds()));
     }
 
-    private function cancelForMissingDetection(Consultation $consultation): Consultation
+    private function hasNoFaceTimedOut(Consultation $consultation): bool
     {
-        $consultation->refresh();
+        $guidance = $this->normalizeGuidance($consultation->pipeline_guidance);
 
-        if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
-            return $consultation;
+        if (! $guidance['no_face_detected'] || $guidance['no_face_detected_since'] === null) {
+            return false;
         }
 
-        try {
-            $this->liveKitService->deleteRoom($consultation);
-        } catch (RuntimeException $exception) {
-            Log::warning('Unable to end LiveKit room during deepfake detection safety cancellation.', [
-                'consultation_id' => $consultation->id,
-                'error' => $exception->getMessage(),
-            ]);
-
-            $consultation->forceFill([
-                'livekit_last_error' => $exception->getMessage(),
-            ])->save();
-        }
-
-        $consultation->forceFill([
-            'status' => Consultation::STATUS_CANCELLED,
-            'ended_at' => now(),
-            'cancellation_reason' => 'Consultation cancelled because deepfake detection was not running.',
-            'pipeline_detection_status' => 'stalled',
-        ])->save();
-
-        return $consultation->fresh();
+        return Carbon::parse($guidance['no_face_detected_since'])
+            ->lessThanOrEqualTo(now()->subSeconds($this->noFaceTimeoutSeconds()));
     }
 
     private function normalizeGuidance(mixed $guidance): array
     {
         if (! is_array($guidance)) {
             return [
-                'low_light' => false,
-                'too_far' => false,
-                'face_area_ratio' => null,
-                'brightness' => null,
+                'no_face_detected' => false,
+                'no_face_detected_since' => null,
                 'participant_identity' => null,
                 'role' => null,
             ];
         }
 
+        $noFaceDetected = (bool) ($guidance['no_face_detected'] ?? false);
+        $existingSince = $guidance['no_face_detected_since'] ?? null;
+        $noFaceDetectedSince = $noFaceDetected
+            ? $this->normalizeTimestamp($existingSince) ?? now()->toIso8601String()
+            : null;
+
         return [
-            'low_light' => (bool) ($guidance['low_light'] ?? false),
-            'too_far' => (bool) ($guidance['too_far'] ?? false),
-            'face_area_ratio' => isset($guidance['face_area_ratio']) ? (float) $guidance['face_area_ratio'] : null,
-            'brightness' => isset($guidance['brightness']) ? (float) $guidance['brightness'] : null,
+            'no_face_detected' => $noFaceDetected,
+            'no_face_detected_since' => $noFaceDetectedSince,
             'participant_identity' => isset($guidance['participant_identity']) ? (string) $guidance['participant_identity'] : null,
             'role' => isset($guidance['role']) ? (string) $guidance['role'] : null,
         ];
@@ -184,15 +194,31 @@ class ConsultationDeepfakeDetectionService
         $normalizedGuidance = $this->normalizeGuidance($guidance);
 
         return [
-            'low_light' => $normalizedGuidance['low_light'],
-            'too_far' => $normalizedGuidance['too_far'],
-            'face_area_ratio' => $normalizedGuidance['face_area_ratio'],
-            'brightness' => $normalizedGuidance['brightness'],
+            'no_face_detected' => $normalizedGuidance['no_face_detected'],
+            'no_face_detected_since' => $normalizedGuidance['no_face_detected_since'],
         ];
     }
 
     private function timeoutSeconds(): int
     {
         return max(1, (int) config('services.pipeline.detection_timeout_seconds', 60));
+    }
+
+    private function noFaceTimeoutSeconds(): int
+    {
+        return max(1, (int) config('services.pipeline.no_face_timeout_seconds', 30));
+    }
+
+    private function normalizeTimestamp(mixed $timestamp): ?string
+    {
+        if ($timestamp === null || $timestamp === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($timestamp)->toIso8601String();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

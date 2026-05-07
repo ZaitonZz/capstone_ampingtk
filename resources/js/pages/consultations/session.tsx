@@ -7,11 +7,14 @@ import {
     ParticipantTile,
     RoomAudioRenderer,
     useDataChannel,
+    useRoomContext,
     useTracks,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LogOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
+import * as ConsultationLiveKitController from '@/actions/App/Http/Controllers/ConsultationLiveKitController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -39,6 +42,12 @@ interface LiveKitConnectPayload {
     participant_token: string;
     ws_url: string | null;
     role: string;
+}
+
+interface LiveKitLeaveResponse {
+    status: Consultation['status'];
+    cancelled: boolean;
+    redirect_url: string;
 }
 
 interface Props {
@@ -82,9 +91,14 @@ function DeepfakeDataListener({
 
 function ConsultationCallStage({
     onDetectionUpdate,
+    onLeaveCall,
+    isLeaving,
 }: {
     onDetectionUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+    onLeaveCall: () => Promise<void>;
+    isLeaving: boolean;
 }) {
+    const room = useRoomContext();
     const tracks = useTracks([
         { source: Track.Source.Camera, withPlaceholder: false },
         { source: Track.Source.ScreenShare, withPlaceholder: false },
@@ -122,15 +136,33 @@ function ConsultationCallStage({
             <ControlBar
                 controls={{
                     chat: false,
+                    leave: false,
                     settings: false,
                 }}
                 className="border-t border-zinc-800/70 bg-zinc-950/95 px-2 py-2"
             />
+            <div className="flex justify-center border-t border-zinc-800/70 bg-zinc-950/95 px-2 pb-3">
+                <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    disabled={isLeaving}
+                    onClick={() => {
+                        void onLeaveCall().finally(() => {
+                            void room.disconnect();
+                        });
+                    }}
+                >
+                    <LogOut className="h-4 w-4" />
+                    {isLeaving ? 'Leaving...' : 'Leave Call'}
+                </Button>
+            </div>
         </div>
     );
 }
 
-function DetectionStatusPanel({
+function DetectionStatusBadge({
     detection,
 }: {
     detection?: ConsultationDeepfakeDetectionState;
@@ -148,75 +180,56 @@ function DetectionStatusPanel({
         starting: 'Waiting for the pipeline to confirm monitoring.',
         delayed: `No active heartbeat within ${detection?.timeout_seconds ?? 60} seconds.`,
         unavailable: 'Monitoring starts when the room and pipeline are ready.',
-        cancelled: 'Deepfake detection was not running, so the consultation was cancelled.',
+        cancelled: `No face was detected for ${detection?.no_face_timeout_seconds ?? 30} seconds, so the consultation was cancelled.`,
     }[state];
     const tone =
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-              ? 'border-rose-200 bg-rose-50 text-rose-800'
-              : state === 'delayed'
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : state === 'delayed'
                 ? 'border-amber-200 bg-amber-50 text-amber-800'
                 : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
 
     return (
-        <div className={`rounded-2xl border p-4 shadow-sm ${tone}`}>
-            <div className="mb-1 flex items-center gap-2 font-semibold">
+        <div className={`rounded-xl border px-3 py-2 shadow-sm ${tone}`}>
+            <div className="flex items-center gap-2 text-sm font-semibold">
                 <Icon className="h-4 w-4" />
                 {label}
             </div>
-            <p className="text-sm">{description}</p>
-            {detection?.last_heartbeat_at && (
-                <p className="mt-2 text-xs opacity-75">
-                    Last heartbeat:{' '}
-                    {new Date(detection.last_heartbeat_at).toLocaleTimeString()}
-                </p>
-            )}
+            <p className="mt-0.5 text-xs">{description}</p>
         </div>
     );
 }
 
-function GuidancePanel({
+function FaceDetectionBadge({
     detection,
 }: {
     detection?: ConsultationDeepfakeDetectionState;
 }) {
-    const guidance = detection?.guidance;
-    const notices = [
-        guidance?.too_far
-            ? 'Move closer to the camera so your face is easier to verify.'
-            : null,
-        guidance?.low_light
-            ? 'Increase lighting in your environment so detection remains reliable.'
-            : null,
-    ].filter(Boolean);
-
-    if (notices.length === 0) {
+    if (detection?.guidance?.no_face_detected !== true) {
         return (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 shadow-sm">
-                <div className="mb-1 flex items-center gap-2 font-semibold">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800 shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-semibold">
                     <CheckCircle2 className="h-4 w-4" />
-                    Camera guidance clear
+                    Face detected
                 </div>
-                <p className="text-sm">
-                    The pipeline has no current distance or lighting warning.
-                </p>
+                <p className="mt-0.5 text-xs">Camera visibility is clear.</p>
             </div>
         );
     }
 
     return (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800 shadow-sm">
-            <div className="mb-2 flex items-center gap-2 font-semibold">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-semibold">
                 <AlertTriangle className="h-4 w-4" />
-                Camera guidance
+                No face detected
             </div>
-            <div className="space-y-2 text-sm">
-                {notices.map((notice) => (
-                    <p key={notice}>{notice}</p>
-                ))}
-            </div>
+            <p className="mt-0.5 text-xs">
+                Cancellation starts after {detection?.no_face_timeout_seconds ?? 30}
+                s without a face.
+            </p>
         </div>
     );
 }
@@ -233,6 +246,7 @@ export default function ConsultationSessionPage({
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
+    const [isLeaving, setIsLeaving] = useState(false);
     usePoll(5000, {
         only: ['consultation', 'verification', 'deepfake_detection'],
         onSuccess: (page) => {
@@ -251,6 +265,8 @@ export default function ConsultationSessionPage({
         [consultation.id],
     );
     const hasAutoRedirectedRef = useRef(false);
+    const isManualLeaveRef = useRef(false);
+    const isLeavingRef = useRef(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
 
     const isCurrentUserVerificationTarget =
@@ -336,10 +352,10 @@ export default function ConsultationSessionPage({
     const serverUrl = payload?.ws_url ?? livekit.ws_url;
     const canStartCall = Boolean(
         livekit.enabled &&
+        consultation.status !== 'cancelled' &&
         payload?.participant_token &&
         payload?.room_name &&
-        serverUrl &&
-        consultation.status !== 'cancelled',
+        serverUrl,
     );
     const currentRole = page.props.auth?.user?.role;
     const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
@@ -364,17 +380,80 @@ export default function ConsultationSessionPage({
         },
     ];
 
-    function leaveSession(): void {
+    function clearStoredSession(): void {
         window.sessionStorage.removeItem(storageKey);
     }
+
+    const redirectToLobby = useCallback(
+        (url?: string): void => {
+            router.visit(
+                url ?? ConsultationLobbyController.show.url(consultation.id),
+                {
+                    replace: true,
+                    preserveScroll: true,
+                },
+            );
+        },
+        [consultation.id],
+    );
+
+    const leaveSession = useCallback(async (): Promise<void> => {
+        if (isLeavingRef.current) {
+            return;
+        }
+
+        isLeavingRef.current = true;
+        isManualLeaveRef.current = true;
+        setIsLeaving(true);
+        clearStoredSession();
+
+        const fallbackUrl = ConsultationLobbyController.show.url(
+            consultation.id,
+        );
+
+        try {
+            const csrfToken = getMetaCsrfToken();
+            const xsrfToken = getCookie('XSRF-TOKEN');
+            const response = await fetch(
+                ConsultationLiveKitController.leave.url(consultation.id),
+                {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(csrfToken !== ''
+                            ? { 'X-CSRF-TOKEN': csrfToken }
+                            : {}),
+                        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                redirectToLobby(fallbackUrl);
+
+                return;
+            }
+
+            const payload = (await response.json()) as LiveKitLeaveResponse;
+            redirectToLobby(payload.redirect_url ?? fallbackUrl);
+        } catch {
+            redirectToLobby(fallbackUrl);
+        }
+    }, [consultation.id, redirectToLobby]);
+
+    const goBackToLobby = useCallback((): void => {
+        clearStoredSession();
+        redirectToLobby();
+    }, [redirectToLobby]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Teleconsultation Session" />
 
             <div className="p-4 md:p-6">
-                <div className="mb-4 flex items-center justify-between">
-                    <div>
+                <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-2xl font-bold tracking-tight">
                             Teleconsultation Session
                         </h1>
@@ -385,16 +464,22 @@ export default function ConsultationSessionPage({
                         </p>
                     </div>
 
-                    <Button variant="outline" asChild onClick={leaveSession}>
-                        <Link
-                            href={ConsultationLobbyController.show.url(
-                                consultation.id,
-                            )}
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
+                        <DetectionStatusBadge detection={effectiveDetection} />
+                        <FaceDetectionBadge detection={effectiveDetection} />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="gap-2 lg:self-center"
+                            disabled={isLeaving}
+                            onClick={() => {
+                                goBackToLobby();
+                            }}
                         >
                             <LogOut className="h-4 w-4" />
                             Back to Lobby
-                        </Link>
-                    </Button>
+                        </Button>
+                    </div>
                 </div>
 
                 {!livekit.enabled && (
@@ -450,8 +535,8 @@ export default function ConsultationSessionPage({
                     </div>
                 )}
 
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
+                <div>
+                    <div>
                         {canStartCall ? (
                             <div className="overflow-hidden rounded-2xl border bg-zinc-950 shadow-sm">
                                 <LiveKitRoom
@@ -461,11 +546,13 @@ export default function ConsultationSessionPage({
                                     audio
                                     video
                                     data-lk-theme="default"
-                                    className="h-[620px]"
+                                    className="h-[680px]"
                                     onDisconnected={() => {
-                                        window.sessionStorage.removeItem(
-                                            storageKey,
-                                        );
+                                        clearStoredSession();
+
+                                        if (isManualLeaveRef.current) {
+                                            return;
+                                        }
 
                                         if (
                                             shouldRedirectToLobbyForVerification
@@ -480,11 +567,13 @@ export default function ConsultationSessionPage({
                                 >
                                     <ConsultationCallStage
                                         onDetectionUpdate={setLiveDetection}
+                                        onLeaveCall={leaveSession}
+                                        isLeaving={isLeaving}
                                     />
                                 </LiveKitRoom>
                             </div>
                         ) : (
-                            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
+                            <div className="flex min-h-[520px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
                                 <div className="max-w-md p-6 text-center">
                                     <h2 className="mb-2 text-lg font-semibold">
                                         Call cannot start yet
@@ -498,64 +587,6 @@ export default function ConsultationSessionPage({
                         )}
                     </div>
 
-                    <div className="space-y-4">
-                        <DetectionStatusPanel detection={effectiveDetection} />
-
-                        <GuidancePanel detection={effectiveDetection} />
-
-                        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-                            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                Connection Details
-                            </p>
-
-                            <div className="mt-2 space-y-2 text-sm">
-                                <p>
-                                    <span className="font-medium">Room:</span>{' '}
-                                    {payload?.room_name ??
-                                        livekit.room_name ??
-                                        '—'}
-                                </p>
-                                <p>
-                                    <span className="font-medium">Status:</span>{' '}
-                                    {payload?.room_status ??
-                                        livekit.room_status ??
-                                        '—'}
-                                </p>
-                                <p className="break-all">
-                                    <span className="font-medium">WS:</span>{' '}
-                                    {payload?.ws_url ?? livekit.ws_url ?? '—'}
-                                </p>
-                                <p>
-                                    <span className="font-medium">Role:</span>{' '}
-                                    {payload?.role ?? '—'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {payload && (
-                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 shadow-sm">
-                                <div className="mb-1 flex items-center gap-2 font-semibold">
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Session credentials loaded
-                                </div>
-                                <p className="text-sm">
-                                    LiveKit call UI is mounted with your current
-                                    participant token.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-                            <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-                                <Shield className="h-4 w-4" />
-                                Security Note
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Token is stored in session storage only and
-                                removed when you leave the session page.
-                            </p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </AppLayout>

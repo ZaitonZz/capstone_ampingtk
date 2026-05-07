@@ -54,5 +54,34 @@ class UpdateConsultationRequest extends FormRequest
                 $validator->errors()->add('doctor_id', 'Selected doctor is not on duty for the specified appointment schedule.');
             }
         });
+
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            $consultation = $this->route('consultation');
+
+            if (! $consultation instanceof Consultation) {
+                return;
+            }
+
+            $nextStatus = $this->input('status', $consultation->status);
+
+            $isMarkingCompleted = $consultation->status !== Consultation::STATUS_COMPLETED
+                && $nextStatus === Consultation::STATUS_COMPLETED;
+
+            if (! $isMarkingCompleted) {
+                return;
+            }
+
+            if ($consultation->hasClinicalDocumentation()) {
+                return;
+            }
+
+            $message = 'Enter a clinical note or add a prescription before marking the consultation as completed.';
+
+            $validator->errors()->add('status', $message);
+        });
     }
 }

@@ -52,8 +52,7 @@ return [
         'microcheck_max_interval_seconds' => (int) env('PIPELINE_MICROCHECK_MAX_INTERVAL_SECONDS', 20),
         'microcheck_expiry_seconds' => (int) env('PIPELINE_MICROCHECK_EXPIRY_SECONDS', 45),
         'detection_timeout_seconds' => (int) env('PIPELINE_DETECTION_TIMEOUT_SECONDS', 60),
-        'low_light_luma_threshold' => (float) env('PIPELINE_LOW_LIGHT_LUMA_THRESHOLD', 0.22),
-        'min_face_area_ratio' => (float) env('PIPELINE_MIN_FACE_AREA_RATIO', 0.035),
+        'no_face_timeout_seconds' => (int) env('PIPELINE_NO_FACE_TIMEOUT_SECONDS', 30),
     ],
 
 ];

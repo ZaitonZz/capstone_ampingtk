@@ -214,6 +214,66 @@ class LiveKitService
         );
     }
 
+    /**
+     * @return array<int, array{identity: string, metadata: ?string}>
+     */
+    public function listParticipants(Consultation $consultation): array
+    {
+        if ($consultation->livekit_room_name === null) {
+            return [];
+        }
+
+        $baseUrl = trim((string) config('services.livekit.url'));
+
+        if ($baseUrl === '') {
+            throw new RuntimeException('Missing services.livekit.url configuration value.');
+        }
+
+        $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
+
+        $response = Http::acceptJson()
+            ->withToken($serverToken)
+            ->asJson()
+            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/ListParticipants', [
+                'room' => $consultation->livekit_room_name,
+            ]);
+
+        $errorCode = (string) $response->json('code');
+
+        if ($response->status() === 404 || $errorCode === 'not_found') {
+            return [];
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                sprintf('LiveKit participant listing failed [%d]: %s', $response->status(), $response->body())
+            );
+        }
+
+        $participants = [];
+
+        foreach ((array) $response->json('participants', []) as $participant) {
+            if (! is_array($participant)) {
+                continue;
+            }
+
+            $identity = trim((string) ($participant['identity'] ?? ''));
+
+            if ($identity === '') {
+                continue;
+            }
+
+            $metadata = $participant['metadata'] ?? null;
+
+            $participants[] = [
+                'identity' => $identity,
+                'metadata' => is_string($metadata) && $metadata !== '' ? $metadata : null,
+            ];
+        }
+
+        return $participants;
+    }
+
     public function deleteRoom(Consultation $consultation): void
     {
         if ($consultation->livekit_room_name === null) {
