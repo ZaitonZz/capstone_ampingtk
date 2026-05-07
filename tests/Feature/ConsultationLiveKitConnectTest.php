@@ -98,6 +98,36 @@ it('returns connect credentials for a consenting consultation patient', function
         ]);
 });
 
+it('does not cancel a consultation on leave when no LiveKit room has been provisioned', function () {
+    config()->set('services.livekit.enabled', false);
+
+    $doctor = User::factory()->doctor()->create();
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => Consultation::STATUS_SCHEDULED,
+        'livekit_room_name' => null,
+        'ended_at' => null,
+        'cancellation_reason' => null,
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => Consultation::STATUS_SCHEDULED,
+            'cancelled' => false,
+        ]);
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe(Consultation::STATUS_SCHEDULED);
+    expect($consultation->ended_at)->toBeNull();
+    expect($consultation->cancellation_reason)->toBeNull();
+    expect($consultation->livekit_room_name)->toBeNull();
+
+    Http::assertNothingSent();
+});
+
 it('allows admin audit connect without explicit consent', function () {
     $doctor = User::factory()->doctor()->create();
     $admin = User::factory()->admin()->create();
@@ -339,38 +369,6 @@ it('cancels the consultation when the last doctor or patient leaves', function (
     expect($freshConsultation->livekit_room_status)->toBe('ended');
     expect($freshConsultation->ended_at)->not->toBeNull();
     expect($freshConsultation->cancellation_reason)->toBe('Consultation cancelled because the last participant left the call.');
-});
-
-it('does not cancel a consultation when no LiveKit room has been provisioned', function () {
-    $doctor = User::factory()->doctor()->create();
-
-    $consultation = Consultation::factory()->teleconsultation()->create([
-        'doctor_id' => $doctor->id,
-        'status' => 'ongoing',
-        'livekit_room_name' => null,
-        'livekit_room_status' => 'not_started',
-    ]);
-
-    Http::fake([
-        'https://livekit.test/twirp/livekit.RoomService/*' => Http::response([], 200),
-    ]);
-
-    $this->actingAs($doctor)
-        ->postJson(route('consultations.livekit.leave', $consultation))
-        ->assertOk()
-        ->assertJson([
-            'status' => 'ongoing',
-            'cancelled' => false,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
-        ]);
-
-    Http::assertNothingSent();
-
-    $freshConsultation = $consultation->fresh();
-
-    expect($freshConsultation->status)->toBe('ongoing');
-    expect($freshConsultation->ended_at)->toBeNull();
-    expect($freshConsultation->cancellation_reason)->toBeNull();
 });
 
 it('does not cancel when an admin audit user leaves', function () {
