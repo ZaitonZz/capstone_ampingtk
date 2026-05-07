@@ -16,7 +16,7 @@ export function NotificationList({ items }: NotificationListProps) {
                 {items.map((item, index) => {
                     const notification =
                         typeof item === 'string'
-                            ? { id: index, message: item }
+                            ? { id: `string-${index}`, message: item }
                             : item;
 
                     return (

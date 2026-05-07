@@ -19,10 +19,19 @@ const timeFormatOptions: DateTimeFormatOptions = {
     timeZone: CLINIC_TIME_ZONE,
 };
 
+const TIMEZONE_LESS_DATE_PATTERN =
+    /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?))?$/;
+
 function parseDate(value: string | null | undefined): Date | null {
     if (!value) return null;
 
-    const date = new Date(value);
+    const trimmedValue = value.trim();
+    const timezoneLessMatch = TIMEZONE_LESS_DATE_PATTERN.exec(trimmedValue);
+    const normalizedValue = timezoneLessMatch
+        ? `${timezoneLessMatch[1]}T${timezoneLessMatch[2] ?? '00:00:00'}+08:00`
+        : trimmedValue;
+
+    const date = new Date(normalizedValue);
 
     return Number.isNaN(date.getTime()) ? null : date;
 }

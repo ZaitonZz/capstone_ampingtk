@@ -14,7 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { formatClinicDateTime, toClinicDatetimeLocal } from '@/lib/clinic-date';
+import {
+    CLINIC_TIME_ZONE,
+    formatClinicDateTime,
+    toClinicDatetimeLocal,
+} from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -304,6 +308,7 @@ export default function ConsultationsCalendar({
                             right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
                         events={calendarEvents}
+                        timeZone={CLINIC_TIME_ZONE}
                         selectable={can_manage_schedule}
                         select={handleDateSelect}
                         eventClick={handleEventClick}
