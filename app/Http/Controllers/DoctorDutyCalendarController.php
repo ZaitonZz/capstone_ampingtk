@@ -45,31 +45,52 @@ class DoctorDutyCalendarController extends Controller
             ])
             ->values();
 
-        $dutyRequests = DoctorDutyRequest::query()
+        $mapDutyRequest = fn (DoctorDutyRequest $request): array => [
+            'id' => $request->id,
+            'doctor_id' => $request->doctor_id,
+            'request_type' => $request->request_type,
+            'start_date' => $request->start_date?->toDateString(),
+            'end_date' => $request->end_date?->toDateString(),
+            'remarks' => $request->remarks,
+            'status' => $request->status,
+            'reviewed_at' => $request->reviewed_at?->toIso8601String(),
+            'reviewer_notes' => $request->reviewer_notes,
+            'created_at' => $request->created_at?->toIso8601String(),
+        ];
+
+        $historyPaginator = DoctorDutyRequest::query()
             ->where('doctor_id', $user->id)
             ->latest('created_at')
-            ->limit(20)
-            ->get()
-            ->map(fn (DoctorDutyRequest $request): array => [
-                'id' => $request->id,
-                'doctor_id' => $request->doctor_id,
-                'request_type' => $request->request_type,
-                'start_date' => $request->start_date?->toDateString(),
-                'end_date' => $request->end_date?->toDateString(),
-                'remarks' => $request->remarks,
-                'status' => $request->status,
-                'reviewed_at' => $request->reviewed_at?->toIso8601String(),
-                'reviewer_notes' => $request->reviewer_notes,
-                'created_at' => $request->created_at?->toIso8601String(),
-            ])
-            ->values();
+            ->paginate(10, ['*'], 'history_page')
+            ->withQueryString();
+
+        $pendingPaginator = DoctorDutyRequest::query()
+            ->where('doctor_id', $user->id)
+            ->where('status', DoctorDutyRequest::STATUS_PENDING)
+            ->latest('created_at')
+            ->paginate(10, ['*'], 'pending_page')
+            ->withQueryString();
 
         return Inertia::render('doctor-duty-calendar/index', [
             'schedules' => $schedules,
-            'duty_requests' => $dutyRequests,
-            'pending_duty_requests' => $dutyRequests
-                ->where('status', DoctorDutyRequest::STATUS_PENDING)
-                ->values(),
+            'duty_requests' => [
+                'data' => collect($historyPaginator->items())->map($mapDutyRequest)->values(),
+                'meta' => [
+                    'current_page' => $historyPaginator->currentPage(),
+                    'last_page' => $historyPaginator->lastPage(),
+                    'per_page' => $historyPaginator->perPage(),
+                    'total' => $historyPaginator->total(),
+                ],
+            ],
+            'pending_duty_requests' => [
+                'data' => collect($pendingPaginator->items())->map($mapDutyRequest)->values(),
+                'meta' => [
+                    'current_page' => $pendingPaginator->currentPage(),
+                    'last_page' => $pendingPaginator->lastPage(),
+                    'per_page' => $pendingPaginator->perPage(),
+                    'total' => $pendingPaginator->total(),
+                ],
+            ],
             'filters' => [
                 'start' => $start->toDateString(),
                 'end' => $end->toDateString(),

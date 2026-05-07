@@ -71,6 +71,16 @@ interface DutyRequest {
     created_at: string;
 }
 
+interface PaginatedData<T> {
+    data: T[];
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+}
+
 interface SpecificDateEntry {
     duty_date: string;
     start_time: string;
@@ -85,8 +95,8 @@ interface Props {
     can_manage_schedule: boolean;
     can_submit_duty_requests: boolean;
     can_review_duty_requests: boolean;
-    duty_requests: DutyRequest[];
-    pending_duty_requests: DutyRequest[];
+    duty_requests: PaginatedData<DutyRequest>;
+    pending_duty_requests_total: number;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -506,7 +516,7 @@ export default function DoctorDutySchedulesIndex({
     can_submit_duty_requests,
     can_review_duty_requests,
     duty_requests,
-    pending_duty_requests,
+    pending_duty_requests_total,
 }: Props) {
     const today = dateKey(new Date());
     const [visibleDate, setVisibleDate] = useState(() =>
@@ -523,7 +533,6 @@ export default function DoctorDutySchedulesIndex({
     const [scheduleStatusFilter, setScheduleStatusFilter] =
         useState<StatusFilter>('all');
     const [schedulePage, setSchedulePage] = useState(1);
-    const [requestPage, setRequestPage] = useState(1);
     const [reviewerNotes, setReviewerNotes] = useState<Record<number, string>>(
         {},
     );
@@ -609,10 +618,13 @@ export default function DoctorDutySchedulesIndex({
         [filteredSchedules, schedulePage],
     );
 
-    const paginatedRequests = useMemo(
-        () => paginateItems(duty_requests, requestPage),
-        [duty_requests, requestPage],
-    );
+    const dutyRequestsData = duty_requests?.data ?? [];
+    const dutyRequestsMeta = duty_requests?.meta ?? {
+        current_page: 1,
+        last_page: 1,
+        per_page: 12,
+        total: dutyRequestsData.length,
+    };
 
     const doctorNameById = useMemo(
         () =>
@@ -887,6 +899,20 @@ export default function DoctorDutySchedulesIndex({
     function handleStatusFilterChange(status: StatusFilter) {
         setScheduleStatusFilter(status);
         setSchedulePage(1);
+    }
+
+    function handleRequestPageChange(page: number) {
+        router.get(
+            '/doctor-duty-schedules',
+            {
+                request_page: page,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+            },
+        );
     }
 
     return (
@@ -2386,7 +2412,7 @@ export default function DoctorDutySchedulesIndex({
                             variant="outline"
                             className="w-fit border-amber-200 bg-amber-50 text-amber-700"
                         >
-                            {pending_duty_requests.length} pending
+                            {pending_duty_requests_total} pending
                         </Badge>
                     </div>
 
@@ -2499,7 +2525,7 @@ export default function DoctorDutySchedulesIndex({
                         </form>
                     )}
 
-                    {duty_requests.length > 0 ? (
+                    {dutyRequestsData.length > 0 ? (
                         <div className="overflow-hidden rounded-lg border bg-background">
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[1120px] text-sm">
@@ -2534,7 +2560,7 @@ export default function DoctorDutySchedulesIndex({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {paginatedRequests.rows.map(
+                                        {dutyRequestsData.map(
                                             (request) => (
                                                 <tr
                                                     key={request.id}
@@ -2545,12 +2571,22 @@ export default function DoctorDutySchedulesIndex({
                                                             'Doctor'}
                                                     </td>
                                                     <td className="px-3 py-3">
-                                                        {
-                                                            REQUEST_TYPE_LABELS[
-                                                            request
-                                                                .request_type
-                                                            ]
-                                                        }
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                request.request_type ===
+                                                                    'on_leave'
+                                                                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                                                                    : 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700'
+                                                            }
+                                                        >
+                                                            {
+                                                                REQUEST_TYPE_LABELS[
+                                                                request
+                                                                    .request_type
+                                                                ]
+                                                            }
+                                                        </Badge>
                                                     </td>
                                                     <td className="px-3 py-3 whitespace-nowrap">
                                                         {formatDateRange(
@@ -2669,12 +2705,23 @@ export default function DoctorDutySchedulesIndex({
                                 </table>
                             </div>
                             <PaginationControls
-                                currentPage={paginatedRequests.currentPage}
-                                lastPage={paginatedRequests.lastPage}
-                                from={paginatedRequests.from}
-                                to={paginatedRequests.to}
-                                total={paginatedRequests.total}
-                                onPageChange={setRequestPage}
+                                currentPage={dutyRequestsMeta.current_page}
+                                lastPage={dutyRequestsMeta.last_page}
+                                from={
+                                    dutyRequestsMeta.total === 0
+                                        ? 0
+                                        :
+                                        (dutyRequestsMeta.current_page - 1) *
+                                        dutyRequestsMeta.per_page +
+                                        1
+                                }
+                                to={Math.min(
+                                    dutyRequestsMeta.total,
+                                    dutyRequestsMeta.current_page *
+                                    dutyRequestsMeta.per_page,
+                                )}
+                                total={dutyRequestsMeta.total}
+                                onPageChange={handleRequestPageChange}
                             />
                         </div>
                     ) : (

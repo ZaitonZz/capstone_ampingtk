@@ -302,9 +302,9 @@ it('allows doctors to view their own duty calendar but not the staff scheduler',
             fn ($page) => $page
                 ->component('doctor-duty-calendar/index')
                 ->has('schedules', 1)
-                ->has('duty_requests', 1)
+                ->has('duty_requests.data', 1)
                 ->where('schedules.0.doctor_id', $doctor->id)
-                ->where('duty_requests.0.doctor_id', $doctor->id)
+                ->where('duty_requests.data.0.doctor_id', $doctor->id)
         );
 
     $this->actingAs($doctor)

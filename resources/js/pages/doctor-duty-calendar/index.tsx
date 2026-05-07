@@ -10,16 +10,68 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
-function StatusBadge({ status }: { status: string }) {
-    return <Badge variant="outline">{status}</Badge>;
+type DutyStatus = 'on_duty' | 'off_duty' | 'absent' | 'on_leave';
+type RequestStatus = 'pending' | 'approved' | 'rejected';
+type RequestType = 'on_leave' | 'absent';
+
+const STATUS_LABELS: Record<DutyStatus, string> = {
+    on_duty: 'On Duty',
+    off_duty: 'Off Duty',
+    absent: 'Absent',
+    on_leave: 'On Leave',
+};
+
+const STATUS_BADGE_CLASSES: Record<DutyStatus, string> = {
+    on_duty: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    off_duty: 'border-slate-200 bg-slate-50 text-slate-700',
+    absent: 'border-rose-200 bg-rose-50 text-rose-700',
+    on_leave: 'border-amber-200 bg-amber-50 text-amber-700',
+};
+
+const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
+    pending: 'Pending',
+    approved: 'Approved',
+    rejected: 'Rejected',
+};
+
+const REQUEST_BADGE_CLASSES: Record<RequestStatus, string> = {
+    pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    rejected: 'border-rose-200 bg-rose-50 text-rose-700',
+};
+
+const REQUEST_TYPE_LABELS: Record<RequestType, string> = {
+    on_leave: 'Leave',
+    absent: 'Absent',
+};
+
+const REQUEST_TYPE_BADGE_CLASSES: Record<RequestType, string> = {
+    on_leave: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+    absent: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+};
+
+function StatusBadge({ status }: { status: DutyStatus }) {
+    return (
+        <Badge variant="outline" className={STATUS_BADGE_CLASSES[status]}>
+            {STATUS_LABELS[status]}
+        </Badge>
+    );
 }
 
-function RequestBadge({ status }: { status: string }) {
-    return <Badge variant="outline">{status}</Badge>;
+function RequestBadge({ status }: { status: RequestStatus }) {
+    return (
+        <Badge variant="outline" className={REQUEST_BADGE_CLASSES[status]}>
+            {REQUEST_STATUS_LABELS[status]}
+        </Badge>
+    );
 }
 
-function RequestTypeBadge({ type }: { type: string }) {
-    return <Badge variant="outline">{type}</Badge>;
+function RequestTypeBadge({ type }: { type: RequestType }) {
+    return (
+        <Badge variant="outline" className={REQUEST_TYPE_BADGE_CLASSES[type]}>
+            {REQUEST_TYPE_LABELS[type]}
+        </Badge>
+    );
 }
 
 type DutySchedule = {
@@ -28,20 +80,30 @@ type DutySchedule = {
     duty_date?: string | null;
     start_time: string;
     end_time: string;
-    status: string;
+    status: DutyStatus;
     remarks?: string | null;
 };
 
 type DutyRequest = {
     id: number;
-    request_type: string;
+    request_type: RequestType;
     start_date: string;
     end_date: string;
-    status: string;
+    status: RequestStatus;
     remarks?: string | null;
     created_at?: string | null;
     reviewed_at?: string | null;
     reviewer_notes?: string | null;
+};
+
+type PaginatedData<T> = {
+    data: T[];
+    meta: {
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
 };
 
 function dateKey(d: Date) {
@@ -95,6 +157,20 @@ function formatDateRange(a?: string, b?: string) {
     return `${formatDate(a)} — ${formatDate(b)}`;
 }
 
+function formatDateTime(value?: string | null) {
+    if (!value) {
+        return 'Not reviewed';
+    }
+
+    return new Intl.DateTimeFormat('en', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(new Date(value));
+}
+
 function toDateInputValue(date: Date) {
     return dateKey(date);
 }
@@ -102,14 +178,19 @@ function toDateInputValue(date: Date) {
 export default function DoctorDutyCalendarIndex(props: {
     auth: any;
     schedules: DutySchedule[];
-    duty_requests: DutyRequest[];
-    pending_duty_requests: DutyRequest[];
+    duty_requests: PaginatedData<DutyRequest>;
+    pending_duty_requests: PaginatedData<DutyRequest>;
     filters: {
         start: string;
         end: string;
     };
 }) {
-    const { schedules = [], duty_requests = [], pending_duty_requests = [], filters } = props;
+    const { schedules = [], duty_requests, pending_duty_requests, filters } = props;
+
+    const historyRequests = duty_requests?.data ?? [];
+    const pendingRequests = pending_duty_requests?.data ?? [];
+    const historyMeta = duty_requests?.meta ?? { current_page: 1, last_page: 1, per_page: 10, total: historyRequests.length };
+    const pendingMeta = pending_duty_requests?.meta ?? { current_page: 1, last_page: 1, per_page: 10, total: pendingRequests.length };
 
     const initialMonth = filters?.start ? startOfMonth(parseLocalDate(filters.start)) : startOfMonth(new Date());
     const initialSelectedDate = schedules[0]?.date ?? filters?.start ?? dateKey(new Date());
@@ -167,6 +248,32 @@ export default function DoctorDutyCalendarIndex(props: {
 
     function goToday() {
         loadMonth(startOfMonth(new Date()));
+    }
+
+    function goToHistoryPage(page: number) {
+        router.get('/doctor-duty-calendar', {
+            start: filters?.start,
+            end: filters?.end,
+            history_page: page,
+            pending_page: pendingMeta.current_page,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
+    }
+
+    function goToPendingPage(page: number) {
+        router.get('/doctor-duty-calendar', {
+            start: filters?.start,
+            end: filters?.end,
+            history_page: historyMeta.current_page,
+            pending_page: page,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
     }
 
     function handleRequestSubmit(e: FormEvent) {
@@ -318,16 +425,24 @@ export default function DoctorDutyCalendarIndex(props: {
                             <p className="mt-1 text-sm text-muted-foreground">Track your latest leave and absence requests.</p>
 
                             <div className="mt-4 space-y-3">
-                                {pending_duty_requests.length > 0 ? (
-                                    pending_duty_requests.map((request) => (
+                                {pendingRequests.length > 0 ? (
+                                    pendingRequests.map((request) => (
                                         <div key={request.id} className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                                            <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><RequestTypeBadge type={request.request_type} /><RequestBadge status={request.status} /></div><span className="text-xs text-muted-foreground">Submitted {request.created_at}</span></div>
+                                            <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><RequestTypeBadge type={request.request_type} /><RequestBadge status={request.status} /></div><span className="text-xs text-muted-foreground">Submitted {formatDateTime(request.created_at)}</span></div>
                                             <p className="mt-2 text-sm font-medium">{formatDateRange(request.start_date, request.end_date)}</p>
                                             {request.remarks && <p className="mt-1 text-sm text-muted-foreground">{request.remarks}</p>}
                                         </div>
                                     ))
                                 ) : (
                                     <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">No pending requests.</div>
+                                )}
+
+                                {pendingMeta.last_page > 1 && (
+                                    <div className="flex items-center justify-end gap-2 pt-2">
+                                        <Button type="button" variant="outline" size="sm" disabled={pendingMeta.current_page <= 1} onClick={() => goToPendingPage(pendingMeta.current_page - 1)}>Previous</Button>
+                                        <span className="text-xs text-muted-foreground">Page {pendingMeta.current_page} of {pendingMeta.last_page}</span>
+                                        <Button type="button" variant="outline" size="sm" disabled={pendingMeta.current_page >= pendingMeta.last_page} onClick={() => goToPendingPage(pendingMeta.current_page + 1)}>Next</Button>
+                                    </div>
                                 )}
                             </div>
                         </section>
@@ -341,8 +456,8 @@ export default function DoctorDutyCalendarIndex(props: {
                             </div>
 
                             <div className="divide-y">
-                                {duty_requests.length > 0 ? (
-                                    duty_requests.map((request) => (
+                                {historyRequests.length > 0 ? (
+                                    historyRequests.map((request) => (
                                         <div key={request.id} className="grid gap-4 p-5 md:grid-cols-[minmax(0,1fr)_14rem]">
                                             <div className="space-y-2">
                                                 <div className="flex flex-wrap items-center gap-2"><RequestTypeBadge type={request.request_type} /><RequestBadge status={request.status} /></div>
@@ -351,14 +466,22 @@ export default function DoctorDutyCalendarIndex(props: {
                                             </div>
 
                                             <div className="space-y-1 text-sm text-muted-foreground md:text-right">
-                                                <p>Submitted {request.created_at}</p>
-                                                <p>Reviewed {request.reviewed_at}</p>
+                                                <p>Submitted {formatDateTime(request.created_at)}</p>
+                                                <p>Reviewed {formatDateTime(request.reviewed_at)}</p>
                                                 {request.reviewer_notes && <p className="text-foreground">Notes: {request.reviewer_notes}</p>}
                                             </div>
                                         </div>
                                     ))
                                 ) : (
                                     <div className="p-5 text-sm text-muted-foreground">No request history yet.</div>
+                                )}
+
+                                {historyMeta.last_page > 1 && (
+                                    <div className="flex items-center justify-end gap-2 p-5 pt-3">
+                                        <Button type="button" variant="outline" size="sm" disabled={historyMeta.current_page <= 1} onClick={() => goToHistoryPage(historyMeta.current_page - 1)}>Previous</Button>
+                                        <span className="text-xs text-muted-foreground">Page {historyMeta.current_page} of {historyMeta.last_page}</span>
+                                        <Button type="button" variant="outline" size="sm" disabled={historyMeta.current_page >= historyMeta.last_page} onClick={() => goToHistoryPage(historyMeta.current_page + 1)}>Next</Button>
+                                    </div>
                                 )}
                             </div>
                         </section>
