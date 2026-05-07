@@ -14,6 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import {
+    CLINIC_TIME_ZONE,
+    formatClinicDateTime,
+    toClinicDatetimeLocal,
+} from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -219,19 +224,11 @@ export default function ConsultationsCalendar({
     }
 
     function handleDateSelect(info: DateSelectArg) {
-        const d = new Date(info.startStr);
-        const dt =
-            [
-                d.getFullYear(),
-                String(d.getMonth() + 1).padStart(2, '0'),
-                String(d.getDate()).padStart(2, '0'),
-            ].join('-') +
-            'T' +
-            [
-                String(d.getHours()).padStart(2, '0'),
-                String(d.getMinutes()).padStart(2, '0'),
-            ].join(':');
-        openCreateModal(dt);
+        openCreateModal(
+            info.startStr.length === 10
+                ? `${info.startStr}T00:00`
+                : toClinicDatetimeLocal(info.startStr),
+        );
     }
 
     function handleApprove(id: number) {
@@ -311,6 +308,7 @@ export default function ConsultationsCalendar({
                             right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
                         events={calendarEvents}
+                        timeZone={CLINIC_TIME_ZONE}
                         selectable={can_manage_schedule}
                         select={handleDateSelect}
                         eventClick={handleEventClick}
@@ -371,7 +369,7 @@ export default function ConsultationsCalendar({
                                 <span className="text-muted-foreground">
                                     Scheduled:{' '}
                                 </span>
-                                {new Date(selected.start).toLocaleString()}
+                                {formatClinicDateTime(selected.start)}
                             </div>
                             {selected.chief_complaint && (
                                 <div>

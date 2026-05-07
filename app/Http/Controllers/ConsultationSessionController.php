@@ -65,6 +65,7 @@ class ConsultationSessionController extends Controller
                 'ws_url' => config('services.livekit.ws_url'),
                 'room_name' => $consultation->livekit_room_name,
                 'room_status' => $consultation->livekit_room_status,
+                'leave_url' => route('consultations.livekit.leave', $consultation),
             ],
             'deepfake_detection' => $this->deepfakeDetectionService->statusPayload($consultation),
         ]);

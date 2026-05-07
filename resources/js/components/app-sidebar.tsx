@@ -36,6 +36,7 @@ import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
+import { dashboard as medicalStaffDashboard } from '@/routes/medicalstaff';
 import { dashboard as patientDashboard } from '@/routes/patient';
 import { index as patientConsultations } from '@/routes/patient/consultations';
 import { index as patientsList } from '@/routes/patients';
@@ -71,7 +72,7 @@ export function AppSidebar() {
     } else if (user.role === 'admin') {
         dashboardHref = adminDashboard();
     } else if (user.role === 'medicalstaff') {
-        dashboardHref = '/medicalstaff/dashboard';
+        dashboardHref = medicalStaffDashboard();
     }
 
     const mainNavItems: NavItem[] = [

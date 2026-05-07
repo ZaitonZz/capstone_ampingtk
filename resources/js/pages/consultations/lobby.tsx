@@ -32,6 +32,11 @@ import {
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import {
+    formatClinicDate,
+    formatClinicDateTime,
+    formatClinicTime,
+} from '@/lib/clinic-date';
+import {
     consultationDetailsUrlForRole,
     consultationIndexUrlForRole,
 } from '@/lib/consultation-navigation';
@@ -199,7 +204,7 @@ function DeepfakeDetectionIndicator({
             {detection?.last_heartbeat_at && (
                 <p className="mt-2 text-[11px] opacity-75">
                     Last heartbeat:{' '}
-                    {new Date(detection.last_heartbeat_at).toLocaleTimeString()}
+                    {formatClinicTime(detection.last_heartbeat_at)}
                 </p>
             )}
         </div>
@@ -437,7 +442,7 @@ export default function ConsultationLobbyPage({
             const audioContext = new (
                 window.AudioContext || (window as any).webkitAudioContext
             )();
-            const resume = () => audioContext.resume().catch(() => { });
+            const resume = () => audioContext.resume().catch(() => {});
 
             void resume();
 
@@ -720,22 +725,22 @@ export default function ConsultationLobbyPage({
     const statusLabel = !isLiveKitEnabled
         ? 'LiveKit disabled'
         : isPaused
-            ? isCurrentUserVerificationTarget
-                ? 'Paused: verification required'
-                : `Paused: waiting for ${verificationTargetRole}`
-            : isAdminUser
-                ? 'Admin audit access'
-                : isConsentConfirmed
-                    ? 'Ready to join'
-                    : 'Consent required';
+          ? isCurrentUserVerificationTarget
+              ? 'Paused: verification required'
+              : `Paused: waiting for ${verificationTargetRole}`
+          : isAdminUser
+            ? 'Admin audit access'
+            : isConsentConfirmed
+              ? 'Ready to join'
+              : 'Consent required';
 
     const statusPillClass = !isLiveKitEnabled
         ? 'bg-zinc-100 text-zinc-700 ring-zinc-200 dark:bg-zinc-900 dark:text-zinc-200 dark:ring-zinc-700'
         : isPaused
-            ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700'
-            : canJoinSession
-                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
-                : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
+          ? 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700'
+          : canJoinSession
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700'
+            : 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700';
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -815,7 +820,9 @@ export default function ConsultationLobbyPage({
                                                 playsInline
                                                 muted
                                                 className="h-full w-full object-cover"
-                                                style={{ transform: 'scaleX(-1)' }}
+                                                style={{
+                                                    transform: 'scaleX(-1)',
+                                                }}
                                             />
                                         )}
                                     </>
@@ -856,7 +863,7 @@ export default function ConsultationLobbyPage({
                                                             'w-0.5 rounded-full transition-all duration-75',
                                                             heights[i],
                                                             showLevelBars &&
-                                                                micLevel >= t
+                                                            micLevel >= t
                                                                 ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.45)]'
                                                                 : 'bg-white/10',
                                                         ].join(' ')}
@@ -960,9 +967,9 @@ export default function ConsultationLobbyPage({
                                     iconClass="bg-orange-500/10 text-orange-500"
                                     value={
                                         consultation.scheduled_at
-                                            ? new Date(
-                                                consultation.scheduled_at,
-                                            ).toLocaleString()
+                                            ? formatClinicDateTime(
+                                                  consultation.scheduled_at,
+                                              )
                                             : '—'
                                     }
                                 />
@@ -997,15 +1004,14 @@ export default function ConsultationLobbyPage({
                                 </span>
                                 {consent?.confirmed_at && !isAdminUser && (
                                     <span className="ml-auto opacity-60">
-                                        {new Date(
-                                            consent.confirmed_at,
-                                        ).toLocaleDateString()}
+                                        {formatClinicDate(consent.confirmed_at)}
                                     </span>
                                 )}
                             </div>
 
                             <p className="mt-3 text-xs text-muted-foreground">
-                                Consent is already in place. You can proceed to the call when the room is ready.
+                                Consent is already in place. You can proceed to
+                                the call when the room is ready.
                             </p>
                         </div>
 
@@ -1045,7 +1051,7 @@ export default function ConsultationLobbyPage({
                                                 disabled={
                                                     isSubmittingOtp ||
                                                     otpCode.trim().length !==
-                                                    otpLength
+                                                        otpLength
                                                 }
                                                 className="w-full"
                                             >
@@ -1069,8 +1075,8 @@ export default function ConsultationLobbyPage({
                                                 {resendInSeconds > 0
                                                     ? `Resend in ${formatCountdown(resendInSeconds)}`
                                                     : isResendingOtp
-                                                        ? 'Sending...'
-                                                        : 'Resend OTP'}
+                                                      ? 'Sending...'
+                                                      : 'Resend OTP'}
                                             </Button>
                                             {expiresInSeconds > 0 && (
                                                 <span className="text-[11px] text-amber-700 dark:text-amber-300">
@@ -1159,12 +1165,12 @@ export default function ConsultationLobbyPage({
                                         {isApplyingOverride
                                             ? 'Applying override...'
                                             : isManualOverrideEnabled
-                                                ? 'Manual Override Enabled'
-                                                : 'Enable Manual Override'}
+                                              ? 'Manual Override Enabled'
+                                              : 'Enable Manual Override'}
                                     </Button>
                                     <p className="text-center text-xs text-muted-foreground">
-                                        Doctors can enable manual override
-                                        while the consultation is pending or
+                                        Doctors can enable manual override while
+                                        the consultation is pending or
                                         scheduled.
                                     </p>
                                 </>

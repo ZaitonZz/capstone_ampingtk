@@ -8,7 +8,7 @@ use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\LiveKitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Throwable;
+use RuntimeException;
 
 class ConsultationLiveKitController extends Controller
 {
@@ -129,7 +129,7 @@ class ConsultationLiveKitController extends Controller
         }
 
         if ($user->isMedicalStaff()) {
-            abort(403, 'Medical staff can schedule consultations but cannot join consultation sessions.');
+            abort(403, 'Medical staff can schedule consultations but cannot leave consultation sessions.');
         }
 
         $isConsultationDoctor = $consultation->doctor_id === $user->id;
@@ -141,84 +141,103 @@ class ConsultationLiveKitController extends Controller
         }
 
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
-            return response()->json([
-                'status' => $consultation->status,
-                'cancelled' => false,
-                'redirect_url' => route('consultations.lobby.show', $consultation),
-            ]);
+            return response()->json($this->leaveResponsePayload($consultation, false));
         }
 
-        $hasProvisionedRoom = $this->hasProvisionedLiveKitRoom($consultation);
-
-        if (! $isAdminAudit && $hasProvisionedRoom) {
-            try {
-                $this->liveKitService->removeParticipantFromConsultation($consultation, $user);
-            } catch (Throwable $exception) {
-                report($exception);
-
-                $consultation->forceFill([
-                    'livekit_last_error' => $exception->getMessage(),
-                ])->save();
-            }
+        if (! $this->hasProvisionedLiveKitRoom($consultation)) {
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'No provisioned LiveKit room exists for this consultation.',
+            ]));
         }
 
-        $cancelled = false;
-        $consultation = $consultation->fresh();
-        $hasProvisionedRoom = $this->hasProvisionedLiveKitRoom($consultation);
-
-        if (
-            ! $isAdminAudit
-            && $hasProvisionedRoom
-            && in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true)
-            && ! $this->hasHumanConsultationParticipantInRoom($consultation)
-        ) {
-            try {
-                $this->liveKitService->deleteRoom($consultation);
-            } catch (Throwable $exception) {
-                report($exception);
-
-                $consultation->forceFill([
-                    'livekit_last_error' => $exception->getMessage(),
-                ])->save();
-            }
-
-            $consultation->forceFill([
-                'status' => Consultation::STATUS_CANCELLED,
-                'ended_at' => now(),
-                'cancellation_reason' => 'Consultation cancelled because the last participant left the call.',
-            ])->save();
-
-            $cancelled = true;
-            $consultation = $consultation->fresh();
+        if ($isAdminAudit) {
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Admin audit participant left the LiveKit room.',
+            ]));
         }
 
-        return response()->json([
-            'status' => $consultation->status,
-            'cancelled' => $cancelled,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
-        ]);
-    }
-
-    private function hasProvisionedLiveKitRoom(Consultation $consultation): bool
-    {
-        return $consultation->livekit_room_name !== null
-            && $consultation->livekit_room_status === 'room_ready';
-    }
-
-    private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
-    {
         try {
-            $participants = $this->liveKitService->listParticipants($consultation);
-        } catch (Throwable $exception) {
+            $this->liveKitService->removeParticipantFromConsultation($consultation, $user);
+        } catch (RuntimeException $exception) {
             report($exception);
 
             $consultation->forceFill([
                 'livekit_last_error' => $exception->getMessage(),
             ])->save();
 
-            return true;
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Participant leave was accepted, but LiveKit removal could not be confirmed.',
+            ]), 202);
         }
 
+        try {
+            $hasRemainingHumanParticipant = $this->hasHumanConsultationParticipantInRoom($consultation);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Participant left, but room cleanup could not be confirmed.',
+            ]), 202);
+        }
+
+        if ($hasRemainingHumanParticipant) {
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Participant left the LiveKit room.',
+            ]));
+        }
+
+        try {
+            $this->liveKitService->deleteRoom($consultation);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+        }
+
+        $consultation->forceFill([
+            'status' => Consultation::STATUS_CANCELLED,
+            'ended_at' => now(),
+            'cancellation_reason' => 'Consultation cancelled because all participants left the LiveKit room.',
+        ])->save();
+
+        return response()->json([
+            'message' => 'Consultation cancelled because all participants left the LiveKit room.',
+            'status' => Consultation::STATUS_CANCELLED,
+            'cancelled' => true,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+    }
+
+    private function hasProvisionedLiveKitRoom(Consultation $consultation): bool
+    {
+        return (bool) config('services.livekit.enabled', false)
+            && $consultation->livekit_room_name !== null
+            && $consultation->livekit_room_status === 'room_ready';
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     * @return array<string, mixed>
+     */
+    private function leaveResponsePayload(Consultation $consultation, bool $cancelled, array $extra = []): array
+    {
+        return [
+            ...$extra,
+            'status' => $consultation->status,
+            'cancelled' => $cancelled,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ];
+    }
+
+    private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
+    {
+        $participants = $this->liveKitService->listParticipants($consultation);
         $patientUserId = $consultation->patient()->value('user_id');
         $doctorUserId = $consultation->doctor_id;
 
@@ -232,6 +251,10 @@ class ConsultationLiveKitController extends Controller
             }
 
             $metadata = $this->decodeParticipantMetadata($participant['metadata']);
+
+            if (($metadata['audit_mode'] ?? false) === true) {
+                continue;
+            }
 
             if (($metadata['role'] ?? null) === 'doctor' || ($metadata['role'] ?? null) === 'patient') {
                 return true;

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { toClinicDatetimeLocal } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -18,23 +19,6 @@ interface Props {
     consultation: Consultation;
     patients: PatientSummary[];
     doctors: DoctorSummary[];
-}
-
-function toDatetimeLocal(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return (
-        [
-            d.getFullYear(),
-            String(d.getMonth() + 1).padStart(2, '0'),
-            String(d.getDate()).padStart(2, '0'),
-        ].join('-') +
-        'T' +
-        [
-            String(d.getHours()).padStart(2, '0'),
-            String(d.getMinutes()).padStart(2, '0'),
-        ].join(':')
-    );
 }
 
 export default function ConsultationEdit({ consultation, doctors }: Props) {
@@ -59,9 +43,9 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
         type: consultation.type,
         status: consultation.status as ConsultationStatus,
         chief_complaint: consultation.chief_complaint ?? '',
-        scheduled_at: toDatetimeLocal(consultation.scheduled_at),
-        started_at: toDatetimeLocal(consultation.started_at),
-        ended_at: toDatetimeLocal(consultation.ended_at),
+        scheduled_at: toClinicDatetimeLocal(consultation.scheduled_at),
+        started_at: toClinicDatetimeLocal(consultation.started_at),
+        ended_at: toClinicDatetimeLocal(consultation.ended_at),
         cancellation_reason: consultation.cancellation_reason ?? '',
         deepfake_verified: consultation.deepfake_verified ?? null,
     });

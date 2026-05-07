@@ -5,6 +5,7 @@ import * as ConsultationController from '@/actions/App/Http/Controllers/Consulta
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -193,26 +194,25 @@ export default function ConsultationShow({
                             </Badge>
                         )}
                         {permissions.can_manage_schedule &&
-                            consultation.status === 'pending' && (
-                                consultation.doctor_available_for_approval ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleApprove}
-                                        className="text-green-600 hover:text-green-700"
-                                    >
-                                        <CheckCircle className="mr-1 h-4 w-4" />
-                                        Approve
-                                    </Button>
-                                ) : (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-amber-200 bg-amber-50 text-amber-700"
-                                    >
-                                        Preferred doctor is not on duty
-                                    </Badge>
-                                )
-                            )}
+                            consultation.status === 'pending' &&
+                            (consultation.doctor_available_for_approval ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleApprove}
+                                    className="text-green-600 hover:text-green-700"
+                                >
+                                    <CheckCircle className="mr-1 h-4 w-4" />
+                                    Approve
+                                </Button>
+                            ) : (
+                                <Badge
+                                    variant="outline"
+                                    className="border-amber-200 bg-amber-50 text-amber-700"
+                                >
+                                    Preferred doctor is not on duty
+                                </Badge>
+                            ))}
                         {consultation.type === 'teleconsultation' &&
                             permissions.can_join_session && (
                                 <Button size="sm" asChild>
@@ -276,9 +276,9 @@ export default function ConsultationShow({
                         label="Scheduled"
                         value={
                             consultation.scheduled_at
-                                ? new Date(
+                                ? formatClinicDateTime(
                                       consultation.scheduled_at,
-                                  ).toLocaleString()
+                                  )
                                 : null
                         }
                     />
@@ -286,9 +286,7 @@ export default function ConsultationShow({
                         label="Started"
                         value={
                             consultation.started_at
-                                ? new Date(
-                                      consultation.started_at,
-                                  ).toLocaleString()
+                                ? formatClinicDateTime(consultation.started_at)
                                 : null
                         }
                     />
@@ -296,9 +294,7 @@ export default function ConsultationShow({
                         label="Ended"
                         value={
                             consultation.ended_at
-                                ? new Date(
-                                      consultation.ended_at,
-                                  ).toLocaleString()
+                                ? formatClinicDateTime(consultation.ended_at)
                                 : null
                         }
                     />
@@ -356,7 +352,9 @@ export default function ConsultationShow({
 
                 {/* SOAP Notes Section */}
                 <div className="mt-4 rounded-xl border p-4">
-                    <h2 className="mb-3 text-base font-semibold">Clinical Notes</h2>
+                    <h2 className="mb-3 text-base font-semibold">
+                        Clinical Notes
+                    </h2>
 
                     {note ? (
                         <div className="space-y-4">
@@ -365,7 +363,7 @@ export default function ConsultationShow({
                                     <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
                                         Subjective (S)
                                     </h3>
-                                    <p className="whitespace-pre-wrap text-sm">
+                                    <p className="text-sm whitespace-pre-wrap">
                                         {note.subjective}
                                     </p>
                                 </div>
@@ -375,7 +373,7 @@ export default function ConsultationShow({
                                     <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
                                         Objective (O)
                                     </h3>
-                                    <p className="whitespace-pre-wrap text-sm">
+                                    <p className="text-sm whitespace-pre-wrap">
                                         {note.objective}
                                     </p>
                                 </div>
@@ -385,7 +383,7 @@ export default function ConsultationShow({
                                     <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
                                         Assessment (A)
                                     </h3>
-                                    <p className="whitespace-pre-wrap text-sm">
+                                    <p className="text-sm whitespace-pre-wrap">
                                         {note.assessment}
                                     </p>
                                 </div>
@@ -395,7 +393,7 @@ export default function ConsultationShow({
                                     <h3 className="mb-1 text-sm font-medium text-muted-foreground uppercase">
                                         Plan (P)
                                     </h3>
-                                    <p className="whitespace-pre-wrap text-sm">
+                                    <p className="text-sm whitespace-pre-wrap">
                                         {note.plan}
                                     </p>
                                 </div>
@@ -410,8 +408,9 @@ export default function ConsultationShow({
                                 )}
                             <div className="mt-2 text-xs text-muted-foreground">
                                 Last updated:{' '}
-                                {new Date(note.updated_at).toLocaleString()}{' '}
-                                {note.doctor?.name && `by Dr. ${note.doctor.name}`}
+                                {formatClinicDateTime(note.updated_at)}{' '}
+                                {note.doctor?.name &&
+                                    `by Dr. ${note.doctor.name}`}
                             </div>
                         </div>
                     ) : (
@@ -423,7 +422,9 @@ export default function ConsultationShow({
 
                 {/* Prescriptions Section */}
                 <div className="mt-4 rounded-xl border p-4">
-                    <h2 className="mb-3 text-base font-semibold">Prescriptions</h2>
+                    <h2 className="mb-3 text-base font-semibold">
+                        Prescriptions
+                    </h2>
 
                     {prescriptions.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
@@ -438,48 +439,50 @@ export default function ConsultationShow({
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex-1">
-                                            <h3 className="font-medium text-base">
+                                            <h3 className="text-base font-medium">
                                                 {prescription.medication_name}
                                             </h3>
                                             <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
                                                 {prescription.dosage && (
                                                     <div>
-                                        <span className="font-medium">
-                                            Dosage:
-                                        </span>{' '}
-                                        {prescription.dosage}
+                                                        <span className="font-medium">
+                                                            Dosage:
+                                                        </span>{' '}
+                                                        {prescription.dosage}
                                                     </div>
                                                 )}
                                                 {prescription.frequency && (
                                                     <div>
-                                        <span className="font-medium">
-                                            Frequency:
-                                        </span>{' '}
-                                        {prescription.frequency}
+                                                        <span className="font-medium">
+                                                            Frequency:
+                                                        </span>{' '}
+                                                        {prescription.frequency}
                                                     </div>
                                                 )}
                                                 {prescription.duration && (
                                                     <div>
-                                        <span className="font-medium">
-                                            Duration:
-                                        </span>{' '}
-                                        {prescription.duration}
+                                                        <span className="font-medium">
+                                                            Duration:
+                                                        </span>{' '}
+                                                        {prescription.duration}
                                                     </div>
                                                 )}
                                                 {prescription.route && (
                                                     <div>
-                                        <span className="font-medium">
-                                            Route:
-                                        </span>{' '}
-                                        {prescription.route}
+                                                        <span className="font-medium">
+                                                            Route:
+                                                        </span>{' '}
+                                                        {prescription.route}
                                                     </div>
                                                 )}
                                                 {prescription.instructions && (
                                                     <div>
-                                        <span className="font-medium">
-                                            Instructions:
-                                        </span>{' '}
-                                        {prescription.instructions}
+                                                        <span className="font-medium">
+                                                            Instructions:
+                                                        </span>{' '}
+                                                        {
+                                                            prescription.instructions
+                                                        }
                                                     </div>
                                                 )}
                                             </div>
@@ -487,9 +490,9 @@ export default function ConsultationShow({
                                     </div>
                                     <div className="mt-2 text-xs text-muted-foreground">
                                         Created:{' '}
-                                        {new Date(
+                                        {formatClinicDateTime(
                                             prescription.created_at,
-                                        ).toLocaleString()}{' '}
+                                        )}{' '}
                                         {prescription.doctor?.name &&
                                             `by Dr. ${prescription.doctor.name}`}
                                     </div>
@@ -560,15 +563,15 @@ export default function ConsultationShow({
                                                 {check.target_role ?? '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
-                                                {new Date(
+                                                {formatClinicDateTime(
                                                     check.scheduled_at,
-                                                ).toLocaleString()}
+                                                )}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {check.completed_at
-                                                    ? new Date(
+                                                    ? formatClinicDateTime(
                                                           check.completed_at,
-                                                      ).toLocaleString()
+                                                      )
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2 text-muted-foreground">
@@ -623,9 +626,9 @@ export default function ConsultationShow({
                                         <tr key={log.id}>
                                             <td className="px-2 py-2 text-muted-foreground">
                                                 {log.scanned_at
-                                                    ? new Date(
+                                                    ? formatClinicDateTime(
                                                           log.scanned_at,
-                                                      ).toLocaleString()
+                                                      )
                                                     : '—'}
                                             </td>
                                             <td className="px-2 py-2">
@@ -696,9 +699,9 @@ export default function ConsultationShow({
                                             {escalation.status}
                                         </Badge>
                                         <span className="text-xs text-muted-foreground">
-                                            {new Date(
+                                            {formatClinicDateTime(
                                                 escalation.created_at,
-                                            ).toLocaleString()}
+                                            )}
                                         </span>
                                     </div>
                                     <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
@@ -718,7 +721,7 @@ export default function ConsultationShow({
                                                     ? ` by ${escalation.resolver.name}`
                                                     : ''}
                                                 {escalation.resolved_at
-                                                    ? ` at ${new Date(escalation.resolved_at).toLocaleString()}`
+                                                    ? ` at ${formatClinicDateTime(escalation.resolved_at)}`
                                                     : ''}
                                             </span>
                                         )}

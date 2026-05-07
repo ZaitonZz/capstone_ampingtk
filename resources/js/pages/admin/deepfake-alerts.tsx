@@ -3,6 +3,7 @@ import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import * as AdminDeepfakeAlertsRoute from '@/routes/admin/deepfake-alerts';
 import type { BreadcrumbItem } from '@/types';
@@ -73,15 +74,20 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
             <div className="mx-auto w-full max-w-6xl space-y-4 p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-semibold">Deepfake Alerts</h1>
+                        <h1 className="text-2xl font-semibold">
+                            Deepfake Alerts
+                        </h1>
                         <p className="text-sm text-muted-foreground">
-                            In-app escalations triggered by 5 straight fake scans.
+                            In-app escalations triggered by 5 straight fake
+                            scans.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
                             asChild
-                            variant={activeStatus === null ? 'default' : 'outline'}
+                            variant={
+                                activeStatus === null ? 'default' : 'outline'
+                            }
                             size="sm"
                         >
                             <Link href={AdminDeepfakeAlertsRoute.index()}>
@@ -90,7 +96,9 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                         </Button>
                         <Button
                             asChild
-                            variant={activeStatus === 'open' ? 'default' : 'outline'}
+                            variant={
+                                activeStatus === 'open' ? 'default' : 'outline'
+                            }
                             size="sm"
                         >
                             <Link
@@ -103,7 +111,11 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                         </Button>
                         <Button
                             asChild
-                            variant={activeStatus === 'resolved' ? 'default' : 'outline'}
+                            variant={
+                                activeStatus === 'resolved'
+                                    ? 'default'
+                                    : 'outline'
+                            }
                             size="sm"
                         >
                             <Link
@@ -128,14 +140,30 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                             <table className="w-full text-sm">
                                 <thead className="border-b text-left">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Status</th>
-                                        <th className="px-3 py-2 font-medium">Consultation</th>
-                                        <th className="px-3 py-2 font-medium">Patient</th>
-                                        <th className="px-3 py-2 font-medium">Doctor</th>
-                                        <th className="px-3 py-2 font-medium">Triggered By</th>
-                                        <th className="px-3 py-2 font-medium">Streak</th>
-                                        <th className="px-3 py-2 font-medium">Created</th>
-                                        <th className="px-3 py-2 font-medium">Action</th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Status
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Consultation
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Patient
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Doctor
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Triggered By
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Streak
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Created
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Action
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -162,16 +190,21 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                                                     '—'}
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {alert.consultation?.doctor?.name ?? '—'}
+                                                {alert.consultation?.doctor
+                                                    ?.name ?? '—'}
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {alert.triggered_by?.name ?? 'System'}
+                                                {alert.triggered_by?.name ??
+                                                    'System'}
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {alert.streak_count} straight fake
+                                                {alert.streak_count} straight
+                                                fake
                                             </td>
                                             <td className="px-3 py-2 text-muted-foreground">
-                                                {new Date(alert.created_at).toLocaleString()}
+                                                {formatClinicDateTime(
+                                                    alert.created_at,
+                                                )}
                                             </td>
                                             <td className="px-3 py-2">
                                                 {alert.status === 'open' ? (
@@ -179,7 +212,9 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                                                         type="button"
                                                         size="sm"
                                                         onClick={() =>
-                                                            resolveAlert(alert.id)
+                                                            resolveAlert(
+                                                                alert.id,
+                                                            )
                                                         }
                                                     >
                                                         <CheckCircle2 className="mr-1 h-4 w-4" />
@@ -188,7 +223,7 @@ export default function AdminDeepfakeAlerts({ alerts, filters }: Props) {
                                                 ) : (
                                                     <span className="text-muted-foreground">
                                                         {alert.resolved_at
-                                                            ? `Resolved ${new Date(alert.resolved_at).toLocaleString()}`
+                                                            ? `Resolved ${formatClinicDateTime(alert.resolved_at)}`
                                                             : 'Resolved'}
                                                     </span>
                                                 )}
