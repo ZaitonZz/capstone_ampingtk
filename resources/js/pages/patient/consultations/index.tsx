@@ -6,6 +6,7 @@ import * as PatientConsultationController from '@/actions/App/Http/Controllers/P
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime, isClinicToday } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     PaginatedConsultations,
@@ -39,18 +40,8 @@ const STATUS_BADGE_CLASSES: Record<ConsultationStatus, string> = {
     no_show: 'border-red-200 bg-red-50 text-red-700',
 };
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
 function isScheduledForToday(scheduledAt: string | null): boolean {
-    if (!scheduledAt) return false;
-    const scheduledTime = new Date(scheduledAt).getTime();
-    if (Number.isNaN(scheduledTime)) return false;
-
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startOfTomorrow = startOfToday + ONE_DAY_MS;
-
-    return scheduledTime >= startOfToday && scheduledTime < startOfTomorrow;
+    return isClinicToday(scheduledAt);
 }
 
 interface Filters {
@@ -62,7 +53,6 @@ interface Props {
     consultations: PaginatedConsultations;
     filters: Filters;
 }
-
 
 export default function PatientConsultationsIndex({
     consultations,
@@ -170,8 +160,12 @@ export default function PatientConsultationsIndex({
                             {consultations.data
                                 .slice()
                                 .sort((a, b) => {
-                                    const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-                                    const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+                                    const aDate = a.scheduled_at
+                                        ? new Date(a.scheduled_at).getTime()
+                                        : Infinity;
+                                    const bDate = b.scheduled_at
+                                        ? new Date(b.scheduled_at).getTime()
+                                        : Infinity;
                                     return aDate - bDate;
                                 })
                                 .map((c) => {
@@ -179,7 +173,11 @@ export default function PatientConsultationsIndex({
                                         c.status === 'completed' ||
                                         c.status === 'cancelled' ||
                                         c.status === 'no_show';
-                                    const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
+                                    const isToday =
+                                        !isFinalStatus &&
+                                        isScheduledForToday(
+                                            c.scheduled_at ?? null,
+                                        );
 
                                     return (
                                         <tr
@@ -192,7 +190,10 @@ export default function PatientConsultationsIndex({
                                         >
                                             <td className="px-4 py-3 font-medium">
                                                 <div className="flex items-center gap-2">
-                                                    <span>Dr. {c.doctor?.name ?? '—'}</span>
+                                                    <span>
+                                                        Dr.{' '}
+                                                        {c.doctor?.name ?? '—'}
+                                                    </span>
                                                     {isToday && (
                                                         <Badge className="border-blue-200 bg-blue-50 text-blue-700">
                                                             Today
@@ -207,7 +208,9 @@ export default function PatientConsultationsIndex({
                                                 <Badge
                                                     variant="outline"
                                                     className={
-                                                        STATUS_BADGE_CLASSES[c.status]
+                                                        STATUS_BADGE_CLASSES[
+                                                            c.status
+                                                        ]
                                                     }
                                                 >
                                                     {STATUS_LABELS[c.status]}
@@ -215,9 +218,9 @@ export default function PatientConsultationsIndex({
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {c.scheduled_at
-                                                    ? new Date(
+                                                    ? formatClinicDateTime(
                                                           c.scheduled_at,
-                                                      ).toLocaleString()
+                                                      )
                                                     : '—'}
                                             </td>
                                             <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
@@ -273,4 +276,3 @@ export default function PatientConsultationsIndex({
         </AppLayout>
     );
 }
-

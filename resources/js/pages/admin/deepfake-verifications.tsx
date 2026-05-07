@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
 import type { BreadcrumbItem } from '@/types';
 import * as AdminDeepfakeVerificationsRoute from '@/routes/admin/deepfake-verifications';
@@ -98,7 +99,7 @@ function formatDateTime(value: string | null): string {
         return '—';
     }
 
-    return new Date(value).toLocaleString();
+    return formatClinicDateTime(value);
 }
 
 function formatScore(value: number | string): string {
@@ -111,7 +112,9 @@ function formatScore(value: number | string): string {
     return `${(parsedValue * 100).toFixed(1)}%`;
 }
 
-function displayPersonName(person?: { first_name: string; last_name: string } | null): string {
+function displayPersonName(
+    person?: { first_name: string; last_name: string } | null,
+): string {
     if (!person) {
         return '—';
     }
@@ -126,8 +129,12 @@ export default function AdminDeepfakeVerifications({
 }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? 'all');
-    const [roleFilter, setRoleFilter] = useState(filters.verified_role ?? 'all');
-    const [flaggedFilter, setFlaggedFilter] = useState(filters.flagged ?? 'all');
+    const [roleFilter, setRoleFilter] = useState(
+        filters.verified_role ?? 'all',
+    );
+    const [flaggedFilter, setFlaggedFilter] = useState(
+        filters.flagged ?? 'all',
+    );
 
     function applyFilters(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -170,9 +177,12 @@ export default function AdminDeepfakeVerifications({
 
             <div className="mx-auto w-full max-w-7xl space-y-4 p-4 md:p-6">
                 <div className="space-y-1">
-                    <h1 className="text-2xl font-semibold">Deepfake Verification</h1>
+                    <h1 className="text-2xl font-semibold">
+                        Deepfake Verification
+                    </h1>
                     <p className="text-sm text-muted-foreground">
-                        Face verification outcomes, confidence score, and risk decisions per consultation.
+                        Face verification outcomes, confidence score, and risk
+                        decisions per consultation.
                     </p>
                 </div>
 
@@ -193,20 +203,27 @@ export default function AdminDeepfakeVerifications({
                         </div>
 
                         <div>
-                            <Label htmlFor="status_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="status_filter"
+                                className="mb-2 block"
+                            >
                                 Result
                             </Label>
                             <Select
                                 value={statusFilter}
                                 onValueChange={(value) =>
-                                    setStatusFilter(value as VerificationStatus | 'all')
+                                    setStatusFilter(
+                                        value as VerificationStatus | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="status_filter">
                                     <SelectValue placeholder="All results" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All results</SelectItem>
+                                    <SelectItem value="all">
+                                        All results
+                                    </SelectItem>
                                     {options.statuses.map((status) => (
                                         <SelectItem key={status} value={status}>
                                             {STATUS_LABEL[status]}
@@ -230,7 +247,9 @@ export default function AdminDeepfakeVerifications({
                                     <SelectValue placeholder="All roles" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All roles</SelectItem>
+                                    <SelectItem value="all">
+                                        All roles
+                                    </SelectItem>
                                     {options.verified_roles.map((role) => (
                                         <SelectItem key={role} value={role}>
                                             {ROLE_LABEL[role]}
@@ -241,23 +260,32 @@ export default function AdminDeepfakeVerifications({
                         </div>
 
                         <div>
-                            <Label htmlFor="flagged_filter" className="mb-2 block">
+                            <Label
+                                htmlFor="flagged_filter"
+                                className="mb-2 block"
+                            >
                                 Risk
                             </Label>
                             <Select
                                 value={flaggedFilter}
                                 onValueChange={(value) =>
-                                    setFlaggedFilter(value as FlaggedState | 'all')
+                                    setFlaggedFilter(
+                                        value as FlaggedState | 'all',
+                                    )
                                 }
                             >
                                 <SelectTrigger id="flagged_filter">
                                     <SelectValue placeholder="All risk levels" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All risk levels</SelectItem>
+                                    <SelectItem value="all">
+                                        All risk levels
+                                    </SelectItem>
                                     {options.flagged_states.map((state) => (
                                         <SelectItem key={state} value={state}>
-                                            {state === 'flagged' ? 'Flagged' : 'Unflagged'}
+                                            {state === 'flagged'
+                                                ? 'Flagged'
+                                                : 'Unflagged'}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -273,87 +301,148 @@ export default function AdminDeepfakeVerifications({
                 <div className="overflow-hidden rounded-xl border">
                     {deepfakeVerificationLogs.data.length === 0 ? (
                         <div className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
-                            <span>No deepfake verification records match this filter.</span>
+                            <span>
+                                No deepfake verification records match this
+                                filter.
+                            </span>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead className="border-b text-left">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">ID</th>
-                                        <th className="px-3 py-2 font-medium">Consultation</th>
-                                        <th className="px-3 py-2 font-medium">Patient</th>
-                                        <th className="px-3 py-2 font-medium">Verified User</th>
-                                        <th className="px-3 py-2 font-medium">Role</th>
-                                        <th className="px-3 py-2 font-medium">Result</th>
-                                        <th className="px-3 py-2 font-medium">Score</th>
-                                        <th className="px-3 py-2 font-medium">Risk</th>
-                                        <th className="px-3 py-2 font-medium">Checked</th>
+                                        <th className="px-3 py-2 font-medium">
+                                            ID
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Consultation
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Patient
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Verified User
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Role
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Result
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Score
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Risk
+                                        </th>
+                                        <th className="px-3 py-2 font-medium">
+                                            Checked
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {deepfakeVerificationLogs.data.map((log) => (
-                                        <tr key={log.id}>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                #{log.id}
-                                            </td>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                Consultation #{log.consultation_id}
-                                            </td>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                {displayPersonName(log.consultation?.patient)}
-                                            </td>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                {log.user?.name ?? '—'}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                {log.verified_role ? (
-                                                    <Badge variant="outline">
-                                                        {ROLE_LABEL[log.verified_role]}
+                                    {deepfakeVerificationLogs.data.map(
+                                        (log) => (
+                                            <tr key={log.id}>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    #{log.id}
+                                                </td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    Consultation #
+                                                    {log.consultation_id}
+                                                </td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    {displayPersonName(
+                                                        log.consultation
+                                                            ?.patient,
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    {log.user?.name ?? '—'}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    {log.verified_role ? (
+                                                        <Badge variant="outline">
+                                                            {
+                                                                ROLE_LABEL[
+                                                                    log
+                                                                        .verified_role
+                                                                ]
+                                                            }
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            —
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <Badge
+                                                        variant={
+                                                            log.matched
+                                                                ? 'secondary'
+                                                                : 'destructive'
+                                                        }
+                                                    >
+                                                        {log.matched
+                                                            ? STATUS_LABEL.matched
+                                                            : STATUS_LABEL.mismatch}
                                                     </Badge>
-                                                ) : (
-                                                    <span className="text-muted-foreground">—</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <Badge variant={log.matched ? 'secondary' : 'destructive'}>
-                                                    {log.matched ? STATUS_LABEL.matched : STATUS_LABEL.mismatch}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                {formatScore(log.face_match_score)}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <Badge variant={log.flagged ? 'destructive' : 'secondary'}>
-                                                    {log.flagged ? 'Flagged' : 'Clear'}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-3 py-2 text-muted-foreground">
-                                                <div className="space-y-1">
-                                                    <div>{formatDateTime(log.checked_at)}</div>
-                                                    <div className="text-xs text-muted-foreground/80">
-                                                        Created {formatDateTime(log.created_at)}
+                                                </td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    {formatScore(
+                                                        log.face_match_score,
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <Badge
+                                                        variant={
+                                                            log.flagged
+                                                                ? 'destructive'
+                                                                : 'secondary'
+                                                        }
+                                                    >
+                                                        {log.flagged
+                                                            ? 'Flagged'
+                                                            : 'Clear'}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    <div className="space-y-1">
+                                                        <div>
+                                                            {formatDateTime(
+                                                                log.checked_at,
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground/80">
+                                                            Created{' '}
+                                                            {formatDateTime(
+                                                                log.created_at,
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                            </tr>
+                                        ),
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     )}
                 </div>
 
-                {deepfakeVerificationLogs.total > 0 && deepfakeVerificationLogs.from !== null && deepfakeVerificationLogs.to !== null && (
-                    <Pagination
-                        currentPage={deepfakeVerificationLogs.current_page}
-                        lastPage={deepfakeVerificationLogs.last_page}
-                        from={deepfakeVerificationLogs.from}
-                        to={deepfakeVerificationLogs.to}
-                        total={deepfakeVerificationLogs.total}
-                        onPageChange={handlePageChange}
-                    />
-                )}
+                {deepfakeVerificationLogs.total > 0 &&
+                    deepfakeVerificationLogs.from !== null &&
+                    deepfakeVerificationLogs.to !== null && (
+                        <Pagination
+                            currentPage={deepfakeVerificationLogs.current_page}
+                            lastPage={deepfakeVerificationLogs.last_page}
+                            from={deepfakeVerificationLogs.from}
+                            to={deepfakeVerificationLogs.to}
+                            total={deepfakeVerificationLogs.total}
+                            onPageChange={handlePageChange}
+                        />
+                    )}
             </div>
         </AppLayout>
     );

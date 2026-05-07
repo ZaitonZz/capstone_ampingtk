@@ -7,6 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import {
+    formatClinicDateTime,
+    formatClinicTime,
+    isClinicToday,
+} from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -62,18 +67,8 @@ interface Props {
 }
 
 const TWO_DAYS_IN_MS = 2 * 24 * 60 * 60 * 1000;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
 function isScheduledForToday(scheduledAt: string | null): boolean {
-    if (!scheduledAt) return false;
-    const scheduledTime = new Date(scheduledAt).getTime();
-    if (Number.isNaN(scheduledTime)) return false;
-
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const startOfTomorrow = startOfToday + ONE_DAY_MS;
-
-    return scheduledTime >= startOfToday && scheduledTime < startOfTomorrow;
+    return isClinicToday(scheduledAt);
 }
 
 function formatMicrocheckCell(consultation: Consultation) {
@@ -106,9 +101,7 @@ function formatMicrocheckCell(consultation: Consultation) {
             {consultation.next_microcheck_due_at && (
                 <span className="text-xs text-muted-foreground">
                     Next:{' '}
-                    {new Date(
-                        consultation.next_microcheck_due_at,
-                    ).toLocaleTimeString()}
+                    {formatClinicTime(consultation.next_microcheck_due_at)}
                 </span>
             )}
         </div>
@@ -280,152 +273,174 @@ export default function ConsultationsIndex({
                             {consultations.data
                                 .slice()
                                 .sort((a, b) => {
-                                    const aDate = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-                                    const bDate = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+                                    const aDate = a.scheduled_at
+                                        ? new Date(a.scheduled_at).getTime()
+                                        : Infinity;
+                                    const bDate = b.scheduled_at
+                                        ? new Date(b.scheduled_at).getTime()
+                                        : Infinity;
                                     return aDate - bDate;
                                 })
                                 .map((c) => {
-                                const isFinalStatus =
-                                    c.status === 'completed' ||
-                                    c.status === 'cancelled' ||
-                                    c.status === 'no_show';
-                                const priorityLabel = isFinalStatus
-                                    ? null
-                                    : getUpcomingPriorityLabel(c.scheduled_at);
-                                const isUpcomingPriority = priorityLabel !== null;
-                                const isToday = !isFinalStatus && isScheduledForToday(c.scheduled_at ?? null);
+                                    const isFinalStatus =
+                                        c.status === 'completed' ||
+                                        c.status === 'cancelled' ||
+                                        c.status === 'no_show';
+                                    const priorityLabel = isFinalStatus
+                                        ? null
+                                        : getUpcomingPriorityLabel(
+                                              c.scheduled_at,
+                                          );
+                                    const isUpcomingPriority =
+                                        priorityLabel !== null;
+                                    const isToday =
+                                        !isFinalStatus &&
+                                        isScheduledForToday(
+                                            c.scheduled_at ?? null,
+                                        );
 
-                                return (
-                                <tr
-                                    key={c.id}
-                                    className={
-                                        isUpcomingPriority
-                                            ? 'border-l-4 border-l-amber-500 bg-amber-50/60 hover:bg-amber-100/70 dark:border-l-amber-400 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
-                                            : 'hover:bg-muted/30'
-                                    }
-                                >
-                                    <td className="px-4 py-3 font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <span>{c.patient?.full_name ?? '-'}</span>
-                                            {isUpcomingPriority && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                                                >
-                                                    {priorityLabel}
-                                                </Badge>
-                                            )}
-                                            {isToday && (
-                                                <Badge className="border-blue-200 bg-blue-50 text-blue-700">
-                                                    Today
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 capitalize">
-                                        Teleconsultation
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Badge
-                                            variant="outline"
+                                    return (
+                                        <tr
+                                            key={c.id}
                                             className={
-                                                STATUS_BADGE_CLASSES[c.status]
+                                                isUpcomingPriority
+                                                    ? 'border-l-4 border-l-amber-500 bg-amber-50/60 hover:bg-amber-100/70 dark:border-l-amber-400 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
+                                                    : 'hover:bg-muted/30'
                                             }
                                         >
-                                            {STATUS_LABELS[c.status]}
-                                        </Badge>
-                                    </td>
-                                    <td className="px-4 py-3 text-muted-foreground">
-                                        <div className="flex flex-col gap-1">
-                                            <span>
-                                                {c.scheduled_at
-                                                    ? new Date(c.scheduled_at).toLocaleString()
-                                                    : '-'}
-                                            </span>
-                                            {isUpcomingPriority && (
-                                                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                                                    Prioritize this consultation
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
-                                        {c.chief_complaint ?? '-'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        {formatMicrocheckCell(c)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={ConsultationController.show.url(
-                                                        c.id,
+                                            <td className="px-4 py-3 font-medium">
+                                                <div className="flex items-center gap-2">
+                                                    <span>
+                                                        {c.patient?.full_name ??
+                                                            '-'}
+                                                    </span>
+                                                    {isUpcomingPriority && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                                                        >
+                                                            {priorityLabel}
+                                                        </Badge>
                                                     )}
-                                                >
-                                                    View
-                                                </Link>
-                                            </Button>
-                                            {can_manage_schedule && (
-                                                <Button
-                                                    variant={
-                                                        c.status ===
-                                                            'pending' &&
-                                                        !c.doctor_available_for_approval
-                                                            ? 'default'
-                                                            : 'ghost'
-                                                    }
-                                                    size="sm"
-                                                    asChild
+                                                    {isToday && (
+                                                        <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                                                            Today
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 capitalize">
+                                                Teleconsultation
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge
+                                                    variant="outline"
                                                     className={
-                                                        c.status ===
-                                                            'pending' &&
-                                                        !c.doctor_available_for_approval
-                                                            ? 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600 hover:text-white'
-                                                            : undefined
+                                                        STATUS_BADGE_CLASSES[
+                                                            c.status
+                                                        ]
                                                     }
                                                 >
-                                                    <Link
-                                                        href={ConsultationController.edit.url(
-                                                            c.id,
-                                                        )}
-                                                    >
-                                                        Edit
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                            {can_manage_schedule &&
-                                                c.status === 'pending' &&
-                                                (c.doctor_available_for_approval ? (
+                                                    {STATUS_LABELS[c.status]}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                <div className="flex flex-col gap-1">
+                                                    <span>
+                                                        {c.scheduled_at
+                                                            ? formatClinicDateTime(
+                                                                  c.scheduled_at,
+                                                              )
+                                                            : '-'}
+                                                    </span>
+                                                    {isUpcomingPriority && (
+                                                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                                                            Prioritize this
+                                                            consultation
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="max-w-xs truncate px-4 py-3 text-muted-foreground">
+                                                {c.chief_complaint ?? '-'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {formatMicrocheckCell(c)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
                                                     <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
-                                                        onClick={() =>
-                                                            handleApprove(c.id)
-                                                        }
-                                                        className="text-green-600 hover:text-green-700"
+                                                        asChild
                                                     >
-                                                        <Check className="mr-1 h-3 w-3" />
-                                                        Approve
+                                                        <Link
+                                                            href={ConsultationController.show.url(
+                                                                c.id,
+                                                            )}
+                                                        >
+                                                            View
+                                                        </Link>
                                                     </Button>
-                                                ) : (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-amber-200 bg-amber-50 text-amber-700"
-                                                    >
-                                                        Preferred doctor is not
-                                                        on duty
-                                                    </Badge>
-                                                ))}
-                                        </div>
-                                    </td>
-                                </tr>
-                                );
-                            })}
+                                                    {can_manage_schedule && (
+                                                        <Button
+                                                            variant={
+                                                                c.status ===
+                                                                    'pending' &&
+                                                                !c.doctor_available_for_approval
+                                                                    ? 'default'
+                                                                    : 'ghost'
+                                                            }
+                                                            size="sm"
+                                                            asChild
+                                                            className={
+                                                                c.status ===
+                                                                    'pending' &&
+                                                                !c.doctor_available_for_approval
+                                                                    ? 'border-amber-500 bg-amber-500 text-white hover:bg-amber-600 hover:text-white'
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            <Link
+                                                                href={ConsultationController.edit.url(
+                                                                    c.id,
+                                                                )}
+                                                            >
+                                                                Edit
+                                                            </Link>
+                                                        </Button>
+                                                    )}
+                                                    {can_manage_schedule &&
+                                                        c.status ===
+                                                            'pending' &&
+                                                        (c.doctor_available_for_approval ? (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleApprove(
+                                                                        c.id,
+                                                                    )
+                                                                }
+                                                                className="text-green-600 hover:text-green-700"
+                                                            >
+                                                                <Check className="mr-1 h-3 w-3" />
+                                                                Approve
+                                                            </Button>
+                                                        ) : (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-amber-200 bg-amber-50 text-amber-700"
+                                                            >
+                                                                Preferred doctor
+                                                                is not on duty
+                                                            </Badge>
+                                                        ))}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 </div>
@@ -455,7 +470,3 @@ export default function ConsultationsIndex({
         </AppLayout>
     );
 }
-
-
-
-

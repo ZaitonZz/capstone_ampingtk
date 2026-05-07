@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { formatClinicDateTime, toClinicDatetimeLocal } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -112,7 +113,7 @@ export default function PatientConsultationCalendar({
         const dt =
             info.dateStr.length === 10
                 ? `${info.dateStr}T09:00`
-                : info.dateStr.slice(0, 16);
+                : toClinicDatetimeLocal(info.dateStr);
 
         openRequestModal(dt);
     }
@@ -240,7 +241,7 @@ export default function PatientConsultationCalendar({
                             <span className="text-muted-foreground">
                                 Date:{' '}
                             </span>
-                            {new Date(selectedEvent.start).toLocaleString()}
+                            {formatClinicDateTime(selectedEvent.start)}
                         </div>
                         {selectedEvent.chief_complaint && (
                             <div>
