@@ -295,7 +295,7 @@ it('allows doctors to view their own duty calendar but not the staff scheduler',
         'duty_date' => now()->addDay()->toDateString(),
     ]);
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->get(route('doctor-duty-calendar.index'))
         ->assertOk()
         ->assertInertia(
@@ -311,7 +311,7 @@ it('allows doctors to view their own duty calendar but not the staff scheduler',
         ->get(route('doctor-duty-schedules.index'))
         ->assertForbidden();
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->post(route('doctor-duty-requests.store'), [
             'request_type' => 'on_leave',
             'start_date' => now()->addDays(2)->toDateString(),
@@ -324,7 +324,7 @@ it('allows doctors to view their own duty calendar but not the staff scheduler',
 it('prevents staff members from entering the doctor duty calendar', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
 
-    $this->actingAs($medicalStaff)
+    $this->actingAsVerified($medicalStaff)
         ->get(route('doctor-duty-calendar.index'))
         ->assertForbidden();
 });
