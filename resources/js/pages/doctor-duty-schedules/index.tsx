@@ -456,7 +456,7 @@ function PaginationControls({
     total: number;
     onPageChange: (page: number) => void;
 }) {
-    if (total <= TABLE_PAGE_SIZE) {
+    if (lastPage <= 1) {
         return null;
     }
 

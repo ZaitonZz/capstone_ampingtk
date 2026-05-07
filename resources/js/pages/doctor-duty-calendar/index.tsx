@@ -108,7 +108,11 @@ type PaginatedData<T> = {
 };
 
 function dateKey(d: Date) {
-    return d.toISOString().slice(0, 10);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
 }
 
 function parseLocalDate(value: string) {
@@ -148,7 +152,7 @@ function formatMonthYear(d: Date) {
 
 function formatDate(iso?: string) {
     if (!iso) return '';
-    const d = new Date(iso);
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00`) : new Date(iso);
     return d.toLocaleDateString();
 }
 

@@ -54,9 +54,9 @@ class StoreDoctorDutyScheduleRequest extends FormRequest
             'recurring_end_date' => ['required_if:schedule_mode,'.DoctorDutyScheduleService::MODE_RECURRING_WEEKLY, 'nullable', 'date', 'after_or_equal:recurring_start_date'],
             'recurring_weekdays' => ['required_if:schedule_mode,'.DoctorDutyScheduleService::MODE_RECURRING_WEEKLY, 'nullable', 'array', 'min:1'],
             'recurring_weekdays.*' => ['in:mon,tue,wed,thu,fri,sat,sun'],
-            'start_time' => ['required_if:schedule_mode,'.DoctorDutyScheduleService::MODE_SINGLE, 'nullable', 'date_format:H:i'],
-            'end_time' => ['required_if:schedule_mode,'.DoctorDutyScheduleService::MODE_SINGLE, 'nullable', 'date_format:H:i', 'after:start_time'],
-            'status' => ['required_if:schedule_mode,single', 'nullable', Rule::in(DoctorDutySchedule::STATUSES)],
+            'start_time' => ['required_unless:schedule_mode,'.DoctorDutyScheduleService::MODE_MULTIPLE_DATES, 'nullable', 'date_format:H:i'],
+            'end_time' => ['required_unless:schedule_mode,'.DoctorDutyScheduleService::MODE_MULTIPLE_DATES, 'nullable', 'date_format:H:i', 'after:start_time'],
+            'status' => ['required_unless:schedule_mode,'.DoctorDutyScheduleService::MODE_MULTIPLE_DATES, 'nullable', Rule::in(DoctorDutySchedule::STATUSES)],
             'remarks' => ['nullable', 'string', 'max:1000'],
         ];
     }
