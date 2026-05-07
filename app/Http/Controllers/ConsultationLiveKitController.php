@@ -148,7 +148,9 @@ class ConsultationLiveKitController extends Controller
             ]);
         }
 
-        if (! $isAdminAudit) {
+        $hasProvisionedRoom = $this->hasProvisionedLiveKitRoom($consultation);
+
+        if (! $isAdminAudit && $hasProvisionedRoom) {
             try {
                 $this->liveKitService->removeParticipantFromConsultation($consultation, $user);
             } catch (Throwable $exception) {
@@ -162,9 +164,11 @@ class ConsultationLiveKitController extends Controller
 
         $cancelled = false;
         $consultation = $consultation->fresh();
+        $hasProvisionedRoom = $this->hasProvisionedLiveKitRoom($consultation);
 
         if (
             ! $isAdminAudit
+            && $hasProvisionedRoom
             && in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true)
             && ! $this->hasHumanConsultationParticipantInRoom($consultation)
         ) {
@@ -193,6 +197,12 @@ class ConsultationLiveKitController extends Controller
             'cancelled' => $cancelled,
             'redirect_url' => route('consultations.lobby.show', $consultation),
         ]);
+    }
+
+    private function hasProvisionedLiveKitRoom(Consultation $consultation): bool
+    {
+        return $consultation->livekit_room_name !== null
+            && $consultation->livekit_room_status === 'room_ready';
     }
 
     private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
