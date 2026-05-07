@@ -50,8 +50,9 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
         },
     ];
 
-    const [availableDoctors, setAvailableDoctors] =
-        useState<DoctorSummary[]>(doctors);
+    const [availableDoctors, setAvailableDoctors] = useState<DoctorSummary[]>(
+        consultation.scheduled_at ? doctors : [],
+    );
 
     const { data, setData, patch, processing, errors } = useForm({
         doctor_id: String(consultation.doctor_id),
@@ -75,7 +76,6 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
 
     useEffect(() => {
         if (!data.scheduled_at) {
-            setAvailableDoctors([]);
             return;
         }
 

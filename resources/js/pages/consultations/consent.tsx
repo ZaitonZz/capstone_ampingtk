@@ -1,6 +1,6 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import type { FormEvent } from 'react';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';

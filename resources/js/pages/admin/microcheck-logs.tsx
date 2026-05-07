@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminMicrocheckLogsRoute from '@/routes/admin/microcheck-logs';
+import type { BreadcrumbItem } from '@/types';
 
 type MicrocheckStatus = 'pending' | 'claimed' | 'completed' | 'expired';
 type MicrocheckTargetRole = 'patient' | 'doctor';

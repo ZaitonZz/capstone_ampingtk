@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Pagination from '@/components/patients/pagination';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +15,8 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminDeepfakeVerificationsRoute from '@/routes/admin/deepfake-verifications';
+import type { BreadcrumbItem } from '@/types';
 
 type VerificationStatus = 'matched' | 'mismatch';
 type VerifiedRole = 'patient' | 'doctor';

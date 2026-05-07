@@ -1,14 +1,15 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, Send } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Clock, Send } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
 
 type DutyStatus = 'on_duty' | 'off_duty' | 'absent' | 'on_leave';
 type RequestStatus = 'pending' | 'approved' | 'rejected';
