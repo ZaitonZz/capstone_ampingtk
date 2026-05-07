@@ -119,7 +119,7 @@ export default function DoctorDutyCalendarIndex(props: {
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'calendar' | 'status' | 'history'>('calendar');
 
-    const dutyRequestForm = useForm({ request_type: 'leave', start_date: '', end_date: '', remarks: '' });
+    const dutyRequestForm = useForm({ request_type: 'on_leave', start_date: '', end_date: '', remarks: '' });
 
     const schedulesByDate = useMemo(() => {
         const map: Record<string, DutySchedule[]> = {};
@@ -376,8 +376,8 @@ export default function DoctorDutyCalendarIndex(props: {
                             <div>
                                 <Label>Type</Label>
                                 <select className="mt-1 w-full rounded border p-2" value={dutyRequestForm.data.request_type} onChange={(e) => dutyRequestForm.setData('request_type', e.target.value)}>
-                                    <option value="leave">Leave</option>
-                                    <option value="absence">Absence</option>
+                                    <option value="on_leave">Leave</option>
+                                    <option value="absent">Absence</option>
                                 </select>
                             </div>
 
