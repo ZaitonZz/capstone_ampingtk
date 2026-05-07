@@ -2,14 +2,22 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\NormalizesClinicDateTimes;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class RequestAppointmentRequest extends FormRequest
 {
+    use NormalizesClinicDateTimes;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeClinicDateTimes(['scheduled_at']);
     }
 
     public function rules(): array

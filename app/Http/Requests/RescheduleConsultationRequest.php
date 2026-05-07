@@ -2,15 +2,23 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\NormalizesClinicDateTimes;
 use App\Services\DoctorDutyAvailabilityService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
 class RescheduleConsultationRequest extends FormRequest
 {
+    use NormalizesClinicDateTimes;
+
     public function authorize(): bool
     {
         return $this->user()?->isMedicalStaff() ?? false;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->normalizeClinicDateTimes(['scheduled_at']);
     }
 
     public function rules(): array
