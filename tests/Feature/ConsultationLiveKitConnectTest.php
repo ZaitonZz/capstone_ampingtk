@@ -320,11 +320,11 @@ it('lets a doctor leave without cancelling when the patient remains in the room'
             'cancelled' => false,
         ]);
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant'
+    Http::assertSent(fn($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant'
         && $request['room'] === 'consultation-201-leave'
         && $request['identity'] === sprintf('user-%d', $doctor->id));
 
-    Http::assertNotSent(fn ($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/DeleteRoom');
+    Http::assertNotSent(fn($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/DeleteRoom');
 
     expect($consultation->fresh()->status)->toBe('ongoing');
 });
