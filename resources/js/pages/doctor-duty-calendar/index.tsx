@@ -1,10 +1,9 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, Send } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import AppLayout from '@/layouts/app-layout';
-import Breadcrumbs from '@/components/breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -48,12 +47,20 @@ function dateKey(d: Date) {
     return d.toISOString().slice(0, 10);
 }
 
+function parseLocalDate(value: string) {
+    return new Date(`${value}T00:00:00`);
+}
+
 function startOfMonth(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
 function addMonths(d: Date, n: number) {
     return new Date(d.getFullYear(), d.getMonth() + n, 1);
+}
+
+function endOfMonth(d: Date) {
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
 function getMonthGridDates(visible: Date) {
@@ -87,16 +94,27 @@ function formatDateRange(a?: string, b?: string) {
     return `${formatDate(a)} — ${formatDate(b)}`;
 }
 
+function toDateInputValue(date: Date) {
+    return dateKey(date);
+}
+
 export default function DoctorDutyCalendarIndex(props: {
     auth: any;
     schedules: DutySchedule[];
     duty_requests: DutyRequest[];
     pending_duty_requests: DutyRequest[];
+    filters: {
+        start: string;
+        end: string;
+    };
 }) {
-    const { schedules = [], duty_requests = [], pending_duty_requests = [] } = props;
+    const { schedules = [], duty_requests = [], pending_duty_requests = [], filters } = props;
 
-    const [visibleDate, setVisibleDate] = useState(() => startOfMonth(new Date()));
-    const [selectedDate, setSelectedDate] = useState<string>(dateKey(new Date()));
+    const initialMonth = filters?.start ? startOfMonth(parseLocalDate(filters.start)) : startOfMonth(new Date());
+    const initialSelectedDate = schedules[0]?.date ?? filters?.start ?? dateKey(new Date());
+
+    const [visibleDate, setVisibleDate] = useState(() => initialMonth);
+    const [selectedDate, setSelectedDate] = useState<string>(initialSelectedDate);
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'calendar' | 'status' | 'history'>('calendar');
 
@@ -114,12 +132,34 @@ export default function DoctorDutyCalendarIndex(props: {
 
     const selectedSchedules = schedulesByDate[selectedDate] ?? [];
 
+    useEffect(() => {
+        const nextVisibleDate = filters?.start ? startOfMonth(parseLocalDate(filters.start)) : startOfMonth(new Date());
+        setVisibleDate(nextVisibleDate);
+        setSelectedDate(schedules[0]?.date ?? filters?.start ?? dateKey(new Date()));
+    }, [filters?.start, schedules]);
+
+    function loadMonth(monthDate: Date) {
+        const start = startOfMonth(monthDate);
+        const end = endOfMonth(monthDate);
+
+        setVisibleDate(start);
+
+        router.get('/doctor-duty-calendar', {
+            start: toDateInputValue(start),
+            end: toDateInputValue(end),
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        });
+    }
+
     function moveMonth(offset: number) {
-        setVisibleDate((v) => addMonths(v, offset));
+        loadMonth(addMonths(visibleDate, offset));
     }
 
     function goToday() {
-        setVisibleDate(startOfMonth(new Date()));
+        loadMonth(startOfMonth(new Date()));
     }
 
     function handleRequestSubmit(e: FormEvent) {
@@ -139,19 +179,37 @@ export default function DoctorDutyCalendarIndex(props: {
         <AppLayout>
             <Head title="Duty Calendar" />
 
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
+            <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between gap-4">
                     <div className="space-y-1">
                         <h1 className="text-2xl font-semibold">Duty Calendar</h1>
                         <p className="text-sm text-muted-foreground">Your personal duty calendar and request centre.</p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <nav className="flex items-center gap-1 rounded-md bg-muted/30 p-1">
-                            <button className={`px-3 py-1 rounded ${activeTab === 'calendar' ? 'bg-white' : ''}`} onClick={() => setActiveTab('calendar')}>Calendar</button>
-                            <button className={`px-3 py-1 rounded ${activeTab === 'status' ? 'bg-white' : ''}`} onClick={() => setActiveTab('status')}>Request Status</button>
-                            <button className={`px-3 py-1 rounded ${activeTab === 'history' ? 'bg-white' : ''}`} onClick={() => setActiveTab('history')}>Request History</button>
-                        </nav>
+                    <div className="rounded-lg border bg-background p-1 shadow-sm">
+                        <div role="tablist" aria-label="Doctor duty calendar sections" className="grid gap-1 md:grid-cols-3">
+                            {[
+                                { id: 'calendar', label: 'Calendar', description: 'Month view and request action' },
+                                { id: 'status', label: 'Request Status', description: 'Pending review items' },
+                                { id: 'history', label: 'Request History', description: 'Submitted request records' },
+                            ].map((tab) => {
+                                const isActive = activeTab === tab.id;
+
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={isActive}
+                                        className={`rounded-md px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 ${isActive ? 'bg-slate-900 text-white shadow-sm' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'}`}
+                                        onClick={() => setActiveTab(tab.id as 'calendar' | 'status' | 'history')}
+                                    >
+                                        <span className="block text-sm font-semibold">{tab.label}</span>
+                                        <span className={`mt-0.5 block text-xs ${isActive ? 'text-slate-200' : 'text-muted-foreground'}`}>{tab.description}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
