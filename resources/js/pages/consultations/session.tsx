@@ -273,6 +273,7 @@ export default function ConsultationSessionPage({
     );
     const hasAutoRedirectedRef = useRef(false);
     const isManualLeaveRef = useRef(false);
+    const isLeavingRef = useRef(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
 
     const isCurrentUserVerificationTarget =
@@ -398,10 +399,11 @@ export default function ConsultationSessionPage({
     );
 
     const leaveSession = useCallback(async (): Promise<void> => {
-        if (isLeaving) {
+        if (isLeavingRef.current) {
             return;
         }
 
+        isLeavingRef.current = true;
         isManualLeaveRef.current = true;
         setIsLeaving(true);
         clearStoredSession();
@@ -439,7 +441,7 @@ export default function ConsultationSessionPage({
         } catch {
             redirectToLobby(fallbackUrl);
         }
-    }, [consultation.id, isLeaving, redirectToLobby]);
+    }, [consultation.id, redirectToLobby]);
 
     const goBackToLobby = useCallback((): void => {
         clearStoredSession();
