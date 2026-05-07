@@ -321,6 +321,19 @@ it('allows doctors to view their own duty calendar but not the staff scheduler',
         ->assertRedirect();
 });
 
+it('validates doctor duty calendar date filters before parsing them', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $this->actingAsVerified($doctor)
+        ->from(route('doctor-duty-calendar.index'))
+        ->get(route('doctor-duty-calendar.index', [
+            'start' => 'not-a-date',
+            'end' => 'also-not-a-date',
+        ]))
+        ->assertRedirect(route('doctor-duty-calendar.index'))
+        ->assertSessionHasErrors(['start', 'end']);
+});
+
 it('prevents staff members from entering the doctor duty calendar', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
 

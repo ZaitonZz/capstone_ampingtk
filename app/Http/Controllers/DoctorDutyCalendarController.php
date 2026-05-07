@@ -17,8 +17,13 @@ class DoctorDutyCalendarController extends Controller
 
         abort_unless($user?->isDoctor(), 403, 'Access restricted to doctors.');
 
-        $startParam = $request->query('start');
-        $endParam = $request->query('end');
+        $validated = $request->validate([
+            'start' => ['nullable', 'date_format:Y-m-d'],
+            'end' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $startParam = $validated['start'] ?? null;
+        $endParam = $validated['end'] ?? null;
 
         $start = filled($startParam)
             ? Carbon::parse((string) $startParam)->startOfDay()
