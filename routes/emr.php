@@ -35,6 +35,7 @@ Route::middleware(['auth', 'medical.staff'])->group(function () {
     // 'calendar' and 'approve' being swallowed by the {consultation} wildcard.
     Route::get('consultations/calendar', [ConsultationController::class, 'calendar'])->name('consultations.calendar');
     Route::get('consultations/available-doctors', [ConsultationController::class, 'availableDoctors'])->name('consultations.available-doctors');
+    Route::get('consultations/available-doctors-by-date', [ConsultationController::class, 'availableDoctorsByDate'])->name('consultations.available-doctors-by-date');
     Route::patch('consultations/{consultation}/approve', [ConsultationController::class, 'approve'])->name('consultations.approve');
     Route::patch('consultations/{consultation}/reschedule', [ConsultationController::class, 'reschedule'])->name('consultations.reschedule');
     Route::patch('consultations/{consultation}/cancel', [ConsultationController::class, 'cancel'])->name('consultations.cancel');

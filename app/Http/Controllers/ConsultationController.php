@@ -207,8 +207,18 @@ class ConsultationController extends Controller
 
         $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
         $availableDoctors = $scheduledAt !== null
-            ? app(DoctorDutyAvailabilityService::class)->availableDoctors($scheduledAt)
+            ? app(DoctorDutyAvailabilityService::class)->availableDoctorsOnDate($consultation->scheduled_at->toDateString())
             : collect();
+
+        $availableDoctors = $availableDoctors
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
 
         return Inertia::render('consultations/edit', [
             'consultation' => $consultation->load(['patient', 'doctor']),
@@ -304,6 +314,29 @@ class ConsultationController extends Controller
         ]);
 
         $doctors = $availabilityService->availableDoctors($validated['scheduled_at'])
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'doctors' => $doctors,
+        ]);
+    }
+
+    public function availableDoctorsByDate(Request $request, DoctorDutyAvailabilityService $availabilityService): JsonResponse
+    {
+        $this->authorize('create', Consultation::class);
+
+        $validated = $request->validate([
+            'scheduled_date' => ['required', 'date'],
+        ]);
+
+        $doctors = $availabilityService->availableDoctorsOnDate($validated['scheduled_date'])
             ->map(fn (User $doctor) => [
                 'id' => $doctor->id,
                 'name' => $doctor->name,

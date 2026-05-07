@@ -332,6 +332,53 @@ it('shows only on-duty doctors for a selected schedule', function () {
         ->assertJsonCount(1, 'doctors');
 });
 
+it('shows doctors on duty for the selected date in consultation edit', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctorMorning = User::factory()->doctor()->create(['name' => 'Morning Doctor']);
+    $doctorAfternoon = User::factory()->doctor()->create(['name' => 'Afternoon Doctor']);
+    $doctorOffDuty = User::factory()->doctor()->create(['name' => 'Off Duty Doctor']);
+    $scheduledAt = now()->addDays(3)->setHour(14)->setMinute(0)->setSecond(0);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '12:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorAfternoon->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '13:00',
+        'end_time' => '18:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorOffDuty->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '18:00',
+        'status' => 'on_leave',
+    ]);
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'status' => 'scheduled',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.edit', $consultation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('consultations/edit')
+            ->has('doctors', 2)
+            ->where('doctors.0.id', $doctorAfternoon->id)
+        );
+});
+
 it('rejects consultation creation when doctor is not on duty', function () {
     $medicalStaff = User::factory()->medicalStaff()->create();
     $doctor = User::factory()->doctor()->create();
