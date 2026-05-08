@@ -34,19 +34,31 @@ class DoctorDutyScheduleService
     {
         $mode = $payload['schedule_mode'] ?? self::MODE_SINGLE;
         $doctorId = (int) $payload['doctor_id'];
+
+        // For multiple dates mode, entries already have per-date times
+        if ($mode === self::MODE_MULTIPLE_DATES) {
+            $entries = (array) ($payload['specific_date_entries'] ?? []);
+            return collect($entries)
+                ->filter()
+                ->map(fn (array $entry) => [
+                    'doctor_id' => $doctorId,
+                    'duty_date' => Carbon::parse($entry['duty_date'])->toDateString(),
+                    'start_time' => $this->normalizeTime((string) $entry['start_time']),
+                    'end_time' => $this->normalizeTime((string) $entry['end_time']),
+                    'status' => (string) $entry['status'],
+                    'remarks' => filled($entry['remarks'] ?? null) ? trim((string) $entry['remarks']) : null,
+                ])
+                ->values()
+                ->all();
+        }
+
+        // For other modes, use existing logic
         $startTime = $this->normalizeTime((string) $payload['start_time']);
         $endTime = $this->normalizeTime((string) $payload['end_time']);
         $status = (string) $payload['status'];
         $remarks = filled($payload['remarks'] ?? null) ? trim((string) $payload['remarks']) : null;
 
         $dates = match ($mode) {
-            self::MODE_MULTIPLE_DATES => collect($payload['duty_dates'] ?? [])
-                ->filter()
-                ->map(fn ($date) => Carbon::parse($date)->toDateString())
-                ->unique()
-                ->sort()
-                ->values()
-                ->all(),
             self::MODE_RECURRING_WEEKLY => $this->expandRecurringDates(
                 (string) ($payload['recurring_start_date'] ?? ''),
                 (string) ($payload['recurring_end_date'] ?? ''),

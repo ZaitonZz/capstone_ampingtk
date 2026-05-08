@@ -28,7 +28,11 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { dashboard as adminDashboard } from '@/routes/admin';
+import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
 import { index as adminDeepfakeAlerts } from '@/routes/admin/deepfake-alerts';
+import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
+import { index as adminDeepfakeVerifications } from '@/routes/admin/deepfake-verifications';
+import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 import { index as adminUsers } from '@/routes/admin/users';
 import { index as consultations } from '@/routes/consultations';
 import { dashboard as doctorDashboard } from '@/routes/doctor';
@@ -37,10 +41,6 @@ import { dashboard as patientDashboard } from '@/routes/patient';
 import { index as patientConsultations } from '@/routes/patient/consultations';
 import { index as patientsList } from '@/routes/patients';
 import type { NavItem } from '@/types';
-import { index as adminActivityLogs } from '@/routes/admin/activity-logs';
-import { index as adminDeepfakeLogs } from '@/routes/admin/deepfake-logs';
-import { index as adminDeepfakeVerifications } from '@/routes/admin/deepfake-verifications';
-import { index as adminMicrocheckLogs } from '@/routes/admin/microcheck-logs';
 
 const footerNavItems: NavItem[] = [
     {
@@ -58,12 +58,12 @@ const footerNavItems: NavItem[] = [
 export function AppSidebar() {
     const user = usePage().props.auth.user;
     const isPatient = user.role === 'patient';
-    const isMedicalStaff =
-        user.role === 'doctor' ||
-        user.role === 'admin' ||
-        user.role === 'medicalstaff';
+    const isDoctor = user.role === 'doctor';
+    const isScheduleManager =
+        user.role === 'admin' || user.role === 'medicalstaff';
+    const isClinicalStaff = isDoctor || isScheduleManager;
     const isAdmin = user.role === 'admin';
-    let dashboardHref = dashboard();
+    let dashboardHref: NavItem['href'] = dashboard();
 
     if (user.role === 'patient') {
         dashboardHref = patientDashboard();
@@ -83,21 +83,32 @@ export function AppSidebar() {
         },
     ];
 
-    if (isMedicalStaff) {
+    if (isClinicalStaff) {
         mainNavItems.push({
             title: 'Patient List',
             href: patientsList(),
             icon: ClipboardList,
         });
         mainNavItems.push({
-            title: 'Doctor Duty Calendar',
-            href: '/doctor-duty-schedules',
-            icon: CalendarDays,
-        });
-        mainNavItems.push({
             title: 'Consultations',
             href: consultations(),
             icon: ContactRound,
+        });
+    }
+
+    if (isDoctor) {
+        mainNavItems.push({
+            title: 'Duty Calendar',
+            href: '/doctor-duty-calendar',
+            icon: CalendarDays,
+        });
+    }
+
+    if (isScheduleManager) {
+        mainNavItems.push({
+            title: 'Doctor Duty Calendar',
+            href: '/doctor-duty-schedules',
+            icon: CalendarDays,
         });
     }
 

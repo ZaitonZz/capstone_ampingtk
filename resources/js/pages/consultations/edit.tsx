@@ -34,8 +34,9 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
         },
     ];
 
-    const [availableDoctors, setAvailableDoctors] =
-        useState<DoctorSummary[]>(doctors);
+    const [availableDoctors, setAvailableDoctors] = useState<DoctorSummary[]>(
+        consultation.scheduled_at ? doctors : [],
+    );
 
     const { data, setData, patch, processing, errors } = useForm({
         doctor_id: String(consultation.doctor_id),
@@ -64,9 +65,10 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
 
         const controller = new AbortController();
         let isMounted = true;
+        const scheduledDate = data.scheduled_at.split('T')[0];
 
         fetch(
-            `/consultations/available-doctors?scheduled_at=${encodeURIComponent(data.scheduled_at)}`,
+            `/consultations/available-doctors-by-date?scheduled_date=${encodeURIComponent(scheduledDate)}`,
             {
                 method: 'GET',
                 headers: { Accept: 'application/json' },
@@ -140,7 +142,7 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
                         >
                             <option value="">
                                 {data.scheduled_at
-                                    ? 'Select doctor on duty...'
+                                    ? 'Select doctor on duty for this date...'
                                     : 'Select schedule first...'}
                             </option>
                             {availableDoctors.map((doctor) => (
@@ -154,8 +156,7 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
                         </select>
                         {data.scheduled_at && availableDoctors.length === 0 && (
                             <p className="text-sm text-muted-foreground">
-                                No doctors are on duty for the selected
-                                schedule.
+                                No doctors are on duty for the selected date.
                             </p>
                         )}
                         {errors.doctor_id && (
@@ -199,7 +200,7 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
                                     status: next,
                                     cancellation_reason:
                                         next === 'cancelled' ||
-                                        next === 'no_show'
+                                            next === 'no_show'
                                             ? prev.cancellation_reason
                                             : '',
                                 }));
@@ -282,24 +283,24 @@ export default function ConsultationEdit({ consultation, doctors }: Props) {
                     {/* Cancellation Reason */}
                     {(data.status === 'cancelled' ||
                         data.status === 'no_show') && (
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="cancellation_reason">
-                                Cancellation Reason
-                            </Label>
-                            <textarea
-                                id="cancellation_reason"
-                                value={data.cancellation_reason}
-                                onChange={(e) =>
-                                    setData(
-                                        'cancellation_reason',
-                                        e.target.value,
-                                    )
-                                }
-                                rows={2}
-                                className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                            />
-                        </div>
-                    )}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cancellation_reason">
+                                    Cancellation Reason
+                                </Label>
+                                <textarea
+                                    id="cancellation_reason"
+                                    value={data.cancellation_reason}
+                                    onChange={(e) =>
+                                        setData(
+                                            'cancellation_reason',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                    className="rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                                />
+                            </div>
+                        )}
 
                     <div className="flex gap-3">
                         <Button type="submit" disabled={processing}>

@@ -17,8 +17,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminMicrocheckLogsRoute from '@/routes/admin/microcheck-logs';
+import type { BreadcrumbItem } from '@/types';
 
 type MicrocheckStatus = 'pending' | 'claimed' | 'completed' | 'expired';
 type MicrocheckTargetRole = 'patient' | 'doctor';

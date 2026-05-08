@@ -16,8 +16,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminDeepfakeVerificationsRoute from '@/routes/admin/deepfake-verifications';
+import type { BreadcrumbItem } from '@/types';
 
 type VerificationStatus = 'matched' | 'mismatch';
 type VerifiedRole = 'patient' | 'doctor';

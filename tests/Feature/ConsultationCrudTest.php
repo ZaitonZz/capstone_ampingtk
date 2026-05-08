@@ -85,6 +85,53 @@ it('medical staff can access consultations index including pending consultations
         ->assertInertia(fn ($page) => $page->has('consultations.data', 3));
 });
 
+it('loads only doctors on duty for the consultation date in the edit form', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctorMorning = User::factory()->doctor()->create(['name' => 'Morning Doctor']);
+    $doctorEvening = User::factory()->doctor()->create(['name' => 'Evening Doctor']);
+    $offDutyDoctor = User::factory()->doctor()->create(['name' => 'Off Duty Doctor']);
+    $scheduledAt = now()->addDays(4)->setHour(15)->setMinute(0)->setSecond(0);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '12:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorEvening->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '13:00',
+        'end_time' => '18:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $offDutyDoctor->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '18:00',
+        'status' => 'off_duty',
+    ]);
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'status' => 'scheduled',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.edit', $consultation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('consultations/edit')
+            ->has('doctors', 2)
+            ->where('doctors.0.id', $doctorEvening->id)
+        );
+});
+
 // ── Approve ───────────────────────────────────────────────────────────────────
 
 it('approves a pending consultation and transitions it to scheduled', function () {

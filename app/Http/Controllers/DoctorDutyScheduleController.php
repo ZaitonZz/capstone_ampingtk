@@ -67,12 +67,16 @@ class DoctorDutyScheduleController extends Controller
             ])
             ->values();
 
-        $doctorRequests = DoctorDutyRequest::query()
+        $doctorRequestsQuery = DoctorDutyRequest::query()
             ->with(['doctor:id,name', 'reviewer:id,name'])
-            ->when(! $canManage, fn ($query) => $query->where('doctor_id', $user->id))
+            ->when(! $canManage, fn ($query) => $query->where('doctor_id', $user->id));
+
+        $doctorRequestsPaginator = (clone $doctorRequestsQuery)
             ->orderByDesc('created_at')
-            ->limit($canManage ? 30 : 20)
-            ->get()
+            ->paginate(12, ['*'], 'request_page')
+            ->withQueryString();
+
+        $doctorRequests = collect($doctorRequestsPaginator->items())
             ->map(fn (DoctorDutyRequest $request) => [
                 'id' => $request->id,
                 'doctor_id' => $request->doctor_id,
@@ -89,9 +93,9 @@ class DoctorDutyScheduleController extends Controller
             ])
             ->values();
 
-        $pendingDoctorRequests = $canManage
-            ? $doctorRequests->filter(fn (array $request) => $request['status'] === DoctorDutyRequest::STATUS_PENDING)->values()
-            : collect();
+        $pendingDoctorRequestsTotal = (clone $doctorRequestsQuery)
+            ->where('status', DoctorDutyRequest::STATUS_PENDING)
+            ->count();
 
         return Inertia::render('doctor-duty-schedules/index', [
             'schedules' => $schedules,
@@ -99,8 +103,16 @@ class DoctorDutyScheduleController extends Controller
             'can_manage_schedule' => $canManage,
             'can_submit_duty_requests' => $user->isDoctor(),
             'can_review_duty_requests' => $canManage,
-            'duty_requests' => $doctorRequests,
-            'pending_duty_requests' => $pendingDoctorRequests,
+            'duty_requests' => [
+                'data' => $doctorRequests,
+                'meta' => [
+                    'current_page' => $doctorRequestsPaginator->currentPage(),
+                    'last_page' => $doctorRequestsPaginator->lastPage(),
+                    'per_page' => $doctorRequestsPaginator->perPage(),
+                    'total' => $doctorRequestsPaginator->total(),
+                ],
+            ],
+            'pending_duty_requests_total' => $pendingDoctorRequestsTotal,
             'filters' => [
                 'start' => $start->toDateString(),
                 'end' => $end->toDateString(),

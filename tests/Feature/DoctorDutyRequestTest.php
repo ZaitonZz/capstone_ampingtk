@@ -8,7 +8,7 @@ use App\Models\User;
 it('allows doctors to submit leave or absence requests', function () {
     $doctor = User::factory()->doctor()->create();
 
-    $this->actingAs($doctor)
+    $this->actingAsVerified($doctor)
         ->post(route('doctor-duty-requests.store'), [
             'request_type' => 'on_leave',
             'start_date' => now()->addDays(2)->toDateString(),

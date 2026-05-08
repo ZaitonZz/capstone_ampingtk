@@ -9,7 +9,7 @@ class DoctorDutySchedulePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isClinicalStaff();
+        return $user->isAdmin() || $user->isMedicalStaff();
     }
 
     public function view(User $user, DoctorDutySchedule $doctorDutySchedule): bool

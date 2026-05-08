@@ -16,8 +16,8 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminDeepfakeLogsRoute from '@/routes/admin/deepfake-logs';
+import type { BreadcrumbItem } from '@/types';
 
 type DeepfakeResult = 'real' | 'fake' | 'inconclusive';
 type FlaggedState = 'flagged' | 'unflagged';

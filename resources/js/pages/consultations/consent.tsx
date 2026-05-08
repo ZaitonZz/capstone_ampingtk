@@ -1,15 +1,18 @@
-import { Head, useForm } from '@inertiajs/react';
-import type { FormEvent } from 'react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import type { FormEvent } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationConsentController from '@/actions/App/Http/Controllers/ConsultationConsentController';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import {
+    consultationDetailsUrlForRole,
+    consultationIndexUrlForRole,
+} from '@/lib/consultation-navigation';
 import { formatClinicDateTime } from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type { Consultation, ConsultationConsent } from '@/types/consultation';
@@ -19,17 +22,33 @@ interface Props {
     consent: ConsultationConsent | null;
 }
 
+interface PageProps {
+    auth?: {
+        user?: {
+            role?: string;
+        };
+    };
+    [key: string]: unknown;
+}
+
 export default function ConsultationConsentPage({
     consultation,
     consent,
 }: Props) {
     const isAlreadyConfirmed = consent?.consent_confirmed === true;
+    const page = usePage<PageProps>();
+    const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
+    const consultationDetailsUrl = consultationDetailsUrlForRole(
+        currentRole,
+        consultation.id,
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Consultations', href: ConsultationController.index.url() },
+        { title: 'Consultations', href: consultationIndexUrl },
         {
             title: consultation.patient?.full_name ?? `#${consultation.id}`,
-            href: ConsultationController.show.url(consultation.id),
+            href: consultationDetailsUrl,
         },
         {
             title: 'Privacy Notice & Consent',
@@ -267,29 +286,25 @@ export default function ConsultationConsentPage({
 
                                     {consultation.type ===
                                         'teleconsultation' && (
-                                        <Button className="w-full" asChild>
-                                            <a
-                                                href={ConsultationLobbyController.show.url(
-                                                    consultation.id,
-                                                )}
-                                            >
-                                                Go to Lobby →
-                                            </a>
-                                        </Button>
-                                    )}
+                                            <Button className="w-full" asChild>
+                                                <Link
+                                                    href={ConsultationLobbyController.show.url(
+                                                        consultation.id,
+                                                    )}
+                                                >
+                                                    Go to Lobby
+                                                </Link>
+                                            </Button>
+                                        )}
 
                                     <Button
                                         variant="outline"
                                         className="w-full"
                                         asChild
                                     >
-                                        <a
-                                            href={ConsultationController.show.url(
-                                                consultation.id,
-                                            )}
-                                        >
-                                            ← Back to Details
-                                        </a>
+                                        <Link href={consultationDetailsUrl}>
+                                            Back to Details
+                                        </Link>
                                     </Button>
                                 </div>
                             ) : (

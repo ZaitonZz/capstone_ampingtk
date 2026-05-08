@@ -158,6 +158,38 @@ it('shows consent as completed on the consultation details page when confirmed',
         );
 });
 
+it('updates medical staff consultation details from the patient consent status', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patient = Patient::factory()->create(['user_id' => $patientUser->id]);
+    $consultation = Consultation::factory()->teleconsultation()->create(['patient_id' => $patient->id]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consent_completed', false)
+        );
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $patientUser->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.show', $consultation))
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->component('consultations/show')
+                ->where('consent_completed', true)
+        );
+});
+
 it('redirects consultation start to consent when consent is incomplete', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create(['doctor_id' => $doctor->id]);
@@ -360,6 +392,53 @@ it('shows only on-duty doctors for a selected schedule', function () {
         ->assertOk()
         ->assertJsonPath('doctors.0.id', $onDutyDoctor->id)
         ->assertJsonCount(1, 'doctors');
+});
+
+it('shows doctors on duty for the selected date in consultation edit', function () {
+    $medicalStaff = User::factory()->medicalStaff()->create();
+    $doctorMorning = User::factory()->doctor()->create(['name' => 'Morning Doctor']);
+    $doctorAfternoon = User::factory()->doctor()->create(['name' => 'Afternoon Doctor']);
+    $doctorOffDuty = User::factory()->doctor()->create(['name' => 'Off Duty Doctor']);
+    $scheduledAt = now()->addDays(3)->setHour(14)->setMinute(0)->setSecond(0);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '12:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorAfternoon->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '13:00',
+        'end_time' => '18:00',
+        'status' => 'on_duty',
+    ]);
+
+    DoctorDutySchedule::factory()->create([
+        'doctor_id' => $doctorOffDuty->id,
+        'duty_date' => $scheduledAt->toDateString(),
+        'start_time' => '08:00',
+        'end_time' => '18:00',
+        'status' => 'on_leave',
+    ]);
+
+    $consultation = Consultation::factory()->create([
+        'doctor_id' => $doctorMorning->id,
+        'status' => 'scheduled',
+        'scheduled_at' => $scheduledAt,
+    ]);
+
+    $this->actingAs($medicalStaff)
+        ->get(route('consultations.edit', $consultation))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('consultations/edit')
+            ->has('doctors', 2)
+            ->where('doctors.0.id', $doctorAfternoon->id)
+        );
 });
 
 it('rejects consultation creation when doctor is not on duty', function () {

@@ -1,4 +1,4 @@
-import { Head, Link, router, usePoll } from '@inertiajs/react';
+import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import '@livekit/components-styles';
 import {
     ControlBar,
@@ -12,11 +12,14 @@ import {
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as ConsultationController from '@/actions/App/Http/Controllers/ConsultationController';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicTime } from '@/lib/clinic-date';
+import {
+    consultationDetailsUrlForRole,
+    consultationIndexUrlForRole,
+} from '@/lib/consultation-navigation';
 import type { BreadcrumbItem } from '@/types';
 import type {
     Consultation,
@@ -47,6 +50,14 @@ interface Props {
     deepfake_detection?: ConsultationDeepfakeDetectionState;
 }
 
+interface PageProps {
+    auth?: {
+        user?: {
+            role?: string;
+        };
+    };
+    [key: string]: unknown;
+}
 function DeepfakeDataListener({
     onUpdate,
 }: {
@@ -229,6 +240,7 @@ export default function ConsultationSessionPage({
     livekit,
     deepfake_detection,
 }: Props) {
+    const page = usePage<PageProps>();
     const isPaused =
         verification?.is_paused === true || consultation.status === 'paused';
     const [liveDetection, setLiveDetection] = useState<
@@ -344,12 +356,18 @@ export default function ConsultationSessionPage({
         payload?.room_name &&
         serverUrl,
     );
+    const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
+    const consultationDetailsUrl = consultationDetailsUrlForRole(
+        currentRole,
+        consultation.id,
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'Consultations', href: ConsultationController.index.url() },
+        { title: 'Consultations', href: consultationIndexUrl },
         {
             title: consultation.patient?.full_name ?? `#${consultation.id}`,
-            href: ConsultationController.show.url(consultation.id),
+            href: consultationDetailsUrl,
         },
         {
             title: 'Lobby',
@@ -360,6 +378,17 @@ export default function ConsultationSessionPage({
             href: '#',
         },
     ];
+
+    function clearStoredSession(): void {
+        window.sessionStorage.removeItem(storageKey);
+    }
+
+    function redirectToLobby(url?: string): void {
+        router.visit(url ?? ConsultationLobbyController.show.url(consultation.id), {
+            replace: true,
+            preserveScroll: true,
+        });
+    }
 
     async function leaveSession(): Promise<void> {
         if (isLeavingRef.current) {
@@ -393,10 +422,8 @@ export default function ConsultationSessionPage({
                 // Navigation still clears the local session credentials.
             }
         }
-
-        router.visit(ConsultationLobbyController.show.url(consultation.id), {
-            preserveScroll: true,
-        });
+        clearStoredSession();
+        redirectToLobby();
     }
 
     return (

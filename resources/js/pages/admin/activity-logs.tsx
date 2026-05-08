@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicDateTime } from '@/lib/clinic-date';
 import { dashboard as adminDashboard } from '@/routes/admin';
-import type { BreadcrumbItem } from '@/types';
 import * as AdminActivityLogsRoute from '@/routes/admin/activity-logs';
+import type { BreadcrumbItem } from '@/types';
 
 type ActivityLogItem = {
     id: number;

@@ -7,6 +7,7 @@ use App\Http\Requests\RescheduleConsultationRequest;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Consultation;
+use App\Models\ConsultationConsent;
 use App\Models\DoctorDutySchedule;
 use App\Models\Patient;
 use App\Models\User;
@@ -21,6 +22,34 @@ use Inertia\Response;
 
 class ConsultationController extends Controller
 {
+    private function patientConsentCompleted(Consultation $consultation): bool
+    {
+        $patientUserId = $consultation->patient()->value('user_id');
+
+        if ($patientUserId === null) {
+            return false;
+        }
+
+        return ConsultationConsent::query()
+            ->where('consultation_id', $consultation->id)
+            ->where('user_id', $patientUserId)
+            ->where('consent_confirmed', true)
+            ->exists();
+    }
+
+    private function consentCompletedForDetails(Consultation $consultation, ?User $user): ?bool
+    {
+        if ($user === null || $consultation->isAdminAuditUser($user)) {
+            return null;
+        }
+
+        if ($user->isMedicalStaff()) {
+            return $this->patientConsentCompleted($consultation);
+        }
+
+        return $consultation->hasConfirmedConsentForUser($user);
+    }
+
     private function doctorAvailableForApproval(Consultation $consultation): bool
     {
         if ($consultation->doctor_id === null || $consultation->scheduled_at === null) {
@@ -148,9 +177,7 @@ class ConsultationController extends Controller
             && $user !== null
             && ! $user->isMedicalStaff()
             && ($user->isAdmin() || $consultation->doctor_id === $user->id);
-        $consentCompleted = $consultation->isAdminAuditUser($user)
-            ? null
-            : $consultation->hasConfirmedConsentForUser($user);
+        $consentCompleted = $this->consentCompletedForDetails($consultation, $user);
 
         $consultation->load([
             'patient',
@@ -207,8 +234,18 @@ class ConsultationController extends Controller
 
         $scheduledAt = $consultation->scheduled_at?->toDateTimeString();
         $availableDoctors = $scheduledAt !== null
-            ? app(DoctorDutyAvailabilityService::class)->availableDoctors($scheduledAt)
+            ? app(DoctorDutyAvailabilityService::class)->availableDoctorsOnDate($consultation->scheduled_at->toDateString())
             : collect();
+
+        $availableDoctors = $availableDoctors
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
 
         return Inertia::render('consultations/edit', [
             'consultation' => $consultation->load(['patient', 'doctor']),
@@ -304,6 +341,29 @@ class ConsultationController extends Controller
         ]);
 
         $doctors = $availabilityService->availableDoctors($validated['scheduled_at'])
+            ->map(fn (User $doctor) => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'doctor_profile' => $doctor->doctorProfile
+                    ? ['specialty' => $doctor->doctorProfile->specialty]
+                    : null,
+            ])
+            ->values();
+
+        return response()->json([
+            'doctors' => $doctors,
+        ]);
+    }
+
+    public function availableDoctorsByDate(Request $request, DoctorDutyAvailabilityService $availabilityService): JsonResponse
+    {
+        $this->authorize('create', Consultation::class);
+
+        $validated = $request->validate([
+            'scheduled_date' => ['required', 'date'],
+        ]);
+
+        $doctors = $availabilityService->availableDoctorsOnDate($validated['scheduled_date'])
             ->map(fn (User $doctor) => [
                 'id' => $doctor->id,
                 'name' => $doctor->name,
