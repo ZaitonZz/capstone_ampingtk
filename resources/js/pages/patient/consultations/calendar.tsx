@@ -1,8 +1,8 @@
-import type { EventClickArg } from '@fullcalendar/core';
+import type { DateSelectArg, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { DateClickArg } from '@fullcalendar/interaction';
 import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import { Head, useForm } from '@inertiajs/react';
 import { CalendarPlus, X } from 'lucide-react';
 import type { FormEvent } from 'react';
@@ -14,7 +14,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { formatClinicDateTime, toClinicDatetimeLocal } from '@/lib/clinic-date';
+import {
+    CLINIC_TIME_ZONE,
+    formatClinicDateTime,
+    toClinicDatetimeLocal,
+} from '@/lib/clinic-date';
 import type { BreadcrumbItem } from '@/types';
 import type {
     CalendarEvent,
@@ -109,11 +113,11 @@ export default function PatientConsultationCalendar({
         setIsRequestModalOpen(true);
     }
 
-    function handleDateClick(info: DateClickArg) {
+    function handleDateSelect(info: DateSelectArg) {
         const dt =
-            info.dateStr.length === 10
-                ? `${info.dateStr}T09:00`
-                : toClinicDatetimeLocal(info.dateStr);
+            info.startStr.length === 10
+                ? `${info.startStr}T00:00`
+                : toClinicDatetimeLocal(info.startStr);
 
         openRequestModal(dt);
     }
@@ -182,15 +186,21 @@ export default function PatientConsultationCalendar({
 
                 <div className="rounded-xl border bg-background p-4">
                     <FullCalendar
-                        plugins={[dayGridPlugin, interactionPlugin]}
-                        initialView="dayGridMonth"
+                        plugins={[
+                            dayGridPlugin,
+                            timeGridPlugin,
+                            interactionPlugin,
+                        ]}
+                        initialView="timeGridWeek"
                         headerToolbar={{
                             left: 'prev,next today',
                             center: 'title',
-                            right: 'dayGridMonth',
+                            right: 'dayGridMonth,timeGridWeek,timeGridDay',
                         }}
                         events={calendarEvents}
-                        dateClick={handleDateClick}
+                        timeZone={CLINIC_TIME_ZONE}
+                        selectable
+                        select={handleDateSelect}
                         eventClick={(info) => handleEventClick(info)}
                         height="auto"
                         nowIndicator
