@@ -336,14 +336,29 @@ export default function ConsultationSessionPage({
         redirectToLobbyForVerification();
     }, [shouldRedirectToLobbyForVerification, redirectToLobbyForVerification]);
 
-    // If OTP expires while user is on the live session, redirect back to
+    // If OTP expires while the user is on the live session, redirect back to
     // consultation details when the backend marks the consultation cancelled.
+    // Note: `isPaused` may become false at the same time the backend sets
+    // `status: cancelled`, so watch for the transition from paused ->
+    // cancelled or a cancellation reason that mentions verification/OTP.
+    const prevPausedRef = useRef<boolean>(isPaused);
+
     useEffect(() => {
         if (hasRedirectedRef.current) {
+            prevPausedRef.current = isPaused;
             return;
         }
 
-        if (isPaused && consultation.status === 'cancelled') {
+        const reason = (consultation.cancellation_reason ?? '').toLowerCase();
+        const reasonIndicatesVerification =
+            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+
+        const wasPaused = prevPausedRef.current;
+
+        if (
+            consultation.status === 'cancelled' &&
+            (wasPaused || reasonIndicatesVerification)
+        ) {
             hasRedirectedRef.current = true;
 
             try {
@@ -358,7 +373,9 @@ export default function ConsultationSessionPage({
 
             router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
         }
-    }, [isPaused, consultation.status, consultation.id, page.props.auth]);
+
+        prevPausedRef.current = isPaused;
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultation.id, page.props.auth]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {

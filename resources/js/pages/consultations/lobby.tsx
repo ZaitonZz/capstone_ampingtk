@@ -317,8 +317,6 @@ export default function ConsultationLobbyPage({
         consultation.id,
     );
 
-    const hasRedirectedRef = useRef(false);
-
     const connectEndpoint = useMemo(
         () =>
             livekit?.connect_url ??
@@ -342,18 +340,27 @@ export default function ConsultationLobbyPage({
         };
     }, [isPaused, startPolling, stopPolling]);
 
+    const hasRedirectedRef = useRef(false);
+    const prevPausedRef = useRef<boolean>(isPaused);
+
     // If OTP expires and backend cancels the consultation, redirect user
     // back to the consultation details page with an explanatory message.
+    // Watch for the transition from paused -> cancelled or a cancellation
+    // reason that mentions verification/OTP because `isPaused` may flip to
+    // false when the backend sets `status: cancelled`.
     useEffect(() => {
         if (hasRedirectedRef.current) {
+            prevPausedRef.current = isPaused;
             return;
         }
 
-        // Backend will mark consultation as `cancelled` when OTP challenge
-        // expires or verification fails. When that happens while the user is
-        // paused for verification, navigate them back to the consultation and
-        // show a clear message.
-        if (isPaused && consultation.status === 'cancelled') {
+        const reason = (consultation.cancellation_reason ?? '').toLowerCase();
+        const reasonIndicatesVerification =
+            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+
+        const wasPaused = prevPausedRef.current;
+
+        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
             hasRedirectedRef.current = true;
 
             toast.error(
@@ -362,7 +369,9 @@ export default function ConsultationLobbyPage({
 
             router.visit(consultationDetailsUrl);
         }
-    }, [isPaused, consultation.status, consultationDetailsUrl]);
+
+        prevPausedRef.current = isPaused;
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultationDetailsUrl]);
 
     // Handle camera on/off
     useEffect(() => {
