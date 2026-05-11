@@ -141,8 +141,14 @@ it('marks room as ended on room_finished event when only a prescription exists (
     expect($consultation->ended_at)->not->toBeNull();
 });
 
-it('updates last activity on participant_joined event', function () {
+it('records the patient join timestamp on participant_joined event', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = \App\Models\Patient::factory()->create(['user_id' => $patientUser->id]);
+
     $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
         'livekit_room_name' => 'consultation-66-xyz98765',
         'livekit_room_status' => 'room_ready',
         'livekit_last_activity_at' => now()->subHour(),
@@ -151,7 +157,10 @@ it('updates last activity on participant_joined event', function () {
     $data = [
         'event' => 'participant_joined',
         'room' => ['name' => 'consultation-66-xyz98765'],
-        'participant' => ['identity' => 'user-1'],
+        'participant' => [
+            'identity' => sprintf('user-%d', $patientUser->id),
+            'metadata' => json_encode(['role' => 'patient']),
+        ],
         'id' => 'EV_join',
         'createdAt' => now()->timestamp,
     ];
@@ -166,7 +175,46 @@ it('updates last activity on participant_joined event', function () {
     $consultation->refresh();
 
     expect($consultation->livekit_last_activity_at->isAfter(now()->subMinute()))->toBeTrue();
+    expect($consultation->livekit_patient_joined_at)->not->toBeNull();
+    expect($consultation->livekit_doctor_joined_at)->toBeNull();
     expect($consultation->livekit_room_status)->toBe('room_ready');
+});
+
+it('records the doctor join timestamp on participant_joined event', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = \App\Models\Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'livekit_room_name' => 'consultation-67-xyz98765',
+        'livekit_room_status' => 'room_ready',
+        'livekit_last_activity_at' => now()->subHour(),
+    ]);
+
+    $data = [
+        'event' => 'participant_joined',
+        'room' => ['name' => 'consultation-67-xyz98765'],
+        'participant' => [
+            'identity' => sprintf('user-%d', $doctor->id),
+            'metadata' => json_encode(['role' => 'doctor']),
+        ],
+        'id' => 'EV_join_doctor',
+        'createdAt' => now()->timestamp,
+    ];
+
+    $body = json_encode($data);
+    $token = livekitWebhookToken($body);
+
+    $this->withHeaders(['Authorization' => $token])
+        ->postJson(route('livekit.webhook'), $data)
+        ->assertNoContent();
+
+    $consultation->refresh();
+
+    expect($consultation->livekit_doctor_joined_at)->not->toBeNull();
+    expect($consultation->livekit_patient_joined_at)->toBeNull();
 });
 
 it('removes the verification target participant if they join while consultation is paused', function () {
