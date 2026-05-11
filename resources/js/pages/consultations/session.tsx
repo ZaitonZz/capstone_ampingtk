@@ -13,8 +13,15 @@ import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicTime } from '@/lib/clinic-date';
 import {
@@ -27,6 +34,7 @@ import type {
     ConsultationDeepfakeDetectionState,
     ConsultationIdentityVerificationState,
 } from '@/types/consultation';
+import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 
 interface LiveKitSessionProps {
     enabled: boolean;
@@ -165,10 +173,10 @@ function DetectionStatusPanel({
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-              ? 'border-rose-200 bg-rose-50 text-rose-800'
-              : state === 'delayed'
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-blue-200 bg-blue-50 text-blue-800';
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : state === 'delayed'
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
 
     return (
@@ -279,10 +287,7 @@ export default function ConsultationSessionPage({
     useEffect(() => {
         if (isPaused) {
             stopPolling();
-
-            return () => {
-                stopPolling();
-            };
+            return;
         }
 
         startPolling();
@@ -299,15 +304,45 @@ export default function ConsultationSessionPage({
     const hasAutoRedirectedRef = useRef(false);
     const hasRedirectedRef = useRef(false);
     const isLeavingRef = useRef(false);
+    const isCheckingLeaveRef = useRef(false);
     const [isLeaving, setIsLeaving] = useState(false);
+    const [isEndForAllDialogOpen, setIsEndForAllDialogOpen] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
 
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
     const verificationTargetRole = verification?.target_role ?? 'participant';
+    const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
+    const consultationDetailsUrl = consultationDetailsUrlForRole(
+        currentRole,
+        consultation.id,
+    );
 
     const shouldRedirectToLobbyForVerification =
         isPaused && isCurrentUserVerificationTarget;
+    const isTerminalConsultation = useMemo(
+        () =>
+            ['completed', 'cancelled', 'no_show'].includes(consultation.status),
+        [consultation.status],
+    );
+
+    const redirectToConsultations = useCallback(
+        (url?: string): void => {
+            if (hasAutoRedirectedRef.current) {
+                return;
+            }
+
+            hasAutoRedirectedRef.current = true;
+            window.sessionStorage.removeItem(storageKey);
+
+            router.visit(url ?? consultationIndexUrl, {
+                replace: true,
+                preserveScroll: true,
+            });
+        },
+        [consultationIndexUrl, storageKey],
+    );
 
     const redirectToLobbyForVerification = useCallback((): void => {
         if (hasAutoRedirectedRef.current) {
@@ -323,33 +358,6 @@ export default function ConsultationSessionPage({
         });
     }, [consultation.id, storageKey]);
 
-    const refreshVerificationState = useCallback((): void => {
-        router.reload({
-            only: ['consultation', 'verification', 'deepfake_detection'],
-            onSuccess: (page) => {
-                const props = page.props as {
-                    consultation?: Consultation;
-                    verification?: ConsultationIdentityVerificationState;
-                    deepfake_detection?: ConsultationDeepfakeDetectionState;
-                };
-
-                if (props.deepfake_detection) {
-                    setLiveDetection(props.deepfake_detection);
-                }
-
-                const refreshedIsPaused =
-                    props.verification?.is_paused === true ||
-                    props.consultation?.status === 'paused';
-                const refreshedIsCurrentUserTarget =
-                    props.verification?.is_current_user_target === true;
-
-                if (refreshedIsPaused && refreshedIsCurrentUserTarget) {
-                    redirectToLobbyForVerification();
-                }
-            },
-        });
-    }, [redirectToLobbyForVerification]);
-
     useEffect(() => {
         if (!shouldRedirectToLobbyForVerification) {
             return;
@@ -357,6 +365,14 @@ export default function ConsultationSessionPage({
 
         redirectToLobbyForVerification();
     }, [shouldRedirectToLobbyForVerification, redirectToLobbyForVerification]);
+
+    useEffect(() => {
+        if (!isTerminalConsultation) {
+            return;
+        }
+
+        redirectToConsultations();
+    }, [isTerminalConsultation, redirectToConsultations]);
 
     // If OTP expires while the user is on the live session, redirect back to
     // consultation details when the backend marks the consultation cancelled.
@@ -382,11 +398,11 @@ export default function ConsultationSessionPage({
 
             toast.error('Verification expired. This consultation has been cancelled.');
 
-            router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
+            router.visit(consultationDetailsUrl);
         }
 
         prevPausedRef.current = isPaused;
-    }, [isPaused, consultation.status, consultation.cancellation_reason, consultation.id, page.props.auth]);
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultationDetailsUrl]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
@@ -415,16 +431,10 @@ export default function ConsultationSessionPage({
     const serverUrl = payload?.ws_url ?? livekit.ws_url;
     const canStartCall = Boolean(
         livekit.enabled &&
-        consultation.status !== 'cancelled' &&
+        !isTerminalConsultation &&
         payload?.participant_token &&
         payload?.room_name &&
         serverUrl,
-    );
-    const currentRole = page.props.auth?.user?.role;
-    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
-    const consultationDetailsUrl = consultationDetailsUrlForRole(
-        currentRole,
-        consultation.id,
     );
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -447,47 +457,98 @@ export default function ConsultationSessionPage({
         window.sessionStorage.removeItem(storageKey);
     }
 
-    function redirectToLobby(url?: string): void {
-        router.visit(url ?? ConsultationLobbyController.show.url(consultation.id), {
-            replace: true,
-            preserveScroll: true,
-        });
+    async function postLeaveRequest(body: Record<string, unknown>): Promise<{
+        cancelled?: boolean;
+        redirect_url?: string;
+        requires_confirmation?: boolean;
+        status?: string;
+    } | null> {
+        if (!livekit.leave_url) {
+            return null;
+        }
+
+        const csrfToken = getMetaCsrfToken();
+        const xsrfToken = getCookie('XSRF-TOKEN');
+
+        try {
+            const response = await fetch(livekit.leave_url, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    ...(csrfToken !== '' ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                    ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(body),
+            });
+
+            if (!response.ok) {
+                return null;
+            }
+
+            return (await response.json()) as {
+                cancelled?: boolean;
+                redirect_url?: string;
+                requires_confirmation?: boolean;
+                status?: string;
+            };
+        } catch {
+            return null;
+        }
     }
 
-    async function leaveSession(): Promise<void> {
+    async function requestLeavePreview(): Promise<boolean> {
+        const response = await postLeaveRequest({ preview: true });
+
+        return response?.requires_confirmation === true;
+    }
+
+    async function leaveSession(endForAll = false): Promise<void> {
         if (isLeavingRef.current) {
             return;
         }
 
         isLeavingRef.current = true;
         setIsLeaving(true);
-        window.sessionStorage.removeItem(storageKey);
 
-        if (livekit.leave_url) {
-            const csrfToken = getMetaCsrfToken();
-            const xsrfToken = getCookie('XSRF-TOKEN');
+        if (endForAll) {
+            setIsEndForAllDialogOpen(false);
+        }
+
+        clearStoredSession();
+
+        const response = await postLeaveRequest({ end_for_all: endForAll });
+
+        redirectToConsultations(response?.redirect_url);
+    }
+
+    async function handleLeaveClick(): Promise<void> {
+        if (isLeavingRef.current || isCheckingLeaveRef.current) {
+            return;
+        }
+
+        if (page.props.auth?.user?.role === 'doctor' && livekit.leave_url) {
+            isCheckingLeaveRef.current = true;
 
             try {
-                await fetch(livekit.leave_url, {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                        ...(csrfToken !== ''
-                            ? { 'X-CSRF-TOKEN': csrfToken }
-                            : {}),
-                        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({}),
-                });
-            } catch {
-                // Navigation still clears the local session credentials.
+                const requiresConfirmation = await requestLeavePreview();
+
+                if (requiresConfirmation) {
+                    setIsEndForAllDialogOpen(true);
+                    return;
+                }
+            } finally {
+                isCheckingLeaveRef.current = false;
             }
         }
-        clearStoredSession();
-        redirectToLobby();
+
+        await leaveSession(false);
+    }
+
+    async function confirmEndForAll(): Promise<void> {
+        await leaveSession(true);
     }
 
     return (
@@ -510,11 +571,11 @@ export default function ConsultationSessionPage({
                     <Button
                         variant="outline"
                         type="button"
-                        onClick={() => void leaveSession()}
-                        disabled={isLeaving}
+                        onClick={() => void handleLeaveClick()}
+                        disabled={isLeaving || isCheckingLeaveRef.current}
                     >
                         <LogOut className="h-4 w-4" />
-                        {isLeaving ? 'Leaving...' : 'Back to Lobby'}
+                        {isLeaving ? 'Leaving...' : 'Leave Session'}
                     </Button>
                 </div>
 
@@ -584,9 +645,7 @@ export default function ConsultationSessionPage({
                                     data-lk-theme="default"
                                     className="h-[620px]"
                                     onDisconnected={() => {
-                                        window.sessionStorage.removeItem(
-                                            storageKey,
-                                        );
+                                        clearStoredSession();
 
                                         if (
                                             shouldRedirectToLobbyForVerification
@@ -596,7 +655,7 @@ export default function ConsultationSessionPage({
                                             return;
                                         }
 
-                                        refreshVerificationState();
+                                        redirectToConsultations();
                                     }}
                                 >
                                     <ConsultationCallStage
@@ -680,6 +739,39 @@ export default function ConsultationSessionPage({
                     </div>
                 </div>
             </div>
+
+            <Dialog
+                open={isEndForAllDialogOpen}
+                onOpenChange={setIsEndForAllDialogOpen}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            End consultation for everyone?
+                        </DialogTitle>
+                        <DialogDescription>
+                            Leaving now will end the consultation for both
+                            doctor and patient. Continue?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsEndForAllDialogOpen(false)}
+                            disabled={isLeaving}
+                        >
+                            Keep Session Open
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => void confirmEndForAll()}
+                            disabled={isLeaving}
+                        >
+                            End Consultation
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

@@ -214,6 +214,18 @@ class LiveKitService
         );
     }
 
+    public function participantIdentityMatchesUser(string $identity, int $userId): bool
+    {
+        $identity = trim($identity);
+
+        if ($identity === '') {
+            return false;
+        }
+
+        return $identity === sprintf('user-%d', $userId)
+            || $identity === (string) $userId;
+    }
+
     /**
      * @return array<int, array{identity: string, metadata: ?string}>
      */
