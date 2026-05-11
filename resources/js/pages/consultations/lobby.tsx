@@ -317,6 +317,8 @@ export default function ConsultationLobbyPage({
         consultation.id,
     );
 
+    const hasRedirectedRef = useRef(false);
+
     const connectEndpoint = useMemo(
         () =>
             livekit?.connect_url ??
@@ -339,6 +341,28 @@ export default function ConsultationLobbyPage({
             stopPolling();
         };
     }, [isPaused, startPolling, stopPolling]);
+
+    // If OTP expires and backend cancels the consultation, redirect user
+    // back to the consultation details page with an explanatory message.
+    useEffect(() => {
+        if (hasRedirectedRef.current) {
+            return;
+        }
+
+        // Backend will mark consultation as `cancelled` when OTP challenge
+        // expires or verification fails. When that happens while the user is
+        // paused for verification, navigate them back to the consultation and
+        // show a clear message.
+        if (isPaused && consultation.status === 'cancelled') {
+            hasRedirectedRef.current = true;
+
+            toast.error(
+                'Verification expired. This consultation has been cancelled — please continue from the consultation page.',
+            );
+
+            router.visit(consultationDetailsUrl);
+        }
+    }, [isPaused, consultation.status, consultationDetailsUrl]);
 
     // Handle camera on/off
     useEffect(() => {

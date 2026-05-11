@@ -275,6 +275,7 @@ export default function ConsultationSessionPage({
         [consultation.id],
     );
     const hasAutoRedirectedRef = useRef(false);
+    const hasRedirectedRef = useRef(false);
     const isLeavingRef = useRef(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
@@ -334,6 +335,30 @@ export default function ConsultationSessionPage({
 
         redirectToLobbyForVerification();
     }, [shouldRedirectToLobbyForVerification, redirectToLobbyForVerification]);
+
+    // If OTP expires while user is on the live session, redirect back to
+    // consultation details when the backend marks the consultation cancelled.
+    useEffect(() => {
+        if (hasRedirectedRef.current) {
+            return;
+        }
+
+        if (isPaused && consultation.status === 'cancelled') {
+            hasRedirectedRef.current = true;
+
+            try {
+                // eslint-disable-next-line @typescript-eslint/no-var-requires
+                const { toast } = require('sonner');
+
+                toast.error('Verification expired. This consultation has been cancelled.');
+            } catch {
+                // eslint-disable-next-line no-alert
+                alert('Verification expired. This consultation has been cancelled.');
+            }
+
+            router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
+        }
+    }, [isPaused, consultation.status, consultation.id, page.props.auth]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
