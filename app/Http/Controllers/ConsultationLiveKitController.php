@@ -322,9 +322,14 @@ class ConsultationLiveKitController extends Controller
 
     private function finalizeAfterLastHumanParticipantLeaves(Consultation $consultation): JsonResponse
     {
-        $shouldComplete = $consultation->livekit_doctor_joined_at !== null
-            && $consultation->livekit_patient_joined_at !== null;
-        $noShowReason = 'Consultation cancelled because the patient never joined the LiveKit room.';
+        $doctorJoined = $consultation->livekit_doctor_joined_at !== null;
+        $patientJoined = $consultation->livekit_patient_joined_at !== null;
+        $shouldComplete = $doctorJoined && $patientJoined;
+        $noShowReason = match (true) {
+            $doctorJoined && ! $patientJoined => 'Consultation cancelled because the patient never joined the LiveKit room.',
+            ! $doctorJoined && $patientJoined => 'Consultation cancelled because the doctor never joined the LiveKit room.',
+            default => 'Consultation cancelled because participant attendance could not be confirmed in the LiveKit room.',
+        };
 
         try {
             $this->liveKitService->deleteRoom($consultation);

@@ -449,6 +449,90 @@ it('cancels the consultation as a no-show when the doctor leaves alone', functio
         ->toBe('Consultation cancelled because the patient never joined the LiveKit room.');
 });
 
+it('cancels the consultation when the patient leaves and the doctor never joined', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'status' => 'ongoing',
+        'livekit_room_name' => 'consultation-208-patient-only',
+        'livekit_room_status' => 'room_ready',
+        'livekit_doctor_joined_at' => null,
+        'livekit_patient_joined_at' => now()->subMinutes(8),
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([], 200),
+        'https://livekit.test/twirp/livekit.RoomService/ListParticipants' => Http::response([
+            'participants' => [
+                ['identity' => 'pipeline-bot-208'],
+            ],
+        ], 200),
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
+    ]);
+
+    $this->actingAs($patientUser)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => Consultation::STATUS_CANCELLED,
+            'cancelled' => true,
+            'message' => 'Consultation cancelled because the doctor never joined the LiveKit room.',
+            'redirect_url' => route('patient.consultations.index'),
+        ]);
+
+    $freshConsultation = $consultation->fresh();
+
+    expect($freshConsultation->status)->toBe(Consultation::STATUS_CANCELLED);
+    expect($freshConsultation->cancellation_reason)
+        ->toBe('Consultation cancelled because the doctor never joined the LiveKit room.');
+});
+
+it('uses a neutral cancellation reason when join tracking is unavailable', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'status' => 'ongoing',
+        'livekit_room_name' => 'consultation-209-unknown-join',
+        'livekit_room_status' => 'room_ready',
+        'livekit_doctor_joined_at' => null,
+        'livekit_patient_joined_at' => null,
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/RemoveParticipant' => Http::response([], 200),
+        'https://livekit.test/twirp/livekit.RoomService/ListParticipants' => Http::response([
+            'participants' => [
+                ['identity' => 'pipeline-bot-209'],
+            ],
+        ], 200),
+        'https://livekit.test/twirp/livekit.RoomService/DeleteRoom' => Http::response([], 200),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => Consultation::STATUS_CANCELLED,
+            'cancelled' => true,
+            'message' => 'Consultation cancelled because participant attendance could not be confirmed in the LiveKit room.',
+            'redirect_url' => route('consultations.index'),
+        ]);
+
+    $freshConsultation = $consultation->fresh();
+
+    expect($freshConsultation->status)->toBe(Consultation::STATUS_CANCELLED);
+    expect($freshConsultation->cancellation_reason)
+        ->toBe('Consultation cancelled because participant attendance could not be confirmed in the LiveKit room.');
+});
+
 it('returns accepted and records the LiveKit error when participant removal fails on leave', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create([
