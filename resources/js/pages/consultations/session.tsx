@@ -12,6 +12,7 @@ import {
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -355,21 +356,10 @@ export default function ConsultationSessionPage({
 
         const wasPaused = prevPausedRef.current;
 
-        if (
-            consultation.status === 'cancelled' &&
-            (wasPaused || reasonIndicatesVerification)
-        ) {
+        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
             hasRedirectedRef.current = true;
 
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const { toast } = require('sonner');
-
-                toast.error('Verification expired. This consultation has been cancelled.');
-            } catch {
-                // eslint-disable-next-line no-alert
-                alert('Verification expired. This consultation has been cancelled.');
-            }
+            toast.error('Verification expired. This consultation has been cancelled.');
 
             router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
         }
