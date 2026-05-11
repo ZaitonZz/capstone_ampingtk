@@ -129,6 +129,15 @@ class ConsultationDeepfakeDetectionService
 
     private function shouldMonitor(Consultation $consultation): bool
     {
+        // Do not monitor while an identity verification is in progress for this
+        // consultation. If a participant is paused for OTP verification we must
+        // avoid cancelling the room due to transient "no face" guidance.
+        if ($consultation->identity_verification_target_user_id !== null
+            || $consultation->identity_verification_started_at !== null
+        ) {
+            return false;
+        }
+
         return $consultation->type === 'teleconsultation'
             && $consultation->livekit_room_status === 'room_ready'
             && in_array($consultation->status, Consultation::LIVEKIT_ELIGIBLE_STATUSES, true);

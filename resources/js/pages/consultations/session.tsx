@@ -12,6 +12,7 @@ import {
 import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -60,10 +61,17 @@ interface PageProps {
 }
 function DeepfakeDataListener({
     onUpdate,
+    isPaused,
 }: {
     onUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+    isPaused: boolean;
 }) {
     useDataChannel('deepfake_detection', (message) => {
+        // Skip processing deepfake data while consultation is paused for identity verification.
+        if (isPaused) {
+            return;
+        }
+
         try {
             const payloadText = new TextDecoder().decode(message.payload);
             const payload = JSON.parse(
@@ -83,8 +91,10 @@ function DeepfakeDataListener({
 
 function ConsultationCallStage({
     onDetectionUpdate,
+    isPaused,
 }: {
     onDetectionUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+    isPaused: boolean;
 }) {
     const tracks = useTracks([
         { source: Track.Source.Camera, withPlaceholder: false },
@@ -97,7 +107,7 @@ function ConsultationCallStage({
 
     return (
         <div className="flex h-full flex-col">
-            <DeepfakeDataListener onUpdate={onDetectionUpdate} />
+            <DeepfakeDataListener onUpdate={onDetectionUpdate} isPaused={isPaused} />
 
             <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2 p-2">
                 {activeTracks.length > 0 ? (
@@ -246,24 +256,48 @@ export default function ConsultationSessionPage({
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
-    usePoll(5000, {
-        only: ['consultation', 'verification', 'deepfake_detection'],
-        onSuccess: (page) => {
-            const props = page.props as {
-                deepfake_detection?: ConsultationDeepfakeDetectionState;
-            };
+    // Use explicit start/stop control for polling. Start when the session is
+    // active (not paused) so we don't poll detection state while a participant
+    // is paused for identity verification.
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        5000,
+        {
+            only: ['consultation', 'verification', 'deepfake_detection'],
+            onSuccess: (page) => {
+                const props = page.props as {
+                    deepfake_detection?: ConsultationDeepfakeDetectionState;
+                };
 
-            if (props.deepfake_detection) {
-                setLiveDetection(props.deepfake_detection);
-            }
+                if (props.deepfake_detection) {
+                    setLiveDetection(props.deepfake_detection);
+                }
+            },
         },
-    });
+        { autoStart: false },
+    );
+
+    useEffect(() => {
+        if (isPaused) {
+            stopPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        startPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
         [consultation.id],
     );
     const hasAutoRedirectedRef = useRef(false);
+    const hasRedirectedRef = useRef(false);
     const isLeavingRef = useRef(false);
     const [isLeaving, setIsLeaving] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
@@ -323,6 +357,36 @@ export default function ConsultationSessionPage({
 
         redirectToLobbyForVerification();
     }, [shouldRedirectToLobbyForVerification, redirectToLobbyForVerification]);
+
+    // If OTP expires while the user is on the live session, redirect back to
+    // consultation details when the backend marks the consultation cancelled.
+    // Note: `isPaused` may become false at the same time the backend sets
+    // `status: cancelled`, so watch for the transition from paused ->
+    // cancelled or a cancellation reason that mentions verification/OTP.
+    const prevPausedRef = useRef<boolean>(isPaused);
+
+    useEffect(() => {
+        if (hasRedirectedRef.current) {
+            prevPausedRef.current = isPaused;
+            return;
+        }
+
+        const reason = (consultation.cancellation_reason ?? '').toLowerCase();
+        const reasonIndicatesVerification =
+            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+
+        const wasPaused = prevPausedRef.current;
+
+        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
+            hasRedirectedRef.current = true;
+
+            toast.error('Verification expired. This consultation has been cancelled.');
+
+            router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
+        }
+
+        prevPausedRef.current = isPaused;
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultation.id, page.props.auth]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
@@ -537,6 +601,7 @@ export default function ConsultationSessionPage({
                                 >
                                     <ConsultationCallStage
                                         onDetectionUpdate={setLiveDetection}
+                                        isPaused={isPaused}
                                     />
                                 </LiveKitRoom>
                             </div>

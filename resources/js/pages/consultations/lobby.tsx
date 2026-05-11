@@ -340,6 +340,39 @@ export default function ConsultationLobbyPage({
         };
     }, [isPaused, startPolling, stopPolling]);
 
+    const hasRedirectedRef = useRef(false);
+    const prevPausedRef = useRef<boolean>(isPaused);
+
+    // If OTP expires and backend cancels the consultation, redirect user
+    // back to the consultation details page with an explanatory message.
+    // Watch for the transition from paused -> cancelled or a cancellation
+    // reason that mentions verification/OTP because `isPaused` may flip to
+    // false when the backend sets `status: cancelled`.
+    useEffect(() => {
+        if (hasRedirectedRef.current) {
+            prevPausedRef.current = isPaused;
+            return;
+        }
+
+        const reason = (consultation.cancellation_reason ?? '').toLowerCase();
+        const reasonIndicatesVerification =
+            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+
+        const wasPaused = prevPausedRef.current;
+
+        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
+            hasRedirectedRef.current = true;
+
+            toast.error(
+                'Verification expired. This consultation has been cancelled — please continue from the consultation page.',
+            );
+
+            router.visit(consultationDetailsUrl);
+        }
+
+        prevPausedRef.current = isPaused;
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultationDetailsUrl]);
+
     // Handle camera on/off
     useEffect(() => {
         let cancelled = false;
