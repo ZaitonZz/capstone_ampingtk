@@ -281,6 +281,12 @@ export default function ConsultationSessionPage({
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
     const verificationTargetRole = verification?.target_role ?? 'participant';
+    const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
+    const consultationDetailsUrl = consultationDetailsUrlForRole(
+        currentRole,
+        consultation.id,
+    );
 
     const shouldRedirectToLobbyForVerification =
         isPaused && isCurrentUserVerificationTarget;
@@ -320,33 +326,6 @@ export default function ConsultationSessionPage({
             preserveScroll: true,
         });
     }, [consultation.id, storageKey]);
-
-    const refreshVerificationState = useCallback((): void => {
-        router.reload({
-            only: ['consultation', 'verification', 'deepfake_detection'],
-            onSuccess: (page) => {
-                const props = page.props as {
-                    consultation?: Consultation;
-                    verification?: ConsultationIdentityVerificationState;
-                    deepfake_detection?: ConsultationDeepfakeDetectionState;
-                };
-
-                if (props.deepfake_detection) {
-                    setLiveDetection(props.deepfake_detection);
-                }
-
-                const refreshedIsPaused =
-                    props.verification?.is_paused === true ||
-                    props.consultation?.status === 'paused';
-                const refreshedIsCurrentUserTarget =
-                    props.verification?.is_current_user_target === true;
-
-                if (refreshedIsPaused && refreshedIsCurrentUserTarget) {
-                    redirectToLobbyForVerification();
-                }
-            },
-        });
-    }, [redirectToLobbyForVerification]);
 
     useEffect(() => {
         if (!shouldRedirectToLobbyForVerification) {
@@ -395,12 +374,6 @@ export default function ConsultationSessionPage({
         payload?.participant_token &&
         payload?.room_name &&
         serverUrl,
-    );
-    const currentRole = page.props.auth?.user?.role;
-    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
-    const consultationDetailsUrl = consultationDetailsUrlForRole(
-        currentRole,
-        consultation.id,
     );
 
     const breadcrumbs: BreadcrumbItem[] = [
