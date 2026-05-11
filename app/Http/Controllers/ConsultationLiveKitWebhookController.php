@@ -191,7 +191,7 @@ class ConsultationLiveKitWebhookController extends Controller
         $participantIdentity = (string) ($participant['identity'] ?? '');
         $metadata = $this->decodeParticipantMetadata(is_string($participant['metadata'] ?? null) ? (string) $participant['metadata'] : null);
         $participantRole = (string) ($metadata['role'] ?? '');
-        $needsPatientLookup = $participantRole !== 'doctor';
+        $isNonDoctorRole = $participantRole !== 'doctor';
 
         if ($participantRole === 'doctor') {
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
@@ -209,17 +209,17 @@ class ConsultationLiveKitWebhookController extends Controller
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
         }
 
-        $patientJoinedAtAlreadySet = array_key_exists('livekit_patient_joined_at', $updates);
+        $hasPatientJoinUpdate = array_key_exists('livekit_patient_joined_at', $updates);
         $patientUserId = null;
 
-        if ($needsPatientLookup && ! $patientJoinedAtAlreadySet) {
+        if ($isNonDoctorRole && ! $hasPatientJoinUpdate) {
             $consultation->loadMissing('patient');
             $patientUserId = $consultation->patient?->user_id;
         }
 
         if (
             $patientUserId !== null
-            && ! $patientJoinedAtAlreadySet
+            && ! $hasPatientJoinUpdate
             && $this->liveKitService->participantIdentityMatchesUser($participantIdentity, (int) $patientUserId)
         ) {
             $updates['livekit_patient_joined_at'] = $consultation->livekit_patient_joined_at ?? now();
