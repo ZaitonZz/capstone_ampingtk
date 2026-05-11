@@ -256,20 +256,41 @@ export default function ConsultationSessionPage({
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
-    // Only poll for detection updates while the consultation is not paused.
-    // While paused for identity verification, face detection monitoring is paused on the backend.
-    usePoll(5000, {
-        only: ['consultation', 'verification', 'deepfake_detection'],
-        onSuccess: (page) => {
-            const props = page.props as {
-                deepfake_detection?: ConsultationDeepfakeDetectionState;
-            };
+    // Use explicit start/stop control for polling. Start when the session is
+    // active (not paused) so we don't poll detection state while a participant
+    // is paused for identity verification.
+    const { start: startPolling, stop: stopPolling } = usePoll(
+        5000,
+        {
+            only: ['consultation', 'verification', 'deepfake_detection'],
+            onSuccess: (page) => {
+                const props = page.props as {
+                    deepfake_detection?: ConsultationDeepfakeDetectionState;
+                };
 
-            if (props.deepfake_detection) {
-                setLiveDetection(props.deepfake_detection);
-            }
+                if (props.deepfake_detection) {
+                    setLiveDetection(props.deepfake_detection);
+                }
+            },
         },
-    }, { isPolling: !isPaused });
+        { autoStart: false },
+    );
+
+    useEffect(() => {
+        if (isPaused) {
+            stopPolling();
+
+            return () => {
+                stopPolling();
+            };
+        }
+
+        startPolling();
+
+        return () => {
+            stopPolling();
+        };
+    }, [isPaused, startPolling, stopPolling]);
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
