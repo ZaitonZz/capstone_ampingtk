@@ -256,7 +256,7 @@ it('does not query patients table for participant_joined when metadata role is d
     DB::disableQueryLog();
 
     $patientTableWasQueried = collect($queries)->contains(
-        fn (array $query): bool => preg_match('/from\\s+[\"`]?patients[\"`]?/i', (string) ($query['query'] ?? '')) === 1
+        fn (array $query): bool => preg_match('/\\bfrom\\b[\\s\\S]*\\bpatients\\b/i', (string) ($query['query'] ?? '')) === 1
     );
 
     expect($patientTableWasQueried)->toBeFalse();

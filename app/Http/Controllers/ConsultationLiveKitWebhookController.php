@@ -209,16 +209,17 @@ class ConsultationLiveKitWebhookController extends Controller
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
         }
 
+        $patientJoinedAtAlreadySet = array_key_exists('livekit_patient_joined_at', $updates);
         $patientUserId = null;
 
-        if ($shouldTryPatientIdentityFallback && ! array_key_exists('livekit_patient_joined_at', $updates)) {
+        if ($shouldTryPatientIdentityFallback && ! $patientJoinedAtAlreadySet) {
             $consultation->loadMissing('patient');
             $patientUserId = $consultation->patient?->user_id;
         }
 
         if (
             $patientUserId !== null
-            && ! array_key_exists('livekit_patient_joined_at', $updates)
+            && ! $patientJoinedAtAlreadySet
             && $this->liveKitService->participantIdentityMatchesUser($participantIdentity, (int) $patientUserId)
         ) {
             $updates['livekit_patient_joined_at'] = $consultation->livekit_patient_joined_at ?? now();
