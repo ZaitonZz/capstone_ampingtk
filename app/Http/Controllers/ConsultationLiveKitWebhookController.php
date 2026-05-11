@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Consultation;
-use App\Models\Patient;
 use App\Services\LiveKitService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -192,12 +191,11 @@ class ConsultationLiveKitWebhookController extends Controller
         $participantIdentity = (string) ($participant['identity'] ?? '');
         $metadata = $this->decodeParticipantMetadata(is_string($participant['metadata'] ?? null) ? (string) $participant['metadata'] : null);
         $participantRole = (string) ($metadata['role'] ?? '');
+        $shouldTryPatientIdentityFallback = $participantRole !== 'doctor';
 
         if ($participantRole === 'doctor') {
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
         }
-
-        $patientUserId = Patient::query()->whereKey($consultation->patient_id)->value('user_id');
 
         if ($participantRole === 'patient') {
             $updates['livekit_patient_joined_at'] = $consultation->livekit_patient_joined_at ?? now();
@@ -209,6 +207,13 @@ class ConsultationLiveKitWebhookController extends Controller
             && $this->liveKitService->participantIdentityMatchesUser($participantIdentity, (int) $consultation->doctor_id)
         ) {
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
+        }
+
+        $patientUserId = null;
+
+        if ($shouldTryPatientIdentityFallback && ! array_key_exists('livekit_patient_joined_at', $updates)) {
+            $consultation->loadMissing('patient');
+            $patientUserId = $consultation->patient?->user_id;
         }
 
         if (

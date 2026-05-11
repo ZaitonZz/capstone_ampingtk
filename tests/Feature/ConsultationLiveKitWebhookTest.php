@@ -1,9 +1,11 @@
 <?php
 
 use App\Models\Consultation;
+use App\Models\Patient;
 use App\Models\PatientNote;
 use App\Models\Prescription;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -144,7 +146,7 @@ it('marks room as ended on room_finished event when only a prescription exists (
 it('records the patient join timestamp on participant_joined event', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
-    $patientProfile = \App\Models\Patient::factory()->create(['user_id' => $patientUser->id]);
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
 
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
@@ -183,7 +185,7 @@ it('records the patient join timestamp on participant_joined event', function ()
 it('records the doctor join timestamp on participant_joined event', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
-    $patientProfile = \App\Models\Patient::factory()->create(['user_id' => $patientUser->id]);
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
 
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
@@ -215,6 +217,49 @@ it('records the doctor join timestamp on participant_joined event', function () 
 
     expect($consultation->livekit_doctor_joined_at)->not->toBeNull();
     expect($consultation->livekit_patient_joined_at)->toBeNull();
+});
+
+it('does not query patients table for participant_joined when metadata role is doctor', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'livekit_room_name' => 'consultation-67-role-doctor-no-patient-query',
+        'livekit_room_status' => 'room_ready',
+    ]);
+
+    $data = [
+        'event' => 'participant_joined',
+        'room' => ['name' => 'consultation-67-role-doctor-no-patient-query'],
+        'participant' => [
+            'identity' => sprintf('user-%d', $doctor->id),
+            'metadata' => json_encode(['role' => 'doctor']),
+        ],
+        'id' => 'EV_join_doctor_no_patient_query',
+        'createdAt' => now()->timestamp,
+    ];
+
+    $body = json_encode($data);
+    $token = livekitWebhookToken($body);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    $this->withHeaders(['Authorization' => $token])
+        ->postJson(route('livekit.webhook'), $data)
+        ->assertNoContent();
+
+    $queries = DB::getQueryLog();
+    DB::disableQueryLog();
+
+    $patientTableWasQueried = collect($queries)->contains(
+        fn (array $query): bool => preg_match('/from\\s+[\"`]?patients[\"`]?/i', (string) ($query['query'] ?? '')) === 1
+    );
+
+    expect($patientTableWasQueried)->toBeFalse();
 });
 
 it('removes the verification target participant if they join while consultation is paused', function () {
