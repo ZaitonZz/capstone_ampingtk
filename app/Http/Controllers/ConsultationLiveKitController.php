@@ -324,6 +324,7 @@ class ConsultationLiveKitController extends Controller
     {
         $shouldComplete = $consultation->livekit_doctor_joined_at !== null
             && $consultation->livekit_patient_joined_at !== null;
+        $noShowReason = 'Consultation cancelled because the patient never joined the LiveKit room.';
 
         try {
             $this->liveKitService->deleteRoom($consultation);
@@ -338,7 +339,7 @@ class ConsultationLiveKitController extends Controller
         $consultation->forceFill([
             'status' => $shouldComplete ? Consultation::STATUS_COMPLETED : Consultation::STATUS_CANCELLED,
             'ended_at' => $consultation->ended_at ?? now(),
-            'cancellation_reason' => $shouldComplete ? null : 'patient_no_show',
+            'cancellation_reason' => $shouldComplete ? null : $noShowReason,
             'livekit_room_status' => 'ended',
             'livekit_ended_at' => now(),
             'livekit_last_activity_at' => now(),
@@ -347,7 +348,7 @@ class ConsultationLiveKitController extends Controller
         return response()->json([
             'message' => $shouldComplete
                 ? 'Consultation completed because the live session had already taken place.'
-                : 'Consultation cancelled because the patient never joined the LiveKit room.',
+                : $noShowReason,
             'status' => $consultation->status,
             'cancelled' => $shouldComplete === false,
             'redirect_url' => $this->consultationIndexUrlForUser(),

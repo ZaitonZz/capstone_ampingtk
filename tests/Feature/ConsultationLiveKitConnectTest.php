@@ -445,7 +445,8 @@ it('cancels the consultation as a no-show when the doctor leaves alone', functio
     expect($freshConsultation->status)->toBe('cancelled');
     expect($freshConsultation->livekit_room_status)->toBe('ended');
     expect($freshConsultation->ended_at)->not->toBeNull();
-    expect($freshConsultation->cancellation_reason)->toBe('patient_no_show');
+    expect($freshConsultation->cancellation_reason)
+        ->toBe('Consultation cancelled because the patient never joined the LiveKit room.');
 });
 
 it('returns accepted and records the LiveKit error when participant removal fails on leave', function () {
