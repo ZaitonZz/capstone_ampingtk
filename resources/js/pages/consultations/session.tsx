@@ -13,7 +13,6 @@ import { Track } from 'livekit-client';
 import { AlertTriangle, CheckCircle2, LogOut, Shield } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -35,6 +34,7 @@ import type {
     ConsultationDeepfakeDetectionState,
     ConsultationIdentityVerificationState,
 } from '@/types/consultation';
+import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 
 interface LiveKitSessionProps {
     enabled: boolean;
