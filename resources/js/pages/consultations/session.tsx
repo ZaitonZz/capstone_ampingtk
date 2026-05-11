@@ -287,10 +287,7 @@ export default function ConsultationSessionPage({
     useEffect(() => {
         if (isPaused) {
             stopPolling();
-
-            return () => {
-                stopPolling();
-            };
+            return;
         }
 
         startPolling();
@@ -401,11 +398,11 @@ export default function ConsultationSessionPage({
 
             toast.error('Verification expired. This consultation has been cancelled.');
 
-            router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
+            router.visit(consultationDetailsUrl);
         }
 
         prevPausedRef.current = isPaused;
-    }, [isPaused, consultation.status, consultation.cancellation_reason, consultation.id, page.props.auth]);
+    }, [isPaused, consultation.status, consultation.cancellation_reason, consultationDetailsUrl]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
