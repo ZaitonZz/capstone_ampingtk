@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Consultation;
+use App\Models\Patient;
 use App\Services\LiveKitService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -46,13 +47,13 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         match ($eventType) {
-            'participant_joined' => $consultation->forceFill([
+            'participant_joined' => $consultation->forceFill(array_merge([
                 'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
                     ? Consultation::STATUS_ONGOING
                     : $consultation->status,
                 'started_at' => $consultation->started_at ?? now(),
                 'livekit_last_activity_at' => now(),
-            ])->save(),
+            ], $this->participantJoinStateUpdates($consultation, (array) ($event['participant'] ?? []))))->save(),
             'participant_left' => $consultation->forceFill([
                 'livekit_last_activity_at' => now(),
             ])->save(),
@@ -165,5 +166,59 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         return base64_decode(strtr($input, '-_', '+/'), true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeParticipantMetadata(?string $metadata): array
+    {
+        if ($metadata === null) {
+            return [];
+        }
+
+        $decoded = json_decode($metadata, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $participant
+     * @return array<string, mixed>
+     */
+    private function participantJoinStateUpdates(Consultation $consultation, array $participant): array
+    {
+        $updates = [];
+        $participantIdentity = (string) ($participant['identity'] ?? '');
+        $metadata = $this->decodeParticipantMetadata(is_string($participant['metadata'] ?? null) ? (string) $participant['metadata'] : null);
+        $participantRole = (string) ($metadata['role'] ?? '');
+
+        if ($participantRole === 'doctor') {
+            $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
+        }
+
+        $patientUserId = Patient::query()->whereKey($consultation->patient_id)->value('user_id');
+
+        if ($participantRole === 'patient') {
+            $updates['livekit_patient_joined_at'] = $consultation->livekit_patient_joined_at ?? now();
+        }
+
+        if (
+            $consultation->doctor_id !== null
+            && ! array_key_exists('livekit_doctor_joined_at', $updates)
+            && $this->liveKitService->participantIdentityMatchesUser($participantIdentity, (int) $consultation->doctor_id)
+        ) {
+            $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
+        }
+
+        if (
+            $patientUserId !== null
+            && ! array_key_exists('livekit_patient_joined_at', $updates)
+            && $this->liveKitService->participantIdentityMatchesUser($participantIdentity, (int) $patientUserId)
+        ) {
+            $updates['livekit_patient_joined_at'] = $consultation->livekit_patient_joined_at ?? now();
+        }
+
+        return $updates;
     }
 }
