@@ -191,7 +191,7 @@ class ConsultationLiveKitWebhookController extends Controller
         $participantIdentity = (string) ($participant['identity'] ?? '');
         $metadata = $this->decodeParticipantMetadata(is_string($participant['metadata'] ?? null) ? (string) $participant['metadata'] : null);
         $participantRole = (string) ($metadata['role'] ?? '');
-        $shouldTryPatientIdentityFallback = $participantRole !== 'doctor';
+        $needsPatientLookup = $participantRole !== 'doctor';
 
         if ($participantRole === 'doctor') {
             $updates['livekit_doctor_joined_at'] = $consultation->livekit_doctor_joined_at ?? now();
@@ -212,7 +212,7 @@ class ConsultationLiveKitWebhookController extends Controller
         $patientJoinedAtAlreadySet = array_key_exists('livekit_patient_joined_at', $updates);
         $patientUserId = null;
 
-        if ($shouldTryPatientIdentityFallback && ! $patientJoinedAtAlreadySet) {
+        if ($needsPatientLookup && ! $patientJoinedAtAlreadySet) {
             $consultation->loadMissing('patient');
             $patientUserId = $consultation->patient?->user_id;
         }
