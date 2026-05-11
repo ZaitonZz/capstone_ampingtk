@@ -1,7 +1,7 @@
 <?php
 
-use App\Models\DoctorDutySchedule;
 use App\Models\DoctorDutyRequest;
+use App\Models\DoctorDutySchedule;
 use App\Models\User;
 
 it('allows medical staff to create, update, and delete doctor duty schedules', function () {
