@@ -60,10 +60,17 @@ interface PageProps {
 }
 function DeepfakeDataListener({
     onUpdate,
+    isPaused,
 }: {
     onUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+    isPaused: boolean;
 }) {
     useDataChannel('deepfake_detection', (message) => {
+        // Skip processing deepfake data while consultation is paused for identity verification.
+        if (isPaused) {
+            return;
+        }
+
         try {
             const payloadText = new TextDecoder().decode(message.payload);
             const payload = JSON.parse(
@@ -83,8 +90,10 @@ function DeepfakeDataListener({
 
 function ConsultationCallStage({
     onDetectionUpdate,
+    isPaused,
 }: {
     onDetectionUpdate: (detection: ConsultationDeepfakeDetectionState) => void;
+    isPaused: boolean;
 }) {
     const tracks = useTracks([
         { source: Track.Source.Camera, withPlaceholder: false },
@@ -97,7 +106,7 @@ function ConsultationCallStage({
 
     return (
         <div className="flex h-full flex-col">
-            <DeepfakeDataListener onUpdate={onDetectionUpdate} />
+            <DeepfakeDataListener onUpdate={onDetectionUpdate} isPaused={isPaused} />
 
             <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2 p-2">
                 {activeTracks.length > 0 ? (
@@ -246,6 +255,8 @@ export default function ConsultationSessionPage({
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
+    // Only poll for detection updates while the consultation is not paused.
+    // While paused for identity verification, face detection monitoring is paused on the backend.
     usePoll(5000, {
         only: ['consultation', 'verification', 'deepfake_detection'],
         onSuccess: (page) => {
@@ -257,7 +268,7 @@ export default function ConsultationSessionPage({
                 setLiveDetection(props.deepfake_detection);
             }
         },
-    });
+    }, { isPolling: !isPaused });
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
@@ -537,6 +548,7 @@ export default function ConsultationSessionPage({
                                 >
                                     <ConsultationCallStage
                                         onDetectionUpdate={setLiveDetection}
+                                        isPaused={isPaused}
                                     />
                                 </LiveKitRoom>
                             </div>

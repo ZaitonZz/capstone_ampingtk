@@ -38,6 +38,7 @@ class DoctorDutyScheduleService
         // For multiple dates mode, entries already have per-date times
         if ($mode === self::MODE_MULTIPLE_DATES) {
             $entries = (array) ($payload['specific_date_entries'] ?? []);
+
             return collect($entries)
                 ->filter()
                 ->map(fn (array $entry) => [
