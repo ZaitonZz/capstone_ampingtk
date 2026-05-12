@@ -232,7 +232,10 @@ function getCookie(name: string): string | null {
     return decodeURIComponent(match[1]);
 }
 
-function secondsUntil(dateString: string | null | undefined): number {
+function secondsUntil(
+    dateString: string | null | undefined,
+    now: number = Date.now(),
+): number {
     if (!dateString) {
         return 0;
     }
@@ -243,7 +246,7 @@ function secondsUntil(dateString: string | null | undefined): number {
         return 0;
     }
 
-    return Math.max(0, Math.floor((target - Date.now()) / 1000));
+    return Math.max(0, Math.floor((target - now) / 1000));
 }
 
 function formatCountdown(totalSeconds: number): string {
@@ -281,6 +284,7 @@ export default function ConsultationLobbyPage({
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animationFrameRef = useRef<number | null>(null);
+    const otpExpiryHandledRef = useRef(false);
 
     const [connectState, setConnectState] = useState<ConnectState>('idle');
     const [connectError, setConnectError] = useState<string | null>(null);
@@ -288,6 +292,7 @@ export default function ConsultationLobbyPage({
     const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
     const [isResendingOtp, setIsResendingOtp] = useState(false);
     const [isApplyingOverride, setIsApplyingOverride] = useState(false);
+    const [otpClock, setOtpClock] = useState(() => Date.now());
 
     const isConsentConfirmed = consent?.consent_confirmed === true;
     const isAdminUser = page.props.auth?.user?.role === 'admin';
@@ -302,8 +307,11 @@ export default function ConsultationLobbyPage({
     const otpLength = Number.isFinite(configuredOtpLength)
         ? Math.max(4, Math.floor(configuredOtpLength))
         : 6;
-    const expiresInSeconds = secondsUntil(verification?.expires_at);
-    const resendInSeconds = secondsUntil(verification?.resend_available_at);
+    const expiresInSeconds = secondsUntil(verification?.expires_at, otpClock);
+    const resendInSeconds = secondsUntil(
+        verification?.resend_available_at,
+        otpClock,
+    );
     const isManualOverrideEnabled =
         verification?.manual_override_enabled === true;
     const canApplyDoctorOverride = Boolean(
@@ -323,6 +331,56 @@ export default function ConsultationLobbyPage({
             ConsultationLiveKitController.connect.url(consultation.id),
         [consultation.id, livekit?.connect_url],
     );
+
+    useEffect(() => {
+        const shouldTickClock =
+            isPaused &&
+            isCurrentUserVerificationTarget &&
+            (verification?.expires_at || verification?.resend_available_at);
+
+        if (!shouldTickClock) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setOtpClock(Date.now());
+        }, 1000);
+
+        return () => window.clearInterval(intervalId);
+    }, [
+        isPaused,
+        isCurrentUserVerificationTarget,
+        verification?.expires_at,
+        verification?.resend_available_at,
+    ]);
+
+    useEffect(() => {
+        otpExpiryHandledRef.current = false;
+    }, [verification?.expires_at]);
+
+    useEffect(() => {
+        if (
+            !isPaused ||
+            !isCurrentUserVerificationTarget ||
+            !verification?.expires_at
+        ) {
+            return;
+        }
+
+        if (expiresInSeconds > 0 || otpExpiryHandledRef.current) {
+            return;
+        }
+
+        otpExpiryHandledRef.current = true;
+        toast.error('Session was cancelled because the OTP expired.');
+        router.visit(consultationIndexUrl);
+    }, [
+        expiresInSeconds,
+        isPaused,
+        isCurrentUserVerificationTarget,
+        consultationIndexUrl,
+        verification?.expires_at,
+    ]);
 
     useEffect(() => {
         if (isPaused) {
@@ -356,11 +414,16 @@ export default function ConsultationLobbyPage({
 
         const reason = (consultation.cancellation_reason ?? '').toLowerCase();
         const reasonIndicatesVerification =
-            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+            reason.includes('verification') ||
+            reason.includes('otp') ||
+            reason.includes('identity');
 
         const wasPaused = prevPausedRef.current;
 
-        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
+        if (
+            consultation.status === 'cancelled' &&
+            (wasPaused || reasonIndicatesVerification)
+        ) {
             hasRedirectedRef.current = true;
 
             toast.error(
@@ -371,7 +434,12 @@ export default function ConsultationLobbyPage({
         }
 
         prevPausedRef.current = isPaused;
-    }, [isPaused, consultation.status, consultation.cancellation_reason, consultationDetailsUrl]);
+    }, [
+        isPaused,
+        consultation.status,
+        consultation.cancellation_reason,
+        consultationDetailsUrl,
+    ]);
 
     // Handle camera on/off
     useEffect(() => {
