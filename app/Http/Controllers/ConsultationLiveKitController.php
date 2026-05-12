@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\InteractsWithLiveKitParticipants;
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
 use App\Services\ConsultationDeepfakeDetectionService;
@@ -12,6 +13,8 @@ use RuntimeException;
 
 class ConsultationLiveKitController extends Controller
 {
+    use InteractsWithLiveKitParticipants;
+
     public function __construct(
         private LiveKitService $liveKitService,
         private ConsultationDeepfakeDetectionService $deepfakeDetectionService,
@@ -363,24 +366,5 @@ class ConsultationLiveKitController extends Controller
         }
 
         return false;
-    }
-
-    private function participantRepresentsUser(string $identity, int $userId): bool
-    {
-        return $identity === sprintf('user-%d', $userId) || $identity === (string) $userId;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function decodeParticipantMetadata(?string $metadata): array
-    {
-        if ($metadata === null) {
-            return [];
-        }
-
-        $decoded = json_decode($metadata, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 }

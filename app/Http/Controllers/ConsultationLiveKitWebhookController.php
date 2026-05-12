@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\InteractsWithLiveKitParticipants;
 use App\Models\Consultation;
 use App\Services\LiveKitService;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Throwable;
 
 class ConsultationLiveKitWebhookController extends Controller
 {
+    use InteractsWithLiveKitParticipants;
+
     public function __construct(private LiveKitService $liveKitService) {}
 
     public function handle(Request $request): Response
@@ -157,25 +160,6 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         $consultation->forceFill($updates)->save();
-    }
-
-    private function participantRepresentsUser(string $identity, int $userId): bool
-    {
-        return $identity === sprintf('user-%d', $userId) || $identity === (string) $userId;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function decodeParticipantMetadata(mixed $metadata): array
-    {
-        if (! is_string($metadata) || $metadata === '') {
-            return [];
-        }
-
-        $decoded = json_decode($metadata, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 
     /**
