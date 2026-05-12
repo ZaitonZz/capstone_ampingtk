@@ -42,7 +42,6 @@ interface LiveKitSessionProps {
     room_name: string | null;
     room_status: string | null;
     leave_url?: string | null;
-    can_end_for_all?: boolean;
 }
 
 interface LiveKitConnectPayload {
@@ -530,7 +529,7 @@ export default function ConsultationSessionPage({
             return;
         }
 
-        if (livekit.can_end_for_all === true && livekit.leave_url) {
+        if (page.props.auth?.user?.role === 'doctor' && livekit.leave_url) {
             isCheckingLeaveRef.current = true;
 
             try {
