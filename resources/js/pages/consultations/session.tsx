@@ -500,10 +500,14 @@ export default function ConsultationSessionPage({
         }
     }
 
-    async function requestLeavePreview(): Promise<boolean> {
+    async function requestLeavePreview(): Promise<boolean | null> {
         const response = await postLeaveRequest({ preview: true });
 
-        return response?.requires_confirmation === true;
+        if (response === null) {
+            return null;
+        }
+
+        return response.requires_confirmation === true;
     }
 
     async function leaveSession(endForAll = false): Promise<void> {
@@ -535,6 +539,11 @@ export default function ConsultationSessionPage({
 
             try {
                 const requiresConfirmation = await requestLeavePreview();
+
+                if (requiresConfirmation === null) {
+                    toast.error('Could not check leave confirmation. Please try again.');
+                    return;
+                }
 
                 if (requiresConfirmation) {
                     setIsEndForAllDialogOpen(true);
