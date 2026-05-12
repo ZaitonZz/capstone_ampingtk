@@ -189,10 +189,10 @@ function DetectionStatusPanel({
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-                ? 'border-rose-200 bg-rose-50 text-rose-800'
-                : state === 'delayed'
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-blue-200 bg-blue-50 text-blue-800';
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : state === 'delayed'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
 
     return (
@@ -336,13 +336,15 @@ export default function ConsultationSessionPage({
     const [leaveForAllMessage, setLeaveForAllMessage] = useState(
         'The patient is still in the call. End the session for everyone?',
     );
-    const [confirmEndAloneDialogOpen, setConfirmEndAloneDialogOpen] = useState(false);
+    const [confirmEndAloneDialogOpen, setConfirmEndAloneDialogOpen] =
+        useState(false);
     const [confirmEndAloneMessage, setConfirmEndAloneMessage] = useState(
         'The patient is not in the call. Mark as no-show or stay in the call?',
     );
     const [patientNeverJoined, setPatientNeverJoined] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
     const currentRole = page.props.auth?.user?.role;
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
 
     const shouldRedirectToLobbyForVerification =
         isPaused && isCurrentUserVerificationTarget;
@@ -449,11 +451,7 @@ export default function ConsultationSessionPage({
                 'Verification expired. This consultation has been cancelled.',
             );
 
-            const redirectTarget = (currentRole ?? '') === 'patient'
-                ? consultationIndexUrl
-                : consultationDetailsUrlForRole(currentRole ?? '', consultation.id);
-
-            router.visit(redirectTarget);
+            router.visit(consultationIndexUrl);
         }
 
         prevPausedRef.current = isPaused;
@@ -463,6 +461,7 @@ export default function ConsultationSessionPage({
         consultation.cancellation_reason,
         consultation.id,
         currentRole,
+        consultationIndexUrl,
     ]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
@@ -497,7 +496,6 @@ export default function ConsultationSessionPage({
         payload?.room_name &&
         serverUrl,
     );
-    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
     const consultationDetailsUrl = consultationDetailsUrlForRole(
         currentRole,
         consultation.id,
@@ -546,7 +544,10 @@ export default function ConsultationSessionPage({
     async function leaveSession({
         leaveForAll = false,
         confirmEndAlone = false,
-    }: { leaveForAll?: boolean; confirmEndAlone?: boolean } = {}): Promise<void> {
+    }: {
+        leaveForAll?: boolean;
+        confirmEndAlone?: boolean;
+    } = {}): Promise<void> {
         if (isLeavingRef.current) {
             return;
         }
@@ -583,11 +584,11 @@ export default function ConsultationSessionPage({
                 if (
                     response.status === 409 &&
                     responsePayload?.requires_leave_for_all_confirmation ===
-                    true
+                        true
                 ) {
                     setLeaveForAllMessage(
                         responsePayload.message ??
-                        'The patient is still in the call. End the session for everyone?',
+                            'The patient is still in the call. End the session for everyone?',
                     );
                     setLeaveForAllDialogOpen(true);
                     isLeavingRef.current = false;
@@ -601,7 +602,7 @@ export default function ConsultationSessionPage({
                 ) {
                     setConfirmEndAloneMessage(
                         responsePayload.message ??
-                        'The patient is not in the call. Mark as no-show or stay in the call?',
+                            'The patient is not in the call. Mark as no-show or stay in the call?',
                     );
                     setPatientNeverJoined(
                         responsePayload.patient_never_joined ?? false,
@@ -615,7 +616,7 @@ export default function ConsultationSessionPage({
                 if (!response.ok) {
                     toast.error(
                         responsePayload?.message ??
-                        'Unable to leave the consultation session.',
+                            'Unable to leave the consultation session.',
                     );
 
                     return;
@@ -660,7 +661,8 @@ export default function ConsultationSessionPage({
                     </div>
 
                     {(() => {
-                        const isDoctor = page.props.auth?.user?.role === 'doctor';
+                        const isDoctor =
+                            page.props.auth?.user?.role === 'doctor';
 
                         // Only doctors can end the consultation.
                         // Patients do not have the authority to leave as this is an important session.
@@ -902,13 +904,15 @@ export default function ConsultationSessionPage({
                     <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
                         {patientNeverJoined ? (
                             <p>
-                                Since the patient never joined, this consultation
-                                will be marked as <strong>No-Show</strong>.
+                                Since the patient never joined, this
+                                consultation will be marked as{' '}
+                                <strong>No-Show</strong>.
                             </p>
                         ) : (
                             <p>
-                                The patient joined but is no longer present. This
-                                consultation will be marked as <strong>Cancelled</strong>.
+                                The patient joined but is no longer present.
+                                This consultation will be marked as{' '}
+                                <strong>Cancelled</strong>.
                             </p>
                         )}
                     </div>
