@@ -142,7 +142,7 @@ function ConsultationCallStage({
                         />
                     ))
                 ) : (
-                    <div className="col-span-full flex min-h-[280px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
+                    <div className="col-span-full flex min-h-70 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
                         <p className="text-sm text-zinc-300">
                             Waiting for participants to publish camera or
                             screen-share tracks.
@@ -281,12 +281,16 @@ export default function ConsultationSessionPage({
     const page = usePage<PageProps>();
     const isPaused =
         verification?.is_paused === true || consultation.status === 'paused';
+    const isCurrentUserVerificationTarget =
+        verification?.is_current_user_target === true;
+    const verificationTargetRole = verification?.target_role ?? 'participant';
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
-    // Use explicit start/stop control for polling. Start when the session is
-    // active (not paused) so we don't poll detection state while a participant
-    // is paused for identity verification.
+    // Use explicit start/stop control for polling. The verified target user
+    // can stop polling once paused because they are redirected to the lobby,
+    // but observers must keep polling so they can react to the paused
+    // consultation transitioning to cancelled when the OTP expires.
     const { start: startPolling, stop: stopPolling } = usePoll(
         5000,
         {
@@ -305,7 +309,7 @@ export default function ConsultationSessionPage({
     );
 
     useEffect(() => {
-        if (isPaused) {
+        if (isPaused && isCurrentUserVerificationTarget) {
             stopPolling();
 
             return () => {
@@ -318,7 +322,7 @@ export default function ConsultationSessionPage({
         return () => {
             stopPolling();
         };
-    }, [isPaused, startPolling, stopPolling]);
+    }, [isPaused, isCurrentUserVerificationTarget, startPolling, stopPolling]);
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
@@ -339,10 +343,6 @@ export default function ConsultationSessionPage({
     const [patientNeverJoined, setPatientNeverJoined] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
     const currentRole = page.props.auth?.user?.role;
-
-    const isCurrentUserVerificationTarget =
-        verification?.is_current_user_target === true;
-    const verificationTargetRole = verification?.target_role ?? 'participant';
 
     const shouldRedirectToLobbyForVerification =
         isPaused && isCurrentUserVerificationTarget;
@@ -746,7 +746,7 @@ export default function ConsultationSessionPage({
                                     audio
                                     video
                                     data-lk-theme="default"
-                                    className="h-[620px]"
+                                    className="h-155"
                                     onDisconnected={() => {
                                         window.sessionStorage.removeItem(
                                             storageKey,
@@ -774,7 +774,7 @@ export default function ConsultationSessionPage({
                                 </LiveKitRoom>
                             </div>
                         ) : (
-                            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
+                            <div className="flex min-h-105 items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
                                 <div className="max-w-md p-6 text-center">
                                     <h2 className="mb-2 text-lg font-semibold">
                                         Call cannot start yet
