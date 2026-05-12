@@ -15,6 +15,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import * as ConsultationLobbyController from '@/actions/App/Http/Controllers/ConsultationLobbyController';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { formatClinicTime } from '@/lib/clinic-date';
 import {
@@ -42,6 +50,16 @@ interface LiveKitConnectPayload {
     participant_token: string;
     ws_url: string | null;
     role: string;
+}
+
+interface LiveKitLeavePayload {
+    message?: string;
+    status?: Consultation['status'];
+    cancelled?: boolean;
+    completed?: boolean;
+    no_show?: boolean;
+    redirect_url?: string;
+    requires_leave_for_all_confirmation?: boolean;
 }
 
 interface Props {
@@ -107,7 +125,10 @@ function ConsultationCallStage({
 
     return (
         <div className="flex h-full flex-col">
-            <DeepfakeDataListener onUpdate={onDetectionUpdate} isPaused={isPaused} />
+            <DeepfakeDataListener
+                onUpdate={onDetectionUpdate}
+                isPaused={isPaused}
+            />
 
             <div className="grid flex-1 auto-rows-fr grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2 p-2">
                 {activeTracks.length > 0 ? (
@@ -133,6 +154,7 @@ function ConsultationCallStage({
             <ControlBar
                 controls={{
                     chat: false,
+                    leave: false,
                     settings: false,
                 }}
                 className="border-t border-zinc-800/70 bg-zinc-950/95 px-2 py-2"
@@ -244,6 +266,10 @@ function getCookie(name: string): string | null {
     return decodeURIComponent(match[1]);
 }
 
+function isTerminalConsultationStatus(status: Consultation['status']): boolean {
+    return ['completed', 'cancelled', 'no_show'].includes(status);
+}
+
 export default function ConsultationSessionPage({
     consultation,
     verification,
@@ -300,7 +326,12 @@ export default function ConsultationSessionPage({
     const hasRedirectedRef = useRef(false);
     const isLeavingRef = useRef(false);
     const [isLeaving, setIsLeaving] = useState(false);
+    const [leaveForAllDialogOpen, setLeaveForAllDialogOpen] = useState(false);
+    const [leaveForAllMessage, setLeaveForAllMessage] = useState(
+        'The patient is still in the call. End the session for everyone?',
+    );
     const effectiveDetection = liveDetection ?? deepfake_detection;
+    const currentRole = page.props.auth?.user?.role;
 
     const isCurrentUserVerificationTarget =
         verification?.is_current_user_target === true;
@@ -346,9 +377,31 @@ export default function ConsultationSessionPage({
                 if (refreshedIsPaused && refreshedIsCurrentUserTarget) {
                     redirectToLobbyForVerification();
                 }
+
+                if (
+                    props.consultation?.status &&
+                    isTerminalConsultationStatus(props.consultation.status) &&
+                    !hasRedirectedRef.current
+                ) {
+                    hasRedirectedRef.current = true;
+                    window.sessionStorage.removeItem(storageKey);
+
+                    router.visit(
+                        consultationDetailsUrlForRole(
+                            currentRole ?? '',
+                            consultation.id,
+                        ),
+                        { replace: true },
+                    );
+                }
             },
         });
-    }, [redirectToLobbyForVerification]);
+    }, [
+        consultation.id,
+        currentRole,
+        redirectToLobbyForVerification,
+        storageKey,
+    ]);
 
     useEffect(() => {
         if (!shouldRedirectToLobbyForVerification) {
@@ -373,20 +426,38 @@ export default function ConsultationSessionPage({
 
         const reason = (consultation.cancellation_reason ?? '').toLowerCase();
         const reasonIndicatesVerification =
-            reason.includes('verification') || reason.includes('otp') || reason.includes('identity');
+            reason.includes('verification') ||
+            reason.includes('otp') ||
+            reason.includes('identity');
 
         const wasPaused = prevPausedRef.current;
 
-        if (consultation.status === 'cancelled' && (wasPaused || reasonIndicatesVerification)) {
+        if (
+            consultation.status === 'cancelled' &&
+            (wasPaused || reasonIndicatesVerification)
+        ) {
             hasRedirectedRef.current = true;
 
-            toast.error('Verification expired. This consultation has been cancelled.');
+            toast.error(
+                'Verification expired. This consultation has been cancelled.',
+            );
 
-            router.visit(consultationDetailsUrlForRole(page.props.auth?.user?.role ?? '', consultation.id));
+            router.visit(
+                consultationDetailsUrlForRole(
+                    currentRole ?? '',
+                    consultation.id,
+                ),
+            );
         }
 
         prevPausedRef.current = isPaused;
-    }, [isPaused, consultation.status, consultation.cancellation_reason, consultation.id, page.props.auth]);
+    }, [
+        isPaused,
+        consultation.status,
+        consultation.cancellation_reason,
+        consultation.id,
+        currentRole,
+    ]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
         if (typeof window === 'undefined') {
@@ -415,12 +486,11 @@ export default function ConsultationSessionPage({
     const serverUrl = payload?.ws_url ?? livekit.ws_url;
     const canStartCall = Boolean(
         livekit.enabled &&
-        consultation.status !== 'cancelled' &&
+        !isTerminalConsultationStatus(consultation.status) &&
         payload?.participant_token &&
         payload?.room_name &&
         serverUrl,
     );
-    const currentRole = page.props.auth?.user?.role;
     const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
     const consultationDetailsUrl = consultationDetailsUrlForRole(
         currentRole,
@@ -448,27 +518,42 @@ export default function ConsultationSessionPage({
     }
 
     function redirectToLobby(url?: string): void {
-        router.visit(url ?? ConsultationLobbyController.show.url(consultation.id), {
-            replace: true,
-            preserveScroll: true,
-        });
+        router.visit(
+            url ?? ConsultationLobbyController.show.url(consultation.id),
+            {
+                replace: true,
+                preserveScroll: true,
+            },
+        );
     }
 
-    async function leaveSession(): Promise<void> {
+    async function readLeavePayload(
+        response: Response,
+    ): Promise<LiveKitLeavePayload | null> {
+        try {
+            return (await response.json()) as LiveKitLeavePayload;
+        } catch {
+            return null;
+        }
+    }
+
+    async function leaveSession({
+        leaveForAll = false,
+    }: { leaveForAll?: boolean } = {}): Promise<void> {
         if (isLeavingRef.current) {
             return;
         }
 
         isLeavingRef.current = true;
         setIsLeaving(true);
-        window.sessionStorage.removeItem(storageKey);
 
-        if (livekit.leave_url) {
-            const csrfToken = getMetaCsrfToken();
-            const xsrfToken = getCookie('XSRF-TOKEN');
+        try {
+            let redirectUrl: string | undefined;
 
-            try {
-                await fetch(livekit.leave_url, {
+            if (livekit.leave_url) {
+                const csrfToken = getMetaCsrfToken();
+                const xsrfToken = getCookie('XSRF-TOKEN');
+                const response = await fetch(livekit.leave_url, {
                     method: 'POST',
                     headers: {
                         Accept: 'application/json',
@@ -480,14 +565,53 @@ export default function ConsultationSessionPage({
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({}),
+                    body: JSON.stringify({ leave_for_all: leaveForAll }),
                 });
-            } catch {
-                // Navigation still clears the local session credentials.
+
+                const responsePayload = await readLeavePayload(response);
+
+                if (
+                    response.status === 409 &&
+                    responsePayload?.requires_leave_for_all_confirmation ===
+                        true
+                ) {
+                    setLeaveForAllMessage(
+                        responsePayload.message ??
+                            'The patient is still in the call. End the session for everyone?',
+                    );
+                    setLeaveForAllDialogOpen(true);
+
+                    return;
+                }
+
+                if (!response.ok) {
+                    toast.error(
+                        responsePayload?.message ??
+                            'Unable to leave the consultation session.',
+                    );
+
+                    return;
+                }
+
+                if (responsePayload?.status === 'completed') {
+                    toast.success('Consultation completed.');
+                } else if (responsePayload?.status === 'no_show') {
+                    toast.info('Consultation marked as no-show.');
+                } else if (responsePayload?.status === 'cancelled') {
+                    toast.info('Consultation cancelled.');
+                }
+
+                redirectUrl = responsePayload?.redirect_url;
             }
+
+            clearStoredSession();
+            redirectToLobby(redirectUrl);
+        } catch {
+            toast.error('Unable to leave the consultation session.');
+        } finally {
+            isLeavingRef.current = false;
+            setIsLeaving(false);
         }
-        clearStoredSession();
-        redirectToLobby();
     }
 
     return (
@@ -588,6 +712,10 @@ export default function ConsultationSessionPage({
                                             storageKey,
                                         );
 
+                                        if (isLeavingRef.current) {
+                                            return;
+                                        }
+
                                         if (
                                             shouldRedirectToLobbyForVerification
                                         ) {
@@ -680,6 +808,41 @@ export default function ConsultationSessionPage({
                     </div>
                 </div>
             </div>
+
+            <Dialog
+                open={leaveForAllDialogOpen}
+                onOpenChange={setLeaveForAllDialogOpen}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Leave for all?</DialogTitle>
+                        <DialogDescription>
+                            {leaveForAllMessage}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setLeaveForAllDialogOpen(false)}
+                            disabled={isLeaving}
+                        >
+                            Stay in call
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => {
+                                setLeaveForAllDialogOpen(false);
+                                void leaveSession({ leaveForAll: true });
+                            }}
+                            disabled={isLeaving}
+                        >
+                            {isLeaving ? 'Ending...' : 'Leave for all'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

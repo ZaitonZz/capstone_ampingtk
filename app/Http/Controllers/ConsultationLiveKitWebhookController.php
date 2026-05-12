@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\InteractsWithLiveKitParticipants;
 use App\Models\Consultation;
 use App\Services\LiveKitService;
 use Illuminate\Http\Request;
@@ -11,6 +12,8 @@ use Throwable;
 
 class ConsultationLiveKitWebhookController extends Controller
 {
+    use InteractsWithLiveKitParticipants;
+
     public function __construct(private LiveKitService $liveKitService) {}
 
     public function handle(Request $request): Response
@@ -45,17 +48,13 @@ class ConsultationLiveKitWebhookController extends Controller
             return response()->noContent();
         }
 
+        $participantRole = in_array($eventType, ['participant_joined', 'participant_left'], true)
+            ? $this->participantRoleForEvent($consultation, $event)
+            : null;
+
         match ($eventType) {
-            'participant_joined' => $consultation->forceFill([
-                'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
-                    ? Consultation::STATUS_ONGOING
-                    : $consultation->status,
-                'started_at' => $consultation->started_at ?? now(),
-                'livekit_last_activity_at' => now(),
-            ])->save(),
-            'participant_left' => $consultation->forceFill([
-                'livekit_last_activity_at' => now(),
-            ])->save(),
+            'participant_joined' => $this->recordParticipantJoined($consultation, $participantRole),
+            'participant_left' => $this->recordParticipantLeft($consultation, $participantRole),
             'room_finished' => (function () use ($consultation) {
                 $hasDoc = $consultation->hasClinicalDocumentation();
                 $shouldComplete = $hasDoc && $consultation->status === Consultation::STATUS_ONGOING;
@@ -94,6 +93,73 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         return response()->noContent();
+    }
+
+    /**
+     * @param  array<string,mixed>  $event
+     */
+    private function participantRoleForEvent(Consultation $consultation, array $event): ?string
+    {
+        $participant = $event['participant'] ?? [];
+        $participant = is_array($participant) ? $participant : [];
+
+        $identity = (string) ($participant['identity'] ?? '');
+
+        if ($this->participantRepresentsUser($identity, (int) $consultation->doctor_id)) {
+            return 'doctor';
+        }
+
+        $consultation->loadMissing('patient');
+        $patientUserId = $consultation->patient?->user_id;
+
+        if ($patientUserId !== null && $this->participantRepresentsUser($identity, (int) $patientUserId)) {
+            return 'patient';
+        }
+
+        $metadata = $this->decodeParticipantMetadata($participant['metadata'] ?? null);
+        $role = $metadata['role'] ?? null;
+
+        return in_array($role, ['doctor', 'patient'], true) ? $role : null;
+    }
+
+    private function recordParticipantJoined(Consultation $consultation, ?string $role): void
+    {
+        $now = now();
+        $updates = [
+            'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
+                ? Consultation::STATUS_ONGOING
+                : $consultation->status,
+            'started_at' => $consultation->started_at ?? $now,
+            'livekit_last_activity_at' => $now,
+        ];
+
+        if ($role === 'doctor' && $consultation->livekit_doctor_joined_at === null) {
+            $updates['livekit_doctor_joined_at'] = $now;
+        }
+
+        if ($role === 'patient' && $consultation->livekit_patient_joined_at === null) {
+            $updates['livekit_patient_joined_at'] = $now;
+        }
+
+        $consultation->forceFill($updates)->save();
+    }
+
+    private function recordParticipantLeft(Consultation $consultation, ?string $role): void
+    {
+        $now = now();
+        $updates = [
+            'livekit_last_activity_at' => $now,
+        ];
+
+        if ($role === 'doctor') {
+            $updates['livekit_doctor_left_at'] = $now;
+        }
+
+        if ($role === 'patient') {
+            $updates['livekit_patient_left_at'] = $now;
+        }
+
+        $consultation->forceFill($updates)->save();
     }
 
     /**
