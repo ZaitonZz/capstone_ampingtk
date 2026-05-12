@@ -161,6 +161,12 @@ class ConsultationLiveKitController extends Controller
 
         $leaveForAll = $request->boolean('leave_for_all');
 
+        // Only doctors can use leave_for_all to end the consultation for everyone.
+        // Patients can disconnect (leave without leave_for_all), but cannot end the session for all.
+        if ($isConsultationPatient && $leaveForAll) {
+            abort(403, 'Patients cannot end the consultation for all participants. The doctor has the authority to end sessions.');
+        }
+
         if ($isConsultationDoctor) {
             try {
                 $participantsBeforeLeave = $this->liveKitService->listParticipants($consultation);
