@@ -513,6 +513,41 @@ class ConsultationIdentityVerificationService
         }
 
         try {
+            // Ensure any connected participants are removed from the LiveKit
+            // room so they are forced out of the consultation UI when the
+            // OTP challenge expires and the consultation is cancelled.
+            $doctorUser = null;
+
+            if ($freshConsultation->doctor_id !== null) {
+                $doctorUser = User::query()->find($freshConsultation->doctor_id);
+            }
+
+            $patientUser = null;
+
+            if ($freshConsultation->patient_id !== null) {
+                $patientModel = \App\Models\Patient::query()->find($freshConsultation->patient_id);
+
+                if ($patientModel !== null && $patientModel->user_id !== null) {
+                    $patientUser = User::query()->find($patientModel->user_id);
+                }
+            }
+
+            if ($doctorUser !== null) {
+                try {
+                    $this->liveKitService->removeParticipantFromConsultation($freshConsultation, $doctorUser);
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+
+            if ($patientUser !== null) {
+                try {
+                    $this->liveKitService->removeParticipantFromConsultation($freshConsultation, $patientUser);
+                } catch (Throwable $e) {
+                    report($e);
+                }
+            }
+
             $this->liveKitService->deleteRoom($freshConsultation);
         } catch (Throwable $exception) {
             report($exception);

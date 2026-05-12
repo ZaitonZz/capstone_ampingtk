@@ -442,12 +442,11 @@ export default function ConsultationSessionPage({
                 'Verification expired. This consultation has been cancelled.',
             );
 
-            router.visit(
-                consultationDetailsUrlForRole(
-                    currentRole ?? '',
-                    consultation.id,
-                ),
-            );
+            const redirectTarget = (currentRole ?? '') === 'patient'
+                ? consultationIndexUrl
+                : consultationDetailsUrlForRole(currentRole ?? '', consultation.id);
+
+            router.visit(redirectTarget);
         }
 
         prevPausedRef.current = isPaused;
