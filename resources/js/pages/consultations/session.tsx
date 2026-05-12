@@ -393,13 +393,14 @@ export default function ConsultationSessionPage({
                     hasRedirectedRef.current = true;
                     window.sessionStorage.removeItem(storageKey);
 
-                    router.visit(
-                        consultationDetailsUrlForRole(
+                    const redirectTarget = currentRole === 'patient'
+                        ? consultationIndexUrl
+                        : consultationDetailsUrlForRole(
                             currentRole ?? '',
                             consultation.id,
-                        ),
-                        { replace: true },
-                    );
+                        );
+
+                    router.visit(redirectTarget, { replace: true });
                 }
             },
         });
@@ -503,6 +504,44 @@ export default function ConsultationSessionPage({
         consultation.id,
     );
 
+    useEffect(() => {
+        if (hasRedirectedRef.current) {
+            return;
+        }
+
+        if (!isTerminalConsultationStatus(consultation.status)) {
+            return;
+        }
+
+        hasRedirectedRef.current = true;
+        window.sessionStorage.removeItem(storageKey);
+
+        const redirectTarget = currentRole === 'patient'
+            ? consultationIndexUrl
+            : consultationDetailsUrl;
+
+        router.visit(redirectTarget, {
+            replace: true,
+            preserveScroll: true,
+        });
+    }, [
+        consultation.status,
+        consultationDetailsUrl,
+        consultationIndexUrl,
+        currentRole,
+        storageKey,
+    ]);
+
+    function redirectAfterSessionEnd(url?: string): void {
+        router.visit(
+            url ?? consultationIndexUrl,
+            {
+                replace: true,
+                preserveScroll: true,
+            },
+        );
+    }
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Consultations', href: consultationIndexUrl },
         {
@@ -521,16 +560,6 @@ export default function ConsultationSessionPage({
 
     function clearStoredSession(): void {
         window.sessionStorage.removeItem(storageKey);
-    }
-
-    function redirectToLobby(url?: string): void {
-        router.visit(
-            url ?? ConsultationLobbyController.show.url(consultation.id),
-            {
-                replace: true,
-                preserveScroll: true,
-            },
-        );
     }
 
     async function readLeavePayload(
@@ -633,7 +662,7 @@ export default function ConsultationSessionPage({
             }
 
             clearStoredSession();
-            redirectToLobby(redirectUrl);
+            redirectAfterSessionEnd(redirectUrl);
         } catch {
             toast.error('Unable to leave the consultation session.');
         } finally {
