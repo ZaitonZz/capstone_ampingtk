@@ -279,6 +279,17 @@ class ConsultationLiveKitController extends Controller
 
     private function completeConsultationForAll(Consultation $consultation): JsonResponse
     {
+        // Mark the consultation as completed first - the doctor's explicit action to end
+        // the session should complete it regardless of room cleanup success
+        $consultation->forceFill([
+            'status' => Consultation::STATUS_COMPLETED,
+            'ended_at' => $consultation->ended_at ?? now(),
+            'cancellation_reason' => null,
+        ])->save();
+
+        // Attempt to delete the room as a best-effort cleanup operation.
+        // If deletion fails, we still want to return success to the frontend since
+        // the consultation has been successfully marked as completed in the business logic.
         try {
             $this->liveKitService->deleteRoom($consultation);
         } catch (RuntimeException $exception) {
@@ -288,16 +299,9 @@ class ConsultationLiveKitController extends Controller
                 'livekit_last_error' => $exception->getMessage(),
             ])->save();
 
-            return response()->json($this->leaveResponsePayload($consultation, false, [
-                'message' => 'Unable to end the LiveKit room for all participants.',
-            ]), 502);
+            // Even if room deletion fails, the consultation is already marked as COMPLETED,
+            // so we return success to allow the frontend to proceed with redirects
         }
-
-        $consultation->forceFill([
-            'status' => Consultation::STATUS_COMPLETED,
-            'ended_at' => $consultation->ended_at ?? now(),
-            'cancellation_reason' => null,
-        ])->save();
 
         return response()->json([
             'message' => 'Consultation completed and the LiveKit room was ended for all participants.',

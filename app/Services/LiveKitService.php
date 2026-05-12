@@ -309,6 +309,7 @@ class LiveKitService
                 'room' => $consultation->livekit_room_name,
                 'status' => $response->status(),
                 'body' => $response->body(),
+                'consultation_id' => $consultation->id,
             ]);
 
             $roomSid = $consultation->livekit_room_sid;
@@ -324,11 +325,25 @@ class LiveKitService
                 $fallbackErrorCode = (string) $fallbackResponse->json('code');
 
                 if (! $fallbackResponse->successful() && ! ($fallbackResponse->status() === 404 || $fallbackErrorCode === 'not_found')) {
+                    Log::error('LiveKit room deletion failed (name and sid fallback).', [
+                        'room' => $consultation->livekit_room_name,
+                        'room_sid' => $roomSid,
+                        'initial_status' => $response->status(),
+                        'fallback_status' => $fallbackResponse->status(),
+                        'consultation_id' => $consultation->id,
+                    ]);
+
                     throw new RuntimeException(
                         sprintf('LiveKit room deletion failed (name then sid) [%d]: %s', $fallbackResponse->status(), $fallbackResponse->body())
                     );
                 }
             } else {
+                Log::error('LiveKit room deletion failed and no SID available for fallback.', [
+                    'room' => $consultation->livekit_room_name,
+                    'status' => $response->status(),
+                    'consultation_id' => $consultation->id,
+                ]);
+
                 throw new RuntimeException(
                     sprintf('LiveKit room deletion failed [%d]: %s', $response->status(), $response->body())
                 );
