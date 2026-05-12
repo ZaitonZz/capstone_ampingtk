@@ -45,17 +45,13 @@ class ConsultationLiveKitWebhookController extends Controller
             return response()->noContent();
         }
 
+        $participantRole = in_array($eventType, ['participant_joined', 'participant_left'], true)
+            ? $this->participantRoleForEvent($consultation, $event)
+            : null;
+
         match ($eventType) {
-            'participant_joined' => $consultation->forceFill([
-                'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
-                    ? Consultation::STATUS_ONGOING
-                    : $consultation->status,
-                'started_at' => $consultation->started_at ?? now(),
-                'livekit_last_activity_at' => now(),
-            ])->save(),
-            'participant_left' => $consultation->forceFill([
-                'livekit_last_activity_at' => now(),
-            ])->save(),
+            'participant_joined' => $this->recordParticipantJoined($consultation, $participantRole),
+            'participant_left' => $this->recordParticipantLeft($consultation, $participantRole),
             'room_finished' => (function () use ($consultation) {
                 $hasDoc = $consultation->hasClinicalDocumentation();
                 $shouldComplete = $hasDoc && $consultation->status === Consultation::STATUS_ONGOING;
@@ -94,6 +90,90 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         return response()->noContent();
+    }
+
+    /**
+     * @param  array<string,mixed>  $event
+     */
+    private function participantRoleForEvent(Consultation $consultation, array $event): ?string
+    {
+        $participant = $event['participant'] ?? [];
+        $participant = is_array($participant) ? $participant : [];
+
+        $identity = (string) ($participant['identity'] ?? '');
+        $patientUserId = $consultation->patient()->value('user_id');
+
+        if ($this->participantRepresentsUser($identity, (int) $consultation->doctor_id)) {
+            return 'doctor';
+        }
+
+        if ($patientUserId !== null && $this->participantRepresentsUser($identity, (int) $patientUserId)) {
+            return 'patient';
+        }
+
+        $metadata = $this->decodeParticipantMetadata($participant['metadata'] ?? null);
+        $role = $metadata['role'] ?? null;
+
+        return in_array($role, ['doctor', 'patient'], true) ? $role : null;
+    }
+
+    private function recordParticipantJoined(Consultation $consultation, ?string $role): void
+    {
+        $now = now();
+        $updates = [
+            'status' => in_array($consultation->status, Consultation::RESCHEDULABLE_STATUSES, true)
+                ? Consultation::STATUS_ONGOING
+                : $consultation->status,
+            'started_at' => $consultation->started_at ?? $now,
+            'livekit_last_activity_at' => $now,
+        ];
+
+        if ($role === 'doctor' && $consultation->livekit_doctor_joined_at === null) {
+            $updates['livekit_doctor_joined_at'] = $now;
+        }
+
+        if ($role === 'patient' && $consultation->livekit_patient_joined_at === null) {
+            $updates['livekit_patient_joined_at'] = $now;
+        }
+
+        $consultation->forceFill($updates)->save();
+    }
+
+    private function recordParticipantLeft(Consultation $consultation, ?string $role): void
+    {
+        $now = now();
+        $updates = [
+            'livekit_last_activity_at' => $now,
+        ];
+
+        if ($role === 'doctor') {
+            $updates['livekit_doctor_left_at'] = $now;
+        }
+
+        if ($role === 'patient') {
+            $updates['livekit_patient_left_at'] = $now;
+        }
+
+        $consultation->forceFill($updates)->save();
+    }
+
+    private function participantRepresentsUser(string $identity, int $userId): bool
+    {
+        return $identity === sprintf('user-%d', $userId) || $identity === (string) $userId;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeParticipantMetadata(mixed $metadata): array
+    {
+        if (! is_string($metadata) || $metadata === '') {
+            return [];
+        }
+
+        $decoded = json_decode($metadata, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**

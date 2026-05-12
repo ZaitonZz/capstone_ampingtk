@@ -156,6 +156,35 @@ class ConsultationLiveKitController extends Controller
             ]));
         }
 
+        $leaveForAll = $request->boolean('leave_for_all');
+
+        if ($isConsultationDoctor) {
+            try {
+                $participantsBeforeLeave = $this->liveKitService->listParticipants($consultation);
+            } catch (RuntimeException $exception) {
+                report($exception);
+
+                $consultation->forceFill([
+                    'livekit_last_error' => $exception->getMessage(),
+                ])->save();
+
+                return response()->json($this->leaveResponsePayload($consultation, false, [
+                    'message' => 'Unable to confirm whether the patient is still in the LiveKit room.',
+                ]), 503);
+            }
+
+            if ($this->hasPatientParticipantInRoom($consultation, $participantsBeforeLeave)) {
+                if (! $leaveForAll) {
+                    return response()->json($this->leaveResponsePayload($consultation, false, [
+                        'message' => 'The patient is still in the call. Confirm Leave for all to end the session for both participants.',
+                        'requires_leave_for_all_confirmation' => true,
+                    ]), 409);
+                }
+
+                return $this->completeConsultationForAll($consultation);
+            }
+        }
+
         try {
             $this->liveKitService->removeParticipantFromConsultation($consultation, $user);
         } catch (RuntimeException $exception) {
@@ -198,18 +227,28 @@ class ConsultationLiveKitController extends Controller
             $consultation->forceFill([
                 'livekit_last_error' => $exception->getMessage(),
             ])->save();
+
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Participant left, but the LiveKit room could not be terminated.',
+            ]), 502);
         }
 
+        $terminalStatus = $this->statusWhenRoomEmpties($consultation, $isConsultationDoctor);
+        $message = $terminalStatus === Consultation::STATUS_NO_SHOW
+            ? 'Consultation marked no-show because the patient never joined before the doctor left.'
+            : 'Consultation cancelled because all participants left the LiveKit room.';
+
         $consultation->forceFill([
-            'status' => Consultation::STATUS_CANCELLED,
+            'status' => $terminalStatus,
             'ended_at' => now(),
-            'cancellation_reason' => 'Consultation cancelled because all participants left the LiveKit room.',
+            'cancellation_reason' => $message,
         ])->save();
 
         return response()->json([
-            'message' => 'Consultation cancelled because all participants left the LiveKit room.',
-            'status' => Consultation::STATUS_CANCELLED,
-            'cancelled' => true,
+            'message' => $message,
+            'status' => $terminalStatus,
+            'cancelled' => $terminalStatus === Consultation::STATUS_CANCELLED,
+            'no_show' => $terminalStatus === Consultation::STATUS_NO_SHOW,
             'redirect_url' => route('consultations.lobby.show', $consultation),
         ]);
     }
@@ -233,6 +272,68 @@ class ConsultationLiveKitController extends Controller
             'cancelled' => $cancelled,
             'redirect_url' => route('consultations.lobby.show', $consultation),
         ];
+    }
+
+    private function completeConsultationForAll(Consultation $consultation): JsonResponse
+    {
+        try {
+            $this->liveKitService->deleteRoom($consultation);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Unable to end the LiveKit room for all participants.',
+            ]), 502);
+        }
+
+        $consultation->forceFill([
+            'status' => Consultation::STATUS_COMPLETED,
+            'ended_at' => $consultation->ended_at ?? now(),
+            'cancellation_reason' => null,
+        ])->save();
+
+        return response()->json([
+            'message' => 'Consultation completed and the LiveKit room was ended for all participants.',
+            'status' => Consultation::STATUS_COMPLETED,
+            'completed' => true,
+            'cancelled' => false,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+    }
+
+    /**
+     * @param  array<int, array{identity: string, metadata: ?string}>  $participants
+     */
+    private function hasPatientParticipantInRoom(Consultation $consultation, array $participants): bool
+    {
+        $patientUserId = $consultation->patient()->value('user_id');
+
+        foreach ($participants as $participant) {
+            if ($patientUserId !== null && $this->participantRepresentsUser($participant['identity'], (int) $patientUserId)) {
+                return true;
+            }
+
+            $metadata = $this->decodeParticipantMetadata($participant['metadata']);
+
+            if (($metadata['role'] ?? null) === 'patient') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function statusWhenRoomEmpties(Consultation $consultation, bool $isConsultationDoctor): string
+    {
+        if ($isConsultationDoctor && $consultation->livekit_patient_joined_at === null) {
+            return Consultation::STATUS_NO_SHOW;
+        }
+
+        return Consultation::STATUS_CANCELLED;
     }
 
     private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
