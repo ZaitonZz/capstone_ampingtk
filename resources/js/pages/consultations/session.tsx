@@ -187,10 +187,10 @@ function DetectionStatusPanel({
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-              ? 'border-rose-200 bg-rose-50 text-rose-800'
-              : state === 'delayed'
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-blue-200 bg-blue-50 text-blue-800';
+                ? 'border-rose-200 bg-rose-50 text-rose-800'
+                : state === 'delayed'
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
 
     return (
@@ -573,11 +573,11 @@ export default function ConsultationSessionPage({
                 if (
                     response.status === 409 &&
                     responsePayload?.requires_leave_for_all_confirmation ===
-                        true
+                    true
                 ) {
                     setLeaveForAllMessage(
                         responsePayload.message ??
-                            'The patient is still in the call. End the session for everyone?',
+                        'The patient is still in the call. End the session for everyone?',
                     );
                     setLeaveForAllDialogOpen(true);
 
@@ -587,7 +587,7 @@ export default function ConsultationSessionPage({
                 if (!response.ok) {
                     toast.error(
                         responsePayload?.message ??
-                            'Unable to leave the consultation session.',
+                        'Unable to leave the consultation session.',
                     );
 
                     return;
