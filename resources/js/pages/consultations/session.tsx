@@ -634,21 +634,21 @@ export default function ConsultationSessionPage({
                     {(() => {
                         const isDoctor = page.props.auth?.user?.role === 'doctor';
 
+                        // Only doctors can end the consultation.
+                        // Patients do not have the authority to leave as this is an important session.
+                        if (!isDoctor) {
+                            return null;
+                        }
+
                         return (
                             <Button
-                                variant={isDoctor ? 'destructive' : 'outline'}
+                                variant="destructive"
                                 type="button"
                                 onClick={() => void leaveSession()}
                                 disabled={isLeaving}
                             >
                                 <LogOut className="h-4 w-4" />
-                                {isLeaving
-                                    ? isDoctor
-                                        ? 'Ending...'
-                                        : 'Leaving...'
-                                    : isDoctor
-                                        ? 'End Consultation'
-                                        : 'Leave Session'}
+                                {isLeaving ? 'Ending...' : 'End Consultation'}
                             </Button>
                         );
                     })()}

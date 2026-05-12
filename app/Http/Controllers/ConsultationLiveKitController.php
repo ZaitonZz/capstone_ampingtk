@@ -143,6 +143,13 @@ class ConsultationLiveKitController extends Controller
             abort(403);
         }
 
+        // Only doctors and admins can use the leave endpoint to end consultation.
+        // Patients cannot leave - they can only disconnect, at which point the doctor or
+        // network timeout will end the consultation.
+        if ($isConsultationPatient && ! $isAdminAudit) {
+            abort(403, 'Patients cannot end the consultation. The doctor has the authority to end sessions.');
+        }
+
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json($this->leaveResponsePayload($consultation, false));
         }

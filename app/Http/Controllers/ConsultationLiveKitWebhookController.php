@@ -70,6 +70,16 @@ class ConsultationLiveKitWebhookController extends Controller
             default => null,
         };
 
+        // Handle the case where doctor leaves while patient never joined the consultation.
+        // This can happen via explicit leave or network disconnect.
+        if (
+            $eventType === 'participant_left'
+            && $participantRole === 'doctor'
+            && ! in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)
+        ) {
+            $this->handleDoctorDeparture($consultation);
+        }
+
         if (
             $eventType === 'participant_joined'
             && $consultation->status === Consultation::STATUS_PAUSED
@@ -160,6 +170,132 @@ class ConsultationLiveKitWebhookController extends Controller
         }
 
         $consultation->forceFill($updates)->save();
+    }
+
+    /**
+     * Handle doctor departure, including cleanup and status updates.
+     * 
+     * When the doctor leaves (either via explicit leave or network disconnect),
+     * we need to check if the patient is still in the room and handle cleanup accordingly.
+     * If the patient never joined, mark the consultation as NO_SHOW.
+     */
+    private function handleDoctorDeparture(Consultation $consultation): void
+    {
+        try {
+            $participants = $this->liveKitService->listParticipants($consultation);
+            $hasPatient = $this->hasPatientParticipantInRoom($consultation, $participants);
+
+            // If patient is still in the room, don't end the session.
+            // Let the patient or the room_finished event handle cleanup.
+            if ($hasPatient) {
+                Log::info('Doctor left but patient still in LiveKit room.', [
+                    'consultation_id' => $consultation->id,
+                    'room_name' => $consultation->livekit_room_name,
+                ]);
+
+                return;
+            }
+
+            // Doctor left and patient is not in room. Check if patient ever joined.
+            if ($consultation->livekit_patient_joined_at === null) {
+                // Patient never joined - this is a no-show scenario.
+                // Delete the room and mark consultation as NO_SHOW.
+                Log::info('Doctor left and patient never joined. Marking as no-show.', [
+                    'consultation_id' => $consultation->id,
+                    'room_name' => $consultation->livekit_room_name,
+                ]);
+
+                try {
+                    $this->liveKitService->deleteRoom($consultation);
+                } catch (Throwable $exception) {
+                    Log::error('Failed to delete LiveKit room during no-show cleanup.', [
+                        'consultation_id' => $consultation->id,
+                        'room_name' => $consultation->livekit_room_name,
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    $consultation->forceFill([
+                        'livekit_last_error' => $exception->getMessage(),
+                    ])->save();
+
+                    return;
+                }
+
+                $consultation->forceFill([
+                    'status' => Consultation::STATUS_NO_SHOW,
+                    'ended_at' => now(),
+                    'cancellation_reason' => 'Doctor left the consultation without patient joining.',
+                    'livekit_room_status' => 'ended',
+                    'livekit_ended_at' => now(),
+                ])->save();
+
+                return;
+            }
+
+            // Doctor left and patient is alone in the room.
+            // Mark as cancelled since the patient was present but the doctor left.
+            Log::info('Doctor left and patient is alone in room. Marking as cancelled.', [
+                'consultation_id' => $consultation->id,
+                'room_name' => $consultation->livekit_room_name,
+            ]);
+
+            try {
+                $this->liveKitService->deleteRoom($consultation);
+            } catch (Throwable $exception) {
+                Log::error('Failed to delete LiveKit room during doctor departure cleanup.', [
+                    'consultation_id' => $consultation->id,
+                    'room_name' => $consultation->livekit_room_name,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $consultation->forceFill([
+                    'livekit_last_error' => $exception->getMessage(),
+                ])->save();
+
+                return;
+            }
+
+            $consultation->forceFill([
+                'status' => Consultation::STATUS_CANCELLED,
+                'ended_at' => now(),
+                'cancellation_reason' => 'Doctor disconnected from the consultation.',
+                'livekit_room_status' => 'ended',
+                'livekit_ended_at' => now(),
+            ])->save();
+        } catch (Throwable $exception) {
+            Log::error('Error handling doctor departure from LiveKit room.', [
+                'consultation_id' => $consultation->id,
+                'room_name' => $consultation->livekit_room_name,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+        }
+    }
+
+    /**
+     * Check if a patient participant exists in the room.
+     * @param  array<int, array{identity: string, metadata: ?string}>  $participants
+     */
+    private function hasPatientParticipantInRoom(Consultation $consultation, array $participants): bool
+    {
+        $patientUserId = $consultation->patient()->value('user_id');
+
+        foreach ($participants as $participant) {
+            if ($patientUserId !== null && $this->participantRepresentsUser($participant['identity'], (int) $patientUserId)) {
+                return true;
+            }
+
+            $metadata = $this->decodeParticipantMetadata($participant['metadata']);
+
+            if (($metadata['role'] ?? null) === 'patient') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
