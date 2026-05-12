@@ -143,13 +143,6 @@ class ConsultationLiveKitController extends Controller
             abort(403);
         }
 
-        // Only doctors and admins can use the leave endpoint to end consultation.
-        // Patients cannot leave - they can only disconnect, at which point the doctor or
-        // network timeout will end the consultation.
-        if ($isConsultationPatient && ! $isAdminAudit) {
-            abort(403, 'Patients cannot end the consultation. The doctor has the authority to end sessions.');
-        }
-
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json($this->leaveResponsePayload($consultation, false));
         }
@@ -167,6 +160,12 @@ class ConsultationLiveKitController extends Controller
         }
 
         $leaveForAll = $request->boolean('leave_for_all');
+
+        // Only doctors can use leave_for_all to end the consultation for everyone.
+        // Patients can disconnect (leave without leave_for_all), but cannot end the session for all.
+        if ($isConsultationPatient && $leaveForAll) {
+            abort(403, 'Patients cannot end the consultation for all participants. The doctor has the authority to end sessions.');
+        }
 
         if ($isConsultationDoctor) {
             try {
