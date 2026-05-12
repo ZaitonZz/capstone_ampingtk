@@ -101,11 +101,13 @@ class ConsultationLiveKitWebhookController extends Controller
         $participant = is_array($participant) ? $participant : [];
 
         $identity = (string) ($participant['identity'] ?? '');
-        $patientUserId = $consultation->patient()->value('user_id');
 
         if ($this->participantRepresentsUser($identity, (int) $consultation->doctor_id)) {
             return 'doctor';
         }
+
+        $consultation->loadMissing('patient');
+        $patientUserId = $consultation->patient?->user_id;
 
         if ($patientUserId !== null && $this->participantRepresentsUser($identity, (int) $patientUserId)) {
             return 'patient';
