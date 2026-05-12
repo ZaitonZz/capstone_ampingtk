@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Concerns\InteractsWithLiveKitParticipants;
 use App\Models\Consultation;
 use App\Models\ConsultationConsent;
+use App\Models\User;
 use App\Services\ConsultationDeepfakeDetectionService;
 use App\Services\LiveKitService;
 use Illuminate\Http\JsonResponse;
@@ -144,7 +145,11 @@ class ConsultationLiveKitController extends Controller
         }
 
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
-            return response()->json($this->leaveResponsePayload($consultation, false));
+            return response()->json([
+                'status' => $consultation->status,
+                'cancelled' => false,
+                'redirect_url' => $this->consultationIndexUrlForUser($user),
+            ]);
         }
 
         if (! $this->hasProvisionedLiveKitRoom($consultation)) {
@@ -191,7 +196,7 @@ class ConsultationLiveKitController extends Controller
                     ]), 409);
                 }
 
-                return $this->completeConsultationForAll($consultation);
+                return $this->completeConsultationForAll($consultation, $user);
             }
 
             // Doctor is leaving and patient is NOT in the room.
@@ -205,7 +210,7 @@ class ConsultationLiveKitController extends Controller
             }
 
             // Doctor confirmed to end the consultation while alone
-            return $this->endConsultationWhenDoctorAlone($consultation);
+            return $this->endConsultationWhenDoctorAlone($consultation, $user);
         }
 
         try {
@@ -272,7 +277,7 @@ class ConsultationLiveKitController extends Controller
             'status' => $terminalStatus,
             'cancelled' => $terminalStatus === Consultation::STATUS_CANCELLED,
             'no_show' => $terminalStatus === Consultation::STATUS_NO_SHOW,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => $this->consultationIndexUrlForUser($user),
         ]);
     }
 
@@ -297,7 +302,7 @@ class ConsultationLiveKitController extends Controller
         ];
     }
 
-    private function completeConsultationForAll(Consultation $consultation): JsonResponse
+    private function completeConsultationForAll(Consultation $consultation, User $user): JsonResponse
     {
         // Mark the consultation as completed first - the doctor's explicit action to end
         // the session should complete it regardless of room cleanup success
@@ -328,7 +333,7 @@ class ConsultationLiveKitController extends Controller
             'status' => Consultation::STATUS_COMPLETED,
             'completed' => true,
             'cancelled' => false,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => $this->consultationIndexUrlForUser($user),
         ]);
     }
 
@@ -339,7 +344,7 @@ class ConsultationLiveKitController extends Controller
      * If there's an error during cleanup (especially participant removal),
      * return 202 Accepted to indicate the operation was accepted but couldn't complete.
      */
-    private function endConsultationWhenDoctorAlone(Consultation $consultation): JsonResponse
+    private function endConsultationWhenDoctorAlone(Consultation $consultation, User $user): JsonResponse
     {
         // Try to remove the doctor from the room first - if this fails, return 202
         try {
@@ -389,8 +394,15 @@ class ConsultationLiveKitController extends Controller
             'status' => $terminalStatus,
             'no_show' => $terminalStatus === Consultation::STATUS_NO_SHOW,
             'cancelled' => $terminalStatus === Consultation::STATUS_CANCELLED,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => $this->consultationIndexUrlForUser($user),
         ]);
+    }
+
+    private function consultationIndexUrlForUser(User $user): string
+    {
+        return $user->isPatient()
+            ? route('patient.consultations.index')
+            : route('consultations.index');
     }
 
     /**
