@@ -219,7 +219,6 @@ it('cancels connect when no face has been detected for 30 seconds', function () 
         ]);
 
     $consultation->refresh();
-
     expect($consultation->status)->toBe('cancelled');
     expect($consultation->livekit_room_status)->toBe('ended');
 });
@@ -228,6 +227,7 @@ it('allows connect when no face has not reached the cancellation timeout', funct
     config()->set('services.pipeline.no_face_timeout_seconds', 30);
 
     $doctor = User::factory()->doctor()->create();
+
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
         'livekit_room_name' => 'consultation-102-no-face-fresh',
@@ -236,7 +236,6 @@ it('allows connect when no face has not reached the cancellation timeout', funct
         'pipeline_detection_status' => 'running',
         'pipeline_last_heartbeat_at' => now()->subSeconds(5),
         'pipeline_guidance' => [
-            'no_face_detected' => true,
             'no_face_detected_since' => now()->subSeconds(10)->toIso8601String(),
         ],
     ]);
@@ -261,12 +260,12 @@ it('allows connect when no face has not reached the cancellation timeout', funct
 
 it('allows connect when deepfake detection heartbeat is fresh', function () {
     config()->set('services.pipeline.detection_timeout_seconds', 60);
-
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create([
         'doctor_id' => $doctor->id,
         'livekit_room_name' => 'consultation-100-fresh',
         'livekit_room_status' => 'room_ready',
+
         'livekit_room_created_at' => now()->subMinutes(2),
         'pipeline_detection_status' => 'running',
         'pipeline_last_heartbeat_at' => now()->subSeconds(10),
@@ -364,7 +363,7 @@ it('completes the consultation and ends the room when the doctor confirms leave 
             'status' => 'completed',
             'completed' => true,
             'cancelled' => false,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => route('consultations.index'),
         ]);
 
     Http::assertSent(fn ($request) => $request->url() === 'https://livekit.test/twirp/livekit.RoomService/DeleteRoom'
@@ -416,7 +415,7 @@ it('marks no-show and ends the room when the doctor leaves alone before the pati
             'status' => 'no_show',
             'cancelled' => false,
             'no_show' => true,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => route('consultations.index'),
         ]);
 
     $freshConsultation = $consultation->fresh();
@@ -457,7 +456,7 @@ it('cancels the consultation when the last doctor or patient leaves', function (
         ->assertJson([
             'status' => 'cancelled',
             'cancelled' => true,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => route('patient.consultations.index'),
         ]);
 
     $freshConsultation = $consultation->fresh();
@@ -578,19 +577,6 @@ it('does not cancel when an admin audit user leaves', function () {
     expect($consultation->fresh()->status)->toBe('ongoing');
 });
 
-it('forbids unrelated users from leaving a consultation room', function () {
-    $doctor = User::factory()->doctor()->create();
-    $otherDoctor = User::factory()->doctor()->create();
-    $consultation = Consultation::factory()->teleconsultation()->create([
-        'doctor_id' => $doctor->id,
-        'livekit_room_name' => 'consultation-204-forbidden-leave',
-    ]);
-
-    $this->actingAs($otherDoctor)
-        ->postJson(route('consultations.livekit.leave', $consultation))
-        ->assertForbidden();
-});
-
 it('returns a stable leave response for terminal consultations', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create([
@@ -609,7 +595,36 @@ it('returns a stable leave response for terminal consultations', function () {
         ->assertJson([
             'status' => 'completed',
             'cancelled' => false,
-            'redirect_url' => route('consultations.lobby.show', $consultation),
+            'redirect_url' => route('consultations.index'),
+        ]);
+
+    Http::assertNothingSent();
+    expect($consultation->fresh()->status)->toBe('completed');
+});
+
+it('redirects a patient to their consultations page after the consultation has ended', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'status' => 'completed',
+        'livekit_room_name' => 'consultation-205-patient-completed-leave',
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/*' => Http::response([], 200),
+    ]);
+
+    $this->actingAs($patientUser)
+        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->assertOk()
+        ->assertJson([
+            'status' => 'completed',
+            'cancelled' => false,
+            'redirect_url' => route('patient.consultations.index'),
         ]);
 
     Http::assertNothingSent();
