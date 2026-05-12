@@ -36,6 +36,20 @@ class ConsultationLobbyController extends Controller
 
         $consultation = $this->deepfakeDetectionService->enforceNoFaceOrCancel($consultation);
 
+        if (
+            $consultation->status === Consultation::STATUS_PAUSED
+            && $consultation->identity_verification_expires_at !== null
+            && now()->greaterThanOrEqualTo($consultation->identity_verification_expires_at)
+        ) {
+            $this->identityVerificationService->cancelForFailedVerification(
+                $consultation,
+                'Identity verification challenge expired.',
+                $currentUser?->id,
+            );
+
+            $consultation->refresh();
+        }
+
         $consultation->load(['patient', 'doctor']);
 
         $consent = $consultation->consentForUser($currentUser);

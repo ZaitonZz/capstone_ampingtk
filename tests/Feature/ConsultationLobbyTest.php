@@ -175,6 +175,39 @@ it('includes configured OTP length in lobby verification payload', function () {
         );
 });
 
+it('cancels the consultation when verification expires on lobby load', function () {
+    $doctor = User::factory()->doctor()->create();
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'status' => Consultation::STATUS_PAUSED,
+        'status_before_pause' => Consultation::STATUS_ONGOING,
+        'identity_verification_target_user_id' => $doctor->id,
+        'identity_verification_target_role' => 'doctor',
+        'identity_verification_started_at' => now()->subMinutes(6),
+        'identity_verification_expires_at' => now()->subMinute(),
+        'identity_verification_attempts' => 0,
+        'identity_verification_resend_available_at' => now()->subMinute(),
+    ]);
+
+    ConsultationConsent::create([
+        'consultation_id' => $consultation->id,
+        'user_id' => $doctor->id,
+        'consent_confirmed' => true,
+        'confirmed_at' => now(),
+    ]);
+
+    $this->actingAs($doctor)
+        ->get(route('consultations.lobby.show', $consultation))
+        ->assertOk();
+
+    $consultation->refresh();
+
+    expect($consultation->status)->toBe(Consultation::STATUS_CANCELLED)
+        ->and($consultation->cancellation_reason)
+        ->toBe('Identity verification challenge expired.');
+});
+
 it('shows manual override enabled state for assigned doctor in lobby payload', function () {
     $doctor = User::factory()->doctor()->create();
     $consultation = Consultation::factory()->teleconsultation()->create([
