@@ -142,7 +142,7 @@ function ConsultationCallStage({
                         />
                     ))
                 ) : (
-                    <div className="col-span-full flex min-h-[280px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
+                    <div className="col-span-full flex min-h-70 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/70 p-6 text-center">
                         <p className="text-sm text-zinc-300">
                             Waiting for participants to publish camera or
                             screen-share tracks.
@@ -189,10 +189,10 @@ function DetectionStatusPanel({
         state === 'running'
             ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
             : state === 'cancelled'
-                ? 'border-rose-200 bg-rose-50 text-rose-800'
-                : state === 'delayed'
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-blue-200 bg-blue-50 text-blue-800';
+              ? 'border-rose-200 bg-rose-50 text-rose-800'
+              : state === 'delayed'
+                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                : 'border-blue-200 bg-blue-50 text-blue-800';
     const Icon = state === 'running' ? CheckCircle2 : AlertTriangle;
 
     return (
@@ -281,23 +281,42 @@ export default function ConsultationSessionPage({
     const page = usePage<PageProps>();
     const isPaused =
         verification?.is_paused === true || consultation.status === 'paused';
+    const isCurrentUserVerificationTarget =
+        verification?.is_current_user_target === true;
+    const verificationTargetRole = verification?.target_role ?? 'participant';
     const [liveDetection, setLiveDetection] = useState<
         ConsultationDeepfakeDetectionState | undefined
     >(deepfake_detection);
-    // Use explicit start/stop control for polling. Start when the session is
-    // active (not paused) so we don't poll detection state while a participant
-    // is paused for identity verification.
+    // Use explicit start/stop control for polling. The verified target user
+    // can stop polling once paused because they are redirected to the lobby,
+    // but observers must keep polling so they can react to the paused
+    // consultation transitioning to cancelled when the OTP expires.
     const { start: startPolling, stop: stopPolling } = usePoll(
         5000,
         {
             only: ['consultation', 'verification', 'deepfake_detection'],
             onSuccess: (page) => {
                 const props = page.props as {
+                    consultation?: Consultation;
                     deepfake_detection?: ConsultationDeepfakeDetectionState;
                 };
 
                 if (props.deepfake_detection) {
                     setLiveDetection(props.deepfake_detection);
+                }
+
+                if (
+                    props.consultation?.status === 'cancelled' &&
+                    !hasRedirectedRef.current
+                ) {
+                    hasRedirectedRef.current = true;
+                    window.sessionStorage.removeItem(storageKey);
+
+                    toast.error(
+                        'Verification expired. This consultation has been cancelled.',
+                    );
+
+                    router.visit(consultationIndexUrl);
                 }
             },
         },
@@ -305,7 +324,7 @@ export default function ConsultationSessionPage({
     );
 
     useEffect(() => {
-        if (isPaused) {
+        if (isPaused && isCurrentUserVerificationTarget) {
             stopPolling();
 
             return () => {
@@ -318,7 +337,7 @@ export default function ConsultationSessionPage({
         return () => {
             stopPolling();
         };
-    }, [isPaused, startPolling, stopPolling]);
+    }, [isPaused, isCurrentUserVerificationTarget, startPolling, stopPolling]);
 
     const storageKey = useMemo(
         () => `livekit-connect-${consultation.id}`,
@@ -332,17 +351,15 @@ export default function ConsultationSessionPage({
     const [leaveForAllMessage, setLeaveForAllMessage] = useState(
         'The patient is still in the call. End the session for everyone?',
     );
-    const [confirmEndAloneDialogOpen, setConfirmEndAloneDialogOpen] = useState(false);
+    const [confirmEndAloneDialogOpen, setConfirmEndAloneDialogOpen] =
+        useState(false);
     const [confirmEndAloneMessage, setConfirmEndAloneMessage] = useState(
         'The patient is not in the call. Mark as no-show or stay in the call?',
     );
     const [patientNeverJoined, setPatientNeverJoined] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
     const currentRole = page.props.auth?.user?.role;
-
-    const isCurrentUserVerificationTarget =
-        verification?.is_current_user_target === true;
-    const verificationTargetRole = verification?.target_role ?? 'participant';
+    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
 
     const shouldRedirectToLobbyForVerification =
         isPaused && isCurrentUserVerificationTarget;
@@ -393,19 +410,13 @@ export default function ConsultationSessionPage({
                     hasRedirectedRef.current = true;
                     window.sessionStorage.removeItem(storageKey);
 
-                    const redirectTarget = currentRole === 'patient'
-                        ? consultationIndexUrl
-                        : consultationDetailsUrlForRole(
-                            currentRole ?? '',
-                            consultation.id,
-                        );
-
-                    router.visit(redirectTarget, { replace: true });
+                    router.visit(consultationIndexUrl, { replace: true });
                 }
             },
         });
     }, [
         consultation.id,
+        consultationIndexUrl,
         currentRole,
         redirectToLobbyForVerification,
         storageKey,
@@ -450,11 +461,7 @@ export default function ConsultationSessionPage({
                 'Verification expired. This consultation has been cancelled.',
             );
 
-            const redirectTarget = (currentRole ?? '') === 'patient'
-                ? consultationIndexUrl
-                : consultationDetailsUrlForRole(currentRole ?? '', consultation.id);
-
-            router.visit(redirectTarget);
+            router.visit(consultationIndexUrl);
         }
 
         prevPausedRef.current = isPaused;
@@ -464,6 +471,7 @@ export default function ConsultationSessionPage({
         consultation.cancellation_reason,
         consultation.id,
         currentRole,
+        consultationIndexUrl,
     ]);
 
     const payload = useMemo((): LiveKitConnectPayload | null => {
@@ -498,7 +506,6 @@ export default function ConsultationSessionPage({
         payload?.room_name &&
         serverUrl,
     );
-    const consultationIndexUrl = consultationIndexUrlForRole(currentRole);
     const consultationDetailsUrl = consultationDetailsUrlForRole(
         currentRole,
         consultation.id,
@@ -575,7 +582,10 @@ export default function ConsultationSessionPage({
     async function leaveSession({
         leaveForAll = false,
         confirmEndAlone = false,
-    }: { leaveForAll?: boolean; confirmEndAlone?: boolean } = {}): Promise<void> {
+    }: {
+        leaveForAll?: boolean;
+        confirmEndAlone?: boolean;
+    } = {}): Promise<void> {
         if (isLeavingRef.current) {
             return;
         }
@@ -612,11 +622,11 @@ export default function ConsultationSessionPage({
                 if (
                     response.status === 409 &&
                     responsePayload?.requires_leave_for_all_confirmation ===
-                    true
+                        true
                 ) {
                     setLeaveForAllMessage(
                         responsePayload.message ??
-                        'The patient is still in the call. End the session for everyone?',
+                            'The patient is still in the call. End the session for everyone?',
                     );
                     setLeaveForAllDialogOpen(true);
                     isLeavingRef.current = false;
@@ -630,7 +640,7 @@ export default function ConsultationSessionPage({
                 ) {
                     setConfirmEndAloneMessage(
                         responsePayload.message ??
-                        'The patient is not in the call. Mark as no-show or stay in the call?',
+                            'The patient is not in the call. Mark as no-show or stay in the call?',
                     );
                     setPatientNeverJoined(
                         responsePayload.patient_never_joined ?? false,
@@ -644,7 +654,7 @@ export default function ConsultationSessionPage({
                 if (!response.ok) {
                     toast.error(
                         responsePayload?.message ??
-                        'Unable to leave the consultation session.',
+                            'Unable to leave the consultation session.',
                     );
 
                     return;
@@ -689,7 +699,8 @@ export default function ConsultationSessionPage({
                     </div>
 
                     {(() => {
-                        const isDoctor = page.props.auth?.user?.role === 'doctor';
+                        const isDoctor =
+                            page.props.auth?.user?.role === 'doctor';
 
                         // Only doctors can end the consultation.
                         // Patients do not have the authority to leave as this is an important session.
@@ -775,7 +786,7 @@ export default function ConsultationSessionPage({
                                     audio
                                     video
                                     data-lk-theme="default"
-                                    className="h-[620px]"
+                                    className="h-155"
                                     onDisconnected={() => {
                                         window.sessionStorage.removeItem(
                                             storageKey,
@@ -803,7 +814,7 @@ export default function ConsultationSessionPage({
                                 </LiveKitRoom>
                             </div>
                         ) : (
-                            <div className="flex min-h-[420px] items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
+                            <div className="flex min-h-105 items-center justify-center rounded-2xl border bg-zinc-950 text-zinc-100 shadow-sm">
                                 <div className="max-w-md p-6 text-center">
                                     <h2 className="mb-2 text-lg font-semibold">
                                         Call cannot start yet
@@ -931,13 +942,15 @@ export default function ConsultationSessionPage({
                     <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
                         {patientNeverJoined ? (
                             <p>
-                                Since the patient never joined, this consultation
-                                will be marked as <strong>No-Show</strong>.
+                                Since the patient never joined, this
+                                consultation will be marked as{' '}
+                                <strong>No-Show</strong>.
                             </p>
                         ) : (
                             <p>
-                                The patient joined but is no longer present. This
-                                consultation will be marked as <strong>Cancelled</strong>.
+                                The patient joined but is no longer present.
+                                This consultation will be marked as{' '}
+                                <strong>Cancelled</strong>.
                             </p>
                         )}
                     </div>
