@@ -297,11 +297,26 @@ export default function ConsultationSessionPage({
             only: ['consultation', 'verification', 'deepfake_detection'],
             onSuccess: (page) => {
                 const props = page.props as {
+                    consultation?: Consultation;
                     deepfake_detection?: ConsultationDeepfakeDetectionState;
                 };
 
                 if (props.deepfake_detection) {
                     setLiveDetection(props.deepfake_detection);
+                }
+
+                if (
+                    props.consultation?.status === 'cancelled' &&
+                    !hasRedirectedRef.current
+                ) {
+                    hasRedirectedRef.current = true;
+                    window.sessionStorage.removeItem(storageKey);
+
+                    toast.error(
+                        'Verification expired. This consultation has been cancelled.',
+                    );
+
+                    router.visit(consultationIndexUrl);
                 }
             },
         },
@@ -395,18 +410,13 @@ export default function ConsultationSessionPage({
                     hasRedirectedRef.current = true;
                     window.sessionStorage.removeItem(storageKey);
 
-                    router.visit(
-                        consultationDetailsUrlForRole(
-                            currentRole ?? '',
-                            consultation.id,
-                        ),
-                        { replace: true },
-                    );
+                    router.visit(consultationIndexUrl, { replace: true });
                 }
             },
         });
     }, [
         consultation.id,
+        consultationIndexUrl,
         currentRole,
         redirectToLobbyForVerification,
         storageKey,
