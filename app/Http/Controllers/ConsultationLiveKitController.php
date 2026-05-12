@@ -192,6 +192,10 @@ class ConsultationLiveKitController extends Controller
 
                 return $this->completeConsultationForAll($consultation);
             }
+
+            // Doctor is leaving and patient is NOT in the room.
+            // Immediately end the consultation (no need for normal leave logic).
+            return $this->endConsultationWhenDoctorAlone($consultation);
         }
 
         try {
@@ -314,6 +318,48 @@ class ConsultationLiveKitController extends Controller
             'status' => Consultation::STATUS_COMPLETED,
             'completed' => true,
             'cancelled' => false,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
+    }
+
+    /**
+     * Handle the case where doctor ends the consultation while alone (patient not in room).
+     * Mark as NO_SHOW if patient never joined, otherwise mark as CANCELLED.
+     */
+    private function endConsultationWhenDoctorAlone(Consultation $consultation): JsonResponse
+    {
+        // Delete the room first - best effort.
+        try {
+            $this->liveKitService->deleteRoom($consultation);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+
+            // Even if room deletion fails, we still want to mark the consultation as ended.
+        }
+
+        // Determine the terminal status based on whether patient ever joined.
+        $terminalStatus = $this->statusWhenRoomEmpties($consultation, true);
+        $message = $terminalStatus === Consultation::STATUS_NO_SHOW
+            ? 'Consultation marked no-show because the patient never joined before the doctor left.'
+            : 'Consultation cancelled because the doctor left the session.';
+
+        $consultation->forceFill([
+            'status' => $terminalStatus,
+            'ended_at' => now(),
+            'cancellation_reason' => $message,
+            'livekit_room_status' => 'ended',
+            'livekit_ended_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'message' => $message,
+            'status' => $terminalStatus,
+            'no_show' => $terminalStatus === Consultation::STATUS_NO_SHOW,
+            'cancelled' => $terminalStatus === Consultation::STATUS_CANCELLED,
             'redirect_url' => route('consultations.lobby.show', $consultation),
         ]);
     }
