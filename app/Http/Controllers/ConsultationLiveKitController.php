@@ -140,13 +140,6 @@ class ConsultationLiveKitController extends Controller
             abort(403);
         }
 
-        if ($request->boolean('preview')) {
-            return response()->json($this->leaveResponsePayload($consultation, false, [
-                'requires_confirmation' => $this->shouldConfirmEndForAll($consultation, $isConsultationDoctor),
-                'message' => 'Leaving now will end the consultation for both doctor and patient. Continue?',
-            ]));
-        }
-
         if (in_array($consultation->status, Consultation::TERMINAL_STATUSES, true)) {
             return response()->json($this->leaveResponsePayload($consultation, false));
         }
@@ -161,10 +154,6 @@ class ConsultationLiveKitController extends Controller
             return response()->json($this->leaveResponsePayload($consultation, false, [
                 'message' => 'Admin audit participant left the LiveKit room.',
             ]));
-        }
-
-        if ($isConsultationDoctor && $request->boolean('end_for_all')) {
-            return $this->endConsultationForEveryone($consultation);
         }
 
         try {
@@ -201,7 +190,28 @@ class ConsultationLiveKitController extends Controller
             ]));
         }
 
-        return $this->finalizeAfterLastHumanParticipantLeaves($consultation);
+        try {
+            $this->liveKitService->deleteRoom($consultation);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+        }
+
+        $consultation->forceFill([
+            'status' => Consultation::STATUS_CANCELLED,
+            'ended_at' => now(),
+            'cancellation_reason' => 'Consultation cancelled because all participants left the LiveKit room.',
+        ])->save();
+
+        return response()->json([
+            'message' => 'Consultation cancelled because all participants left the LiveKit room.',
+            'status' => Consultation::STATUS_CANCELLED,
+            'cancelled' => true,
+            'redirect_url' => route('consultations.lobby.show', $consultation),
+        ]);
     }
 
     private function hasProvisionedLiveKitRoom(Consultation $consultation): bool
@@ -221,158 +231,22 @@ class ConsultationLiveKitController extends Controller
             ...$extra,
             'status' => $consultation->status,
             'cancelled' => $cancelled,
-            'redirect_url' => $this->consultationIndexUrlForUser(),
+            'redirect_url' => route('consultations.lobby.show', $consultation),
         ];
-    }
-
-    private function consultationIndexUrlForUser(): string
-    {
-        return $this->requestingUserRole() === 'patient'
-            ? route('patient.consultations.index')
-            : route('consultations.index');
-    }
-
-    private function requestingUserRole(): ?string
-    {
-        return request()->user()?->role;
-    }
-
-    private function shouldConfirmEndForAll(Consultation $consultation, bool $isConsultationDoctor): bool
-    {
-        if (! $isConsultationDoctor || ! $this->hasProvisionedLiveKitRoom($consultation)) {
-            return false;
-        }
-
-        try {
-            $presence = $this->consultationRoomPresence($consultation);
-        } catch (RuntimeException $exception) {
-            report($exception);
-
-            return false;
-        }
-
-        return $presence['patient_present'];
-    }
-
-    /**
-     * @return array{doctor_present: bool, patient_present: bool}
-     */
-    private function consultationRoomPresence(Consultation $consultation): array
-    {
-        $participants = $this->liveKitService->listParticipants($consultation);
-        $consultation->loadMissing('patient');
-        $patientUserId = $consultation->patient?->user_id;
-        $doctorUserId = $consultation->doctor_id;
-
-        $doctorPresent = false;
-        $patientPresent = false;
-
-        foreach ($participants as $participant) {
-            $identity = (string) ($participant['identity'] ?? '');
-            $metadata = $this->decodeParticipantMetadata($participant['metadata']);
-
-            if (($metadata['audit_mode'] ?? false) === true) {
-                continue;
-            }
-
-            if ($doctorUserId !== null && $this->liveKitService->participantIdentityMatchesUser($identity, (int) $doctorUserId)) {
-                $doctorPresent = true;
-            }
-
-            if ($patientUserId !== null && $this->liveKitService->participantIdentityMatchesUser($identity, (int) $patientUserId)) {
-                $patientPresent = true;
-            }
-        }
-
-        return [
-            'doctor_present' => $doctorPresent,
-            'patient_present' => $patientPresent,
-        ];
-    }
-
-    private function endConsultationForEveryone(Consultation $consultation): JsonResponse
-    {
-        try {
-            $this->liveKitService->deleteRoom($consultation);
-        } catch (RuntimeException $exception) {
-            report($exception);
-
-            $consultation->forceFill([
-                'livekit_last_error' => $exception->getMessage(),
-            ])->save();
-        }
-
-        $consultation->forceFill([
-            'status' => Consultation::STATUS_COMPLETED,
-            'ended_at' => $consultation->ended_at ?? now(),
-            'cancellation_reason' => null,
-            'livekit_room_status' => 'ended',
-            'livekit_ended_at' => now(),
-            'livekit_last_activity_at' => now(),
-        ])->save();
-
-        return response()->json([
-            'message' => 'Consultation ended for both participants.',
-            'status' => Consultation::STATUS_COMPLETED,
-            'cancelled' => false,
-            'ended_for_all' => true,
-            'redirect_url' => $this->consultationIndexUrlForUser(),
-        ]);
-    }
-
-    private function finalizeAfterLastHumanParticipantLeaves(Consultation $consultation): JsonResponse
-    {
-        $doctorJoined = $consultation->livekit_doctor_joined_at !== null;
-        $patientJoined = $consultation->livekit_patient_joined_at !== null;
-        $shouldComplete = $doctorJoined && $patientJoined;
-        $noShowReason = match (true) {
-            $doctorJoined && ! $patientJoined => 'Consultation cancelled because the patient never joined the LiveKit room.',
-            ! $doctorJoined && $patientJoined => 'Consultation cancelled because the doctor never joined the LiveKit room.',
-            default => 'Consultation cancelled because participant attendance could not be confirmed in the LiveKit room.',
-        };
-
-        try {
-            $this->liveKitService->deleteRoom($consultation);
-        } catch (RuntimeException $exception) {
-            report($exception);
-
-            $consultation->forceFill([
-                'livekit_last_error' => $exception->getMessage(),
-            ])->save();
-        }
-
-        $consultation->forceFill([
-            'status' => $shouldComplete ? Consultation::STATUS_COMPLETED : Consultation::STATUS_CANCELLED,
-            'ended_at' => $consultation->ended_at ?? now(),
-            'cancellation_reason' => $shouldComplete ? null : $noShowReason,
-            'livekit_room_status' => 'ended',
-            'livekit_ended_at' => now(),
-            'livekit_last_activity_at' => now(),
-        ])->save();
-
-        return response()->json([
-            'message' => $shouldComplete
-                ? 'Consultation completed because the live session had already taken place.'
-                : $noShowReason,
-            'status' => $consultation->status,
-            'cancelled' => $shouldComplete === false,
-            'redirect_url' => $this->consultationIndexUrlForUser(),
-        ]);
     }
 
     private function hasHumanConsultationParticipantInRoom(Consultation $consultation): bool
     {
         $participants = $this->liveKitService->listParticipants($consultation);
-        $consultation->loadMissing('patient');
-        $patientUserId = $consultation->patient?->user_id;
+        $patientUserId = $consultation->patient()->value('user_id');
         $doctorUserId = $consultation->doctor_id;
 
         foreach ($participants as $participant) {
-            if ($doctorUserId !== null && $this->liveKitService->participantIdentityMatchesUser($participant['identity'], (int) $doctorUserId)) {
+            if ($this->participantRepresentsUser($participant['identity'], $doctorUserId)) {
                 return true;
             }
 
-            if ($patientUserId !== null && $this->liveKitService->participantIdentityMatchesUser($participant['identity'], (int) $patientUserId)) {
+            if ($patientUserId !== null && $this->participantRepresentsUser($participant['identity'], (int) $patientUserId)) {
                 return true;
             }
 
@@ -388,6 +262,11 @@ class ConsultationLiveKitController extends Controller
         }
 
         return false;
+    }
+
+    private function participantRepresentsUser(string $identity, int $userId): bool
+    {
+        return $identity === sprintf('user-%d', $userId) || $identity === (string) $userId;
     }
 
     /**
