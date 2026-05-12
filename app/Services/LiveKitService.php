@@ -288,19 +288,51 @@ class LiveKitService
 
         $serverToken = $this->issueRoomAdminToken($consultation->livekit_room_name);
 
+        // Try deletion by room name first. If that fails for reasons other
+        // than not-found, attempt a fallback using the stored room SID (if
+        // available). This improves robustness when LiveKit rejects by-name
+        // deletes but accepts SID-based deletes.
+        $deleteEndpoint = rtrim($baseUrl, '/').'/twirp/livekit.RoomService/DeleteRoom';
+
         $response = Http::acceptJson()
             ->withToken($serverToken)
             ->asJson()
-            ->post(rtrim($baseUrl, '/').'/twirp/livekit.RoomService/DeleteRoom', [
+            ->post($deleteEndpoint, [
                 'room' => $consultation->livekit_room_name,
             ]);
 
         $errorCode = (string) $response->json('code');
 
         if (! $response->successful() && ! ($response->status() === 404 || $errorCode === 'not_found')) {
-            throw new RuntimeException(
-                sprintf('LiveKit room deletion failed [%d]: %s', $response->status(), $response->body())
-            );
+            // Log original failure and attempt fallback by SID if available.
+            Log::warning('LiveKit DeleteRoom by name failed, attempting SID fallback.', [
+                'room' => $consultation->livekit_room_name,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+
+            $roomSid = $consultation->livekit_room_sid;
+
+            if ($roomSid !== null && trim((string) $roomSid) !== '') {
+                $fallbackResponse = Http::acceptJson()
+                    ->withToken($serverToken)
+                    ->asJson()
+                    ->post($deleteEndpoint, [
+                        'sid' => $roomSid,
+                    ]);
+
+                $fallbackErrorCode = (string) $fallbackResponse->json('code');
+
+                if (! $fallbackResponse->successful() && ! ($fallbackResponse->status() === 404 || $fallbackErrorCode === 'not_found')) {
+                    throw new RuntimeException(
+                        sprintf('LiveKit room deletion failed (name then sid) [%d]: %s', $fallbackResponse->status(), $fallbackResponse->body())
+                    );
+                }
+            } else {
+                throw new RuntimeException(
+                    sprintf('LiveKit room deletion failed [%d]: %s', $response->status(), $response->body())
+                );
+            }
         }
 
         $consultation->forceFill([
