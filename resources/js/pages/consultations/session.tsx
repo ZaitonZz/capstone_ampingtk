@@ -631,15 +631,27 @@ export default function ConsultationSessionPage({
                         </p>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => void leaveSession()}
-                        disabled={isLeaving}
-                    >
-                        <LogOut className="h-4 w-4" />
-                        {isLeaving ? 'Leaving...' : 'Back to Lobby'}
-                    </Button>
+                    {(() => {
+                        const isDoctor = page.props.auth?.user?.role === 'doctor';
+
+                        return (
+                            <Button
+                                variant={isDoctor ? 'destructive' : 'outline'}
+                                type="button"
+                                onClick={() => void leaveSession()}
+                                disabled={isLeaving}
+                            >
+                                <LogOut className="h-4 w-4" />
+                                {isLeaving
+                                    ? isDoctor
+                                        ? 'Ending...'
+                                        : 'Leaving...'
+                                    : isDoctor
+                                        ? 'End Consultation'
+                                        : 'Leave Session'}
+                            </Button>
+                        );
+                    })()}
                 </div>
 
                 {!livekit.enabled && (
