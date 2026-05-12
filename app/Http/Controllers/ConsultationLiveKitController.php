@@ -325,10 +325,29 @@ class ConsultationLiveKitController extends Controller
     /**
      * Handle the case where doctor ends the consultation while alone (patient not in room).
      * Mark as NO_SHOW if patient never joined, otherwise mark as CANCELLED.
+     * 
+     * If there's an error during cleanup (especially participant removal),
+     * return 202 Accepted to indicate the operation was accepted but couldn't complete.
      */
     private function endConsultationWhenDoctorAlone(Consultation $consultation): JsonResponse
     {
-        // Delete the room first - best effort.
+        // Try to remove the doctor from the room first - if this fails, return 202
+        try {
+            $this->liveKitService->removeParticipantFromConsultation($consultation, auth()->user());
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            $consultation->forceFill([
+                'livekit_last_error' => $exception->getMessage(),
+            ])->save();
+
+            // Return 202 when participant removal fails
+            return response()->json($this->leaveResponsePayload($consultation, false, [
+                'message' => 'Participant leave was accepted, but LiveKit removal could not be confirmed.',
+            ]), 202);
+        }
+
+        // Now try to delete the room - best effort
         try {
             $this->liveKitService->deleteRoom($consultation);
         } catch (RuntimeException $exception) {
