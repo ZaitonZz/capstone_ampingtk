@@ -367,6 +367,41 @@ it('prompts the doctor to confirm ending for everyone when the patient is presen
         ]);
 });
 
+it('does not require doctor confirmation when the patient is not present', function () {
+    $doctor = User::factory()->doctor()->create();
+    $patientUser = User::factory()->patient()->create();
+    $patientProfile = Patient::factory()->create(['user_id' => $patientUser->id]);
+
+    $consultation = Consultation::factory()->teleconsultation()->create([
+        'doctor_id' => $doctor->id,
+        'patient_id' => $patientProfile->id,
+        'status' => 'ongoing',
+        'livekit_room_name' => 'consultation-201-preview-no-patient',
+        'livekit_room_status' => 'room_ready',
+        'livekit_doctor_joined_at' => now()->subMinutes(10),
+        'livekit_patient_joined_at' => null,
+    ]);
+
+    Http::fake([
+        'https://livekit.test/twirp/livekit.RoomService/ListParticipants' => Http::response([
+            'participants' => [
+                ['identity' => sprintf('user-%d', $doctor->id)],
+            ],
+        ], 200),
+    ]);
+
+    $this->actingAs($doctor)
+        ->postJson(route('consultations.livekit.leave', $consultation), [
+            'preview' => true,
+        ])
+        ->assertOk()
+        ->assertJson([
+            'requires_confirmation' => false,
+            'status' => 'ongoing',
+            'cancelled' => false,
+        ]);
+});
+
 it('ends the consultation for everyone when the doctor confirms ending for all', function () {
     $doctor = User::factory()->doctor()->create();
     $patientUser = User::factory()->patient()->create();
