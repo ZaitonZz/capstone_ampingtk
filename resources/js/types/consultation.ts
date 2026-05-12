@@ -136,6 +136,10 @@ export interface Consultation {
     livekit_room_status: string | null;
     livekit_room_created_at: string | null;
     livekit_last_activity_at: string | null;
+    livekit_doctor_joined_at: string | null;
+    livekit_patient_joined_at: string | null;
+    livekit_doctor_left_at: string | null;
+    livekit_patient_left_at: string | null;
     livekit_ended_at: string | null;
     livekit_last_error: string | null;
     deepfake_verified: boolean | null;
