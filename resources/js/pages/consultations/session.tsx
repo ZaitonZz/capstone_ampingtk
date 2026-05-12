@@ -60,6 +60,8 @@ interface LiveKitLeavePayload {
     no_show?: boolean;
     redirect_url?: string;
     requires_leave_for_all_confirmation?: boolean;
+    requires_confirm_end_alone?: boolean;
+    patient_never_joined?: boolean;
 }
 
 interface Props {
@@ -330,6 +332,11 @@ export default function ConsultationSessionPage({
     const [leaveForAllMessage, setLeaveForAllMessage] = useState(
         'The patient is still in the call. End the session for everyone?',
     );
+    const [confirmEndAloneDialogOpen, setConfirmEndAloneDialogOpen] = useState(false);
+    const [confirmEndAloneMessage, setConfirmEndAloneMessage] = useState(
+        'The patient is not in the call. Mark as no-show or stay in the call?',
+    );
+    const [patientNeverJoined, setPatientNeverJoined] = useState(false);
     const effectiveDetection = liveDetection ?? deepfake_detection;
     const currentRole = page.props.auth?.user?.role;
 
@@ -539,7 +546,8 @@ export default function ConsultationSessionPage({
 
     async function leaveSession({
         leaveForAll = false,
-    }: { leaveForAll?: boolean } = {}): Promise<void> {
+        confirmEndAlone = false,
+    }: { leaveForAll?: boolean; confirmEndAlone?: boolean } = {}): Promise<void> {
         if (isLeavingRef.current) {
             return;
         }
@@ -565,7 +573,10 @@ export default function ConsultationSessionPage({
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                     credentials: 'same-origin',
-                    body: JSON.stringify({ leave_for_all: leaveForAll }),
+                    body: JSON.stringify({
+                        leave_for_all: leaveForAll,
+                        confirm_end_alone: confirmEndAlone,
+                    }),
                 });
 
                 const responsePayload = await readLeavePayload(response);
@@ -580,7 +591,25 @@ export default function ConsultationSessionPage({
                         'The patient is still in the call. End the session for everyone?',
                     );
                     setLeaveForAllDialogOpen(true);
+                    isLeavingRef.current = false;
+                    setIsLeaving(false);
+                    return;
+                }
 
+                if (
+                    response.status === 409 &&
+                    responsePayload?.requires_confirm_end_alone === true
+                ) {
+                    setConfirmEndAloneMessage(
+                        responsePayload.message ??
+                        'The patient is not in the call. Mark as no-show or stay in the call?',
+                    );
+                    setPatientNeverJoined(
+                        responsePayload.patient_never_joined ?? false,
+                    );
+                    setConfirmEndAloneDialogOpen(true);
+                    isLeavingRef.current = false;
+                    setIsLeaving(false);
                     return;
                 }
 
@@ -851,6 +880,62 @@ export default function ConsultationSessionPage({
                             disabled={isLeaving}
                         >
                             {isLeaving ? 'Ending...' : 'Leave for all'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={confirmEndAloneDialogOpen}
+                onOpenChange={setConfirmEndAloneDialogOpen}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {patientNeverJoined
+                                ? 'Mark as No-Show?'
+                                : 'End Consultation?'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {confirmEndAloneMessage}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-900">
+                        {patientNeverJoined ? (
+                            <p>
+                                Since the patient never joined, this consultation
+                                will be marked as <strong>No-Show</strong>.
+                            </p>
+                        ) : (
+                            <p>
+                                The patient joined but is no longer present. This
+                                consultation will be marked as <strong>Cancelled</strong>.
+                            </p>
+                        )}
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setConfirmEndAloneDialogOpen(false)}
+                            disabled={isLeaving}
+                        >
+                            Stay in Call
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => {
+                                setConfirmEndAloneDialogOpen(false);
+                                void leaveSession({ confirmEndAlone: true });
+                            }}
+                            disabled={isLeaving}
+                        >
+                            {isLeaving
+                                ? 'Ending...'
+                                : patientNeverJoined
+                                  ? 'Mark as No-Show'
+                                  : 'End Consultation'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

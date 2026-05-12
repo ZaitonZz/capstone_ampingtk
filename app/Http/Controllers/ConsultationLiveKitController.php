@@ -160,6 +160,7 @@ class ConsultationLiveKitController extends Controller
         }
 
         $leaveForAll = $request->boolean('leave_for_all');
+        $confirmEndAlone = $request->boolean('confirm_end_alone');
 
         // Only doctors can use leave_for_all to end the consultation for everyone.
         // Patients can disconnect (leave without leave_for_all), but cannot end the session for all.
@@ -194,7 +195,16 @@ class ConsultationLiveKitController extends Controller
             }
 
             // Doctor is leaving and patient is NOT in the room.
-            // Immediately end the consultation (no need for normal leave logic).
+            // If not confirmed, ask for confirmation. Otherwise, end the consultation.
+            if (! $confirmEndAlone) {
+                return response()->json($this->leaveResponsePayload($consultation, false, [
+                    'message' => 'The patient is not in the call. Confirm to mark as no-show or stay in the call.',
+                    'requires_confirm_end_alone' => true,
+                    'patient_never_joined' => $consultation->livekit_patient_joined_at === null,
+                ]), 409);
+            }
+
+            // Doctor confirmed to end the consultation while alone
             return $this->endConsultationWhenDoctorAlone($consultation);
         }
 
