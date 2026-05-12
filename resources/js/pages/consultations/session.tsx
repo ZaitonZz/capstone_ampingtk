@@ -541,7 +541,8 @@ export default function ConsultationSessionPage({
                 const requiresConfirmation = await requestLeavePreview();
 
                 if (requiresConfirmation === null) {
-                    toast.error('Could not check leave confirmation. Please try again.');
+                    toast.error('Could not check leave confirmation. Opening confirmation as a safe default.');
+                    setIsEndForAllDialogOpen(true);
                     return;
                 }
 
