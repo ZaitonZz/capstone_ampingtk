@@ -410,7 +410,7 @@ it('marks no-show and ends the room when the doctor leaves alone before the pati
     ]);
 
     $this->actingAs($doctor)
-        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->postJson(route('consultations.livekit.leave', $consultation), ['confirm_end_alone' => true])
         ->assertOk()
         ->assertJson([
             'status' => 'no_show',
@@ -487,7 +487,7 @@ it('returns accepted and records the LiveKit error when participant removal fail
     ]);
 
     $this->actingAs($doctor)
-        ->postJson(route('consultations.livekit.leave', $consultation))
+        ->postJson(route('consultations.livekit.leave', $consultation), ['confirm_end_alone' => true])
         ->assertAccepted()
         ->assertJson([
             'message' => 'Participant leave was accepted, but LiveKit removal could not be confirmed.',
