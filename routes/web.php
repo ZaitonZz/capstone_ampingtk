@@ -198,7 +198,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
     // Admin-specific dashboard
     Route::middleware('admin')->group(function () {
         Route::get('admin/dashboard', function () {
-            $failedLogins = ActivityLog::query()
+            $failedLogins = collect(ActivityLog::query()
                 ->where('event', 'failed_login')
                 ->with('actor:id,name,email')
                 ->latest()
@@ -216,7 +216,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                         'ip_address' => $log->ip_address,
                         'occurred_at' => $log->created_at?->toIso8601String(),
                     ];
-                });
+                }));
 
             $faceFailureGroups = ConsultationFaceVerificationLog::query()
                 ->selectRaw('user_id, verified_role, count(*) as failure_count, max(checked_at) as last_failed_at')
@@ -254,7 +254,7 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                 ->get(['id', 'name', 'email'])
                 ->keyBy('id');
 
-            $repeatedIdentityFailures = $faceFailureGroups
+            $repeatedIdentityFailures = collect($faceFailureGroups
                 ->map(function ($group) use ($identityFailureUsers): array {
                     $user = $identityFailureUsers->get($group->user_id);
 
@@ -275,8 +275,8 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                             : null,
                     ];
                 })
-                ->merge(
-                    $deepfakeFailureGroups->map(function ($group) use ($identityFailureUsers): array {
+            )->merge(
+                collect($deepfakeFailureGroups->map(function ($group) use ($identityFailureUsers): array {
                         $user = $identityFailureUsers->get($group->user_id);
 
                         return [
@@ -295,10 +295,10 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                                 ? Carbon::parse($group->last_failed_at)->toIso8601String()
                                 : null,
                         ];
-                    })
-                );
+                    }))
+            );
 
-            $unusualAccessPatterns = ActivityLog::query()
+            $unusualAccessPatterns = collect(ActivityLog::query()
                 ->where('event', 'unusual_access_pattern')
                 ->with('actor:id,name,email')
                 ->latest()
@@ -316,9 +316,9 @@ Route::middleware(['auth', 'verified', 'require-otp'])->group(function () {
                         'ip_address' => $log->ip_address,
                         'occurred_at' => $log->created_at?->toIso8601String(),
                     ];
-                });
+                }));
 
-            $activityLogs = $failedLogins
+            $activityLogs = collect($failedLogins)
                 ->merge($repeatedIdentityFailures)
                 ->merge($unusualAccessPatterns)
                 ->sortByDesc('occurred_at')
